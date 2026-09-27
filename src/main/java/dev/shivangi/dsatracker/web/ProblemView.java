@@ -1,5 +1,7 @@
 package dev.shivangi.dsatracker.web;
 
+import dev.shivangi.dsatracker.analysis.CodeLanguage;
+import dev.shivangi.dsatracker.analysis.ComplexityAnalysis;
 import dev.shivangi.dsatracker.domain.Difficulty;
 import dev.shivangi.dsatracker.domain.Problem;
 import dev.shivangi.dsatracker.repetition.SpacedRepetitionPolicy;
@@ -23,13 +25,19 @@ public record ProblemView(
         LocalDate lastReviewedOn,
         LocalDate nextDueOn,
         long overdueDays,
-        boolean mature) {
+        boolean mature,
+        String code,
+        CodeLanguage codeLanguage,
+        ComplexityAnalysis analysis,
+        boolean editable) {
 
-    public static ProblemView of(Problem p, long overdueDays) {
+    /** {@code editable}: true only on the day the problem was solved (see Problem#isEditableOn). */
+    public static ProblemView of(Problem p, long overdueDays, LocalDate today) {
         return new ProblemView(p.getId(), p.getCatalogId(), p.getName(), p.getLink(),
                 p.getLearnings(), p.getExcalidrawUrl(), p.getSolvedOn(), p.getDifficulty(),
                 p.getIntervalDays(), p.getEase(), p.getReps(), p.getLapses(),
                 p.getLastReviewedOn(), p.getNextDueOn(), overdueDays,
-                p.getIntervalDays() >= SpacedRepetitionPolicy.MATURE_DAYS);
+                p.getIntervalDays() >= SpacedRepetitionPolicy.MATURE_DAYS,
+                p.getCode(), p.getCodeLanguage(), p.analysis(), p.isEditableOn(today));
     }
 }

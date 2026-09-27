@@ -19,6 +19,9 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- Spring Boot 3.5.6 pins Testcontainers 1.21.3, which Docker Engine 29 (Docker Desktop 4.52+)
+             rejects ("client version 1.32 is too old"). 1.21.4 talks to newer Docker correctly. -->
+        <testcontainers.version>1.21.4</testcontainers.version>
     </properties>
 
     <dependencies>

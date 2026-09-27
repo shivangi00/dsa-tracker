@@ -181,6 +181,38 @@ textarea { resize: vertical; }
 .notes a:hover { text-decoration: underline; }
 .due-item .notes { grid-column: 1 / -1; margin: 0; }
 
+/* Notes: editable on the day you solve a problem, frozen afterwards */
+.editable-tag { color: var(--good); font-weight: 600; }
+.frozen-tag { display: inline-block; padding: 0 6px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-2); font-weight: 600; font-size: 11px; line-height: 17px; }
+.notes-form { display: grid; gap: 10px; margin-top: 8px; }
+.notes-form .field > span { font-size: 12px; }
+.code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.code-label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 10px 0 4px; }
+.code-head .code-label { margin: 0; }
+.lang-select { font: inherit; font-size: 12px; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.lang-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.code-input, .code-view { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12.5px; line-height: 1.55; tab-size: 4; }
+.code-input { white-space: pre; overflow-x: auto; min-height: 170px; }
+.code-view { margin: 0; padding: 10px 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 6px; overflow: auto; max-height: 360px; }
+.hint { margin: -4px 0 0; font-size: 11.5px; color: var(--ink-3); }
+.notes-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.save-status { font-size: 12px; color: var(--ink-3); }
+
+/* Complexity analysis card */
+.analysis { margin-top: 10px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+.analysis-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 28px; }
+.metric { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.metric-label { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.metric-value { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 20px; font-weight: 600; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.analysis-meta { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; color: var(--ink-3); }
+.confidence { font-weight: 600; }
+.confidence.high { color: var(--good); }
+.confidence.medium { color: var(--warning); }
+.confidence.low { color: var(--critical); }
+.analysis-why summary { cursor: pointer; font-size: 12px; font-weight: 500; color: var(--accent); margin-top: 10px; width: fit-content; }
+.analysis-why ul { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; }
+.analysis-why li + li { margin-top: 4px; }
+
 /* ------------------------------------------------------------------
    Heatmap
 ------------------------------------------------------------------- */
@@ -323,6 +355,7 @@ a.btn { text-decoration: none; display: inline-block; }
 }
 
 @media (max-width: 640px) {
+  .analysis-meta { margin-left: 0; align-items: flex-start; flex-basis: 100%; }
   .q-options { grid-template-columns: 1fr; }
   .q-step { margin-left: 0; }
   .summary-stats { grid-template-columns: 1fr 1fr; }

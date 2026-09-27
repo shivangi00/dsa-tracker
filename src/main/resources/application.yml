@@ -77,6 +77,12 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    # "Up" means the app can serve pages and reach its database. The mail server isn't part of
+    # that: a failed email is logged and the app carries on, so a mail outage (or no Mailpit in
+    # tests) mustn't mark the whole app as down and make the host refuse a deploy.
+    mail:
+      enabled: false
 
 app:
   # Every "today" in the app is computed in this zone, so midnight means midnight in London.
@@ -88,3 +94,6 @@ app:
   mail-from: ${MAIL_FROM:DSA Tracker <no-reply@dsatracker.local>}
   rate-limits-enabled: ${RATE_LIMITS_ENABLED:true}
   log-reset-links: ${LOG_RESET_LINKS:true}      # set false in production
+  # Optional. With a key, "Analyse" asks Claude; without one it uses the built-in estimate.
+  anthropic-api-key: ${ANTHROPIC_API_KEY:}
+  analysis-model: ${ANALYSIS_MODEL:claude-haiku-4-5-20251001}

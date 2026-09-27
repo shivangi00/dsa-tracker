@@ -13,6 +13,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param weeklyTargetDays study days per plan week to aim for (5 = two rest days built in)
  * @param rateLimitsEnabled limit sign-in / sign-up / reset attempts per IP (off only in tests)
  * @param logResetLinks  write reset links to the log if email fails (handy locally; off in production)
+ * @param anthropicApiKey optional: when set, "Analyse" asks Claude instead of the built-in estimate
+ * @param analysisModel  the Claude model used for analysis
  */
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(
@@ -23,5 +25,7 @@ public record AppProperties(
         String mailFrom,
         int weeklyTargetDays,
         boolean rateLimitsEnabled,
-        boolean logResetLinks) {
+        boolean logResetLinks,
+        String anthropicApiKey,
+        String analysisModel) {
 }

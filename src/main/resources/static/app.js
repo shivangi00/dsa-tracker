@@ -420,29 +420,248 @@ function catalogRow(c) {
 }
 
 let notesSeq = 0;
+const openNotes = new Set();   // problem ids whose notes panel is open, kept across reloads
 
-/** A "Notes" button and the hidden panel it opens: when you did it, what you learned, your drawing. */
+const LANGUAGES = { JAVA: 'Java', PYTHON: 'Python', JAVASCRIPT: 'JavaScript', CPP: 'C++' };
+const CONFIDENCE = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
+
+function lastLanguage() {
+  try { return localStorage.getItem('dsa.codeLanguage') || 'JAVA'; } catch { return 'JAVA'; }
+}
+function rememberLanguage(lang) {
+  try { localStorage.setItem('dsa.codeLanguage', lang); } catch { /* private mode: fine */ }
+}
+
+/**
+ * A "Notes" button and the panel it opens. On the day the problem was solved the panel is a form
+ * (notes, drawing link, code, Analyse); after that it's a read-only record, frozen.
+ */
 function notes(p) {
   const panel = el('div', 'notes');
-  panel.hidden = true;
   panel.id = `notes-${++notesSeq}`;   // the same problem can appear in Today and in the list
-  panel.append(el('p', 'notes-when',
-    `Done ${fmt(p.solvedOn)} · reviewed ${plural(p.reps + p.lapses, 'time')} · current gap ${plural(p.intervalDays, 'day')}`));
-  if (p.learnings) panel.append(el('p', 'notes-text', p.learnings));
-  if (p.excalidrawUrl) {
-    const a = el('a', '', 'Open drawing in Excalidraw ↗');
-    a.href = p.excalidrawUrl; a.target = '_blank'; a.rel = 'noopener';
-    panel.append(a);
+  panel.hidden = !openNotes.has(p.id);
+
+  const reviewed = `reviewed ${plural(p.reps + p.lapses, 'time')} · current gap ${plural(p.intervalDays, 'day')}`;
+  const when = el('p', 'notes-when');
+  if (p.editable) {
+    when.append(`Done today · ${reviewed} · `, el('span', 'editable-tag', 'Editable until midnight, then frozen'));
+  } else {
+    const lock = el('span', 'frozen-tag', 'Frozen');
+    lock.title = `Notes can only be edited on the day you solve a problem (${fmt(p.solvedOn)}).`;
+    when.append(`Done ${fmt(p.solvedOn)} · ${reviewed} · `, lock);
   }
+  panel.append(when);
+  panel.append(p.editable ? notesForm(p) : notesRecord(p));
+
   const toggle = el('button', 'btn ghost', 'Notes');
   toggle.type = 'button';
-  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-expanded', String(!panel.hidden));
   toggle.setAttribute('aria-controls', panel.id);
   toggle.addEventListener('click', () => {
     panel.hidden = !panel.hidden;
+    if (panel.hidden) openNotes.delete(p.id); else openNotes.add(p.id);
     toggle.setAttribute('aria-expanded', String(!panel.hidden));
   });
   return { toggle, panel };
+}
+
+/** Frozen notes: what you wrote on the day, your code and its analysis. */
+function notesRecord(p) {
+  const box = el('div', 'notes-record');
+  if (p.learnings) box.append(el('p', 'notes-text', p.learnings));
+  if (p.excalidrawUrl) {
+    const a = el('a', '', 'Open drawing in Excalidraw ↗');
+    a.href = p.excalidrawUrl; a.target = '_blank'; a.rel = 'noopener';
+    box.append(a);
+  }
+  if (p.code) {
+    box.append(el('p', 'code-label', `Your code · ${LANGUAGES[p.codeLanguage] || ''}`));
+    const pre = el('pre', 'code-view');
+    pre.append(el('code', '', p.code));
+    box.append(pre);
+  }
+  if (p.analysis) box.append(analysisBox(p.analysis));
+  return box;
+}
+
+/** Today's notes: editable, with a code box and Analyse. */
+function notesForm(p) {
+  const form = el('form', 'notes-form');
+  form.noValidate = true;
+  const uid = `nf-${notesSeq}`;
+
+  const learnings = el('textarea');
+  learnings.name = 'learnings'; learnings.rows = 4; learnings.maxLength = 2000; learnings.value = p.learnings || '';
+  const drawing = el('input');
+  drawing.name = 'excalidrawUrl'; drawing.type = 'url'; drawing.maxLength = 500;
+  drawing.placeholder = 'https://excalidraw.com/#json=…'; drawing.value = p.excalidrawUrl || '';
+
+  const lang = el('select', 'lang-select');
+  lang.name = 'codeLanguage';
+  lang.id = `${uid}-lang`;
+  for (const [value, label] of Object.entries(LANGUAGES)) {
+    const o = el('option', '', label);
+    o.value = value;
+    lang.append(o);
+  }
+  lang.value = p.codeLanguage || lastLanguage();
+
+  const code = el('textarea', 'code-input');
+  code.name = 'code'; code.rows = 10; code.maxLength = 10000; code.spellcheck = false;
+  code.id = `${uid}-code`;
+  code.value = p.code || '';
+  code.placeholder = 'Paste or type your solution';
+  code.setAttribute('autocapitalize', 'off');
+  code.setAttribute('autocomplete', 'off');
+  code.setAttribute('aria-describedby', `${uid}-hint`);
+  code.addEventListener('keydown', indentWithTab);
+
+  const codeHead = el('div', 'code-head');
+  const codeLabel = el('label', 'code-label', 'Your code');
+  codeLabel.htmlFor = code.id;
+  const langLabel = el('label', 'sr-only', 'Language');
+  langLabel.htmlFor = lang.id;
+  codeHead.append(codeLabel, langLabel, lang);
+  const hint = el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.');
+  hint.id = `${uid}-hint`;
+
+  const error = el('p', 'form-error');
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+  const status = el('span', 'save-status');
+  status.setAttribute('aria-live', 'polite');
+
+  const save = el('button', 'btn', 'Save');
+  save.type = 'submit';
+  const analyse = el('button', 'btn primary', 'Analyse');
+  analyse.type = 'button';
+  analyse.title = 'Estimate the time and space complexity of your code';
+  const actions = el('div', 'notes-actions');
+  actions.append(save, analyse, status);
+
+  const result = el('div', 'analysis-slot');
+  if (p.analysis) result.append(analysisBox(p.analysis));
+
+  form.append(
+    field('What you learned', learnings),
+    field('Excalidraw link', drawing, 'optional'),
+    codeHead, code, hint, error, actions, result);
+
+  const saved = () => ({
+    learnings: learnings.value.trim(),
+    excalidrawUrl: drawing.value.trim(),
+    code: code.value.trim() ? code.value : '',
+    codeLanguage: code.value.trim() ? lang.value : null,
+  });
+  let last = JSON.stringify(saved());
+  const dirty = () => JSON.stringify(saved()) !== last;
+
+  // Changing the code makes the old analysis wrong, so hide it until the next Analyse.
+  const markStale = () => { if (dirty()) result.replaceChildren(); status.textContent = dirty() ? 'Unsaved changes' : ''; };
+  [learnings, drawing, code, lang].forEach((x) => x.addEventListener('input', markStale));
+
+  async function persist() {
+    const body = saved();
+    if (!body.learnings) throw new Error('Write down what you learned.');
+    if (body.excalidrawUrl && !/^https:\/\/\S+$/.test(body.excalidrawUrl)) throw new Error('The Excalidraw link must start with https://');
+    const updated = await api(`/api/problems/${p.id}/notes`, { method: 'PATCH', body: JSON.stringify(body) });
+    last = JSON.stringify(saved());
+    if (body.codeLanguage) rememberLanguage(body.codeLanguage);
+    Object.assign(p, updated);
+    return updated;
+  }
+
+  async function run(button, work) {
+    error.hidden = true;
+    save.disabled = analyse.disabled = true;
+    const label = button.textContent;
+    button.textContent = button === analyse ? 'Analysing…' : 'Saving…';
+    try {
+      await work();
+    } catch (e) {
+      error.textContent = e.message;
+      error.hidden = false;
+      if (/frozen/i.test(e.message)) await load();   // midnight passed: show the frozen record
+    } finally {
+      button.textContent = label;
+      save.disabled = analyse.disabled = false;
+    }
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    run(save, async () => {
+      await persist();
+      status.textContent = 'Saved';
+      syncCopies(p);
+    });
+  });
+
+  analyse.addEventListener('click', () => run(analyse, async () => {
+    if (!code.value.trim()) throw new Error('Add your code first, then analyse it.');
+    if (dirty()) await persist();
+    const updated = await api(`/api/problems/${p.id}/analysis`, { method: 'POST' });
+    Object.assign(p, updated);
+    status.textContent = '';
+    result.replaceChildren(analysisBox(updated.analysis));
+    syncCopies(p);
+  }));
+
+  return form;
+}
+
+/** The same problem can be shown twice (Today and the list): refresh the data behind both. */
+function syncCopies(p) {
+  if (!state) return;
+  for (const list of [state.due, state.catalog.map((c) => c.progress).filter(Boolean)]) {
+    for (const q of list) if (q.id === p.id && q !== p) Object.assign(q, p);
+  }
+}
+
+function field(label, control, optional) {
+  const wrap = el('label', 'field');
+  const span = el('span', '', label);
+  if (optional) span.append(el('em', '', optional));
+  wrap.append(span, control);
+  return wrap;
+}
+
+/** Tab inserts four spaces in the code box; Esc then Tab leaves it, so keyboard users aren't trapped. */
+function indentWithTab(e) {
+  const box = e.currentTarget;
+  if (e.key === 'Escape') { box.dataset.tabExit = '1'; return; }
+  if (e.key !== 'Tab' || e.shiftKey || box.dataset.tabExit) { delete box.dataset.tabExit; return; }
+  e.preventDefault();
+  const { selectionStart: a, selectionEnd: b, value } = box;
+  box.value = value.slice(0, a) + '    ' + value.slice(b);
+  box.selectionStart = box.selectionEnd = a + 4;
+  box.dispatchEvent(new Event('input'));
+}
+
+/** Time and space, how sure the analysis is, and the steps behind it. */
+function analysisBox(a) {
+  const box = el('section', 'analysis');
+  box.setAttribute('aria-label', 'Complexity analysis');
+  const head = el('div', 'analysis-head');
+  const time = el('div', 'metric');
+  time.append(el('span', 'metric-label', 'Time'), el('span', 'metric-value', a.time));
+  const space = el('div', 'metric');
+  space.append(el('span', 'metric-label', 'Space'), el('span', 'metric-value', a.space));
+  const meta = el('div', 'analysis-meta');
+  meta.append(
+    el('span', `confidence ${a.confidence}`, CONFIDENCE[a.confidence] || a.confidence),
+    el('span', 'source', a.source === 'claude' ? 'Analysed by Claude' : 'Built-in estimate'));
+  head.append(time, space, meta);
+  box.append(head);
+  if (a.reasons && a.reasons.length) {
+    const details = el('details', 'analysis-why');
+    details.append(el('summary', '', 'How this was worked out'));
+    const list = el('ul');
+    for (const r of a.reasons) list.append(el('li', '', r));
+    details.append(list);
+    box.append(details);
+  }
+  return box;
 }
 
 document.querySelectorAll('input[name=show]').forEach((r) =>

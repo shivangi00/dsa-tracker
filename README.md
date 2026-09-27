@@ -102,6 +102,15 @@ Week *n* of your plan runs for 7 days from your start date. On the week's last d
 
 Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, entries outside the 150), so every LeetCode number and link is real.
 
+## Notes, code and complexity analysis
+
+- **Editable on the day, frozen after.** On the day you solve a problem, its notes panel is a form: what you learned, the Excalidraw link and your code. At midnight (London time) it freezes into a read-only record of what you understood that day. The server enforces this (409 after the day), not just the page.
+- **Your code** in Java, Python, JavaScript or C++ (up to 10,000 characters). Tab indents; Esc then Tab moves on.
+- **Analyse** estimates time and space complexity and shows how it got there, with a confidence level:
+  - **Built-in estimate** (always available, free, nothing leaves the server): reads the code's structure. Nested loops multiply; fixed loops (26 letters, 4 directions) are O(1); halving loops are O(log n); sliding windows and monotonic stacks are amortised; sort is O(n log n), heap operations O(log n). Recursion is classified as tree traversal, visit-once DFS/BFS, divide and conquer, memoised, backtracking or exponential. Space counts arrays, maps, 2-D tables and recursion depth, not the returned answer. It uses k for the size of each item (Group Anagrams is O(n·k)) and m·n for grids. Tested on 33 NeetCode solutions.
+  - **Claude** (optional): set `ANTHROPIC_API_KEY` and Analyse asks Claude instead; if Claude can't be reached, the built-in estimate answers. Limited to 50 analyses per user per day.
+- Changing the code clears its old analysis, since that analysis described different code.
+
 ## API
 
 | Method | Path | Body | Notes |
@@ -116,6 +125,8 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 | GET | `/api/dashboard` | | due reviews, memory stages, recall, study days, weekly tests, all 150 problems with your progress |
 | POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl }` | first review tomorrow |
 | POST | `/api/problems/{id}/reviews` | `{ remembered: true \| false }` | returns the new gap and due date |
+| PATCH | `/api/problems/{id}/notes` | `{ learnings, excalidrawUrl, code, codeLanguage }` | only on the day it was solved, else 409 |
+| POST | `/api/problems/{id}/analysis` | | analyses the saved code; only on the day it was solved |
 | DELETE | `/api/problems/{id}` | | undo "done" |
 | POST | `/api/tests/week/{n}` | | opens week n's test (creates it the first time); 409 before it unlocks |
 | GET | `/api/tests/{id}` | | the test; right answers only for questions you've answered |
@@ -134,10 +145,12 @@ src/main/java/dev/shivangi/dsatracker/
   repetition/    SpacedRepetitionPolicy, ScheduleState          ← the review algorithm (pure Java)
   consistency/   ConsistencyCalculator, ActivityRepository      ← study days, weekly target (pure Java + SQL)
   weekly/        TestBuilder                                    ← picks test questions (pure Java)
-  service/       AuthService, MailService, ProblemService, DashboardService, WeeklyTestService
+  analysis/      CodeStructure, HeuristicComplexityAnalyser, Cx ← the built-in complexity estimate (pure Java)
+                 ClaudeComplexityAnalyser, FallbackComplexityAnalyser  ← optional Claude, with the estimate as backup
+  service/       AuthService, MailService, ProblemService, AnalysisService, DashboardService, WeeklyTestService
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
 src/main/resources/
-  db/migration/V1…V7      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits
+  db/migration/V1…V8      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis
   static/        http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css
 src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)
 Dockerfile (Render), Dockerfile.vercel + vercel.json (Vercel), docker-compose.yml, .github/workflows/ci.yml, .env.example, DEPLOY.md
@@ -159,6 +172,8 @@ All settings are environment variables; `.env.example` has production values to 
 | `COOKIE_SECURE` | false | true (cookies only over HTTPS) |
 | `LOG_RESET_LINKS` | true | false (never write reset links to logs) |
 | `RATE_LIMITS_ENABLED` | true | true |
+| `ANTHROPIC_API_KEY` | (empty: built-in estimate) | optional: a key from console.anthropic.com makes Analyse use Claude |
+| `ANALYSIS_MODEL` | `claude-haiku-4-5-20251001` | any Claude model id |
 | `PORT`, `WEB_THREADS` | 8080, 200 | `8080` on Vercel, set by Render / leave |
 
 ## The NeetCode 150 list

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -19,6 +20,7 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,6 +43,9 @@ class ApiIntegrationTest {
 
     @Autowired
     MockMvc mvc;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     // ---------- helpers
 
@@ -154,6 +159,69 @@ class ApiIntegrationTest {
         markDone(gina, 3);
         mvc.perform(post("/api/tests/week/1").with(csrf()).cookie(gina))
                 .andExpect(status().isConflict());
+    }
+
+    // ---------- notes, code and analysis
+
+    private static final String TWO_SUM = """
+            {"learnings":"Hash map of value to index.","excalidrawUrl":"",
+             "code":"def twoSum(nums, target):\\n    seen = {}\\n    for i, n in enumerate(nums):\\n        if target - n in seen:\\n            return [seen[target - n], i]\\n        seen[n] = i\\n",
+             "codeLanguage":"PYTHON"}""";
+
+    @Test
+    void notesAndCodeCanBeEditedAndAnalysedOnTheDaySolved() throws Exception {
+        Cookie hana = signUp("hana");
+        long id = markDone(hana, 1);
+
+        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(hana)
+                        .contentType(APPLICATION_JSON).content(TWO_SUM))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.editable").value(true))
+                .andExpect(jsonPath("$.codeLanguage").value("PYTHON"))
+                .andExpect(jsonPath("$.analysis").doesNotExist());
+
+        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(hana))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.analysis.time").value("O(n)"))
+                .andExpect(jsonPath("$.analysis.space").value("O(n)"))
+                .andExpect(jsonPath("$.analysis.source").value("estimate"));
+
+        // Changing the code clears the analysis of the old code
+        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(hana)
+                        .contentType(APPLICATION_JSON).content(TWO_SUM.replace("seen[n] = i", "seen[n] = i  # done")))
+                .andExpect(jsonPath("$.analysis").doesNotExist());
+    }
+
+    @Test
+    void notesAreFrozenOnceTheDayIsOver() throws Exception {
+        Cookie ivan = signUp("ivan");
+        long id = markDone(ivan, 1);
+        // Pretend it was solved yesterday
+        jdbc.update("UPDATE problems SET solved_on = solved_on - 1, last_reviewed_on = last_reviewed_on - 1, "
+                + "next_due_on = next_due_on - 1 WHERE id = ?", id);
+
+        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(ivan)
+                        .contentType(APPLICATION_JSON).content(TWO_SUM))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("frozen")));
+        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(ivan))
+                .andExpect(status().isConflict());
+        mvc.perform(get("/api/dashboard").cookie(ivan))
+                .andExpect(jsonPath("$.catalog[0].progress.editable").value(false));
+    }
+
+    @Test
+    void analysingNeedsCodeAndOnlyYourOwnProblem() throws Exception {
+        Cookie joan = signUp("joan");   // usernames are 3–30 characters
+        Cookie kim = signUp("kim");
+        long id = markDone(joan, 1);
+        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(joan))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(kim))
+                .andExpect(status().isNotFound());
+        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(kim)
+                        .contentType(APPLICATION_JSON).content(TWO_SUM))
+                .andExpect(status().isNotFound());
     }
 
     @Test

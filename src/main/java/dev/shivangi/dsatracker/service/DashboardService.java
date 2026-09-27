@@ -109,6 +109,6 @@ public class DashboardService {
     }
 
     private ProblemView view(Problem p, LocalDate today) {
-        return ProblemView.of(p, policy.overdueDays(p.schedule(), today));
+        return ProblemView.of(p, policy.overdueDays(p.schedule(), today), today);
     }
 }

@@ -21,6 +21,10 @@ public final class RateLimitRules {
     /** Stops anyone flooding one person's inbox with reset emails. */
     public static final RateLimiter.Rule FORGOT_PER_EMAIL = new RateLimiter.Rule("forgot-email", 3, Duration.ofHours(1));
 
+    // Per user (AnalysisService)
+    /** Keeps the cost of the optional Claude analyser bounded; generous for normal use. */
+    public static final RateLimiter.Rule ANALYSES_PER_USER = new RateLimiter.Rule("analyse-user", 50, Duration.ofDays(1));
+
     private RateLimitRules() {
     }
 }
