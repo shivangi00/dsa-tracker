@@ -1,0 +1,90 @@
+# Every setting that differs between your laptop and production comes from an environment
+# variable: ${NAME:default}. The defaults are for local development; DEPLOY.md lists what to
+# set in production. Secrets never go in this file or in Git.
+
+spring:
+  lifecycle:
+    # How long a graceful shutdown waits for running requests. Under Vercel's 30-second limit.
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/dsatracker}
+    username: ${DB_USER:dsa}
+    password: ${DB_PASSWORD:dsa}
+    hikari:
+      # Connection pool: requests borrow a connection and give it back. Small pools are faster
+      # than big ones; 10 comfortably serves hundreds of concurrent users of an app like this.
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      # Production on a scale-to-zero database (Neon): set DB_MIN_IDLE=0 so idle connections
+      # close after 5 minutes and the database can sleep when nobody is using the site.
+      minimum-idle: ${DB_MIN_IDLE:10}
+      idle-timeout: 300000
+      connection-timeout: 10000
+  jpa:
+    # Flyway owns the schema; Hibernate never changes it.
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  flyway:
+    enabled: true
+    # Migrations use the app's database by default. When DB_URL points at a connection pooler
+    # (Neon's "-pooler" host), set SPRING_FLYWAY_URL to the direct URL: Spring reads it as
+    # spring.flyway.url, and Flyway reuses DB_USER / DB_PASSWORD. (Not set here, so tests keep
+    # using the database Testcontainers provides.)
+  session:
+    # Sign-ins are stored in Postgres (tables from V6), not in server memory.
+    jdbc:
+      initialize-schema: never
+      # Delete expired sessions once an hour (the default, every minute, would keep a
+      # scale-to-zero database awake all the time).
+      cleanup-cron: "0 0 * * * *"
+  # Outgoing email. Locally: Mailpit from docker-compose (read it at http://localhost:8025).
+  # Production: a real SMTP provider, e.g. Resend (smtp.resend.com, port 587, STARTTLS).
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+
+server:
+  port: ${PORT:8080}                  # hosts like Render tell the app which port to use
+  # Behind a hosting proxy, trust its X-Forwarded-* headers so the app sees https and the real
+  # visitor IP (needed for Secure cookies and per-IP rate limits).
+  forward-headers-strategy: framework
+  shutdown: graceful                  # finish in-flight requests before stopping on redeploy
+  servlet:
+    session:
+      timeout: 14d                    # stay signed in for two weeks of inactivity
+      cookie:
+        http-only: true               # JavaScript can't read the session cookie
+        same-site: strict             # other sites can't make the browser send it
+        secure: ${COOKIE_SECURE:false}   # true in production (HTTPS only)
+        max-age: 14d
+  tomcat:
+    threads:
+      max: ${WEB_THREADS:200}         # requests handled at the same time
+
+management:
+  # Only a health check is exposed: hosts poll /actuator/health to know the app is up.
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  # Every "today" in the app is computed in this zone, so midnight means midnight in London.
+  zone: Europe/London
+  plan-days: 100
+  target-problems: 150
+  weekly-target-days: 5               # study days per week to aim for; 2 rest days built in
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+  mail-from: ${MAIL_FROM:DSA Tracker <no-reply@dsatracker.local>}
+  rate-limits-enabled: ${RATE_LIMITS_ENABLED:true}
+  log-reset-links: ${LOG_RESET_LINKS:true}      # set false in production

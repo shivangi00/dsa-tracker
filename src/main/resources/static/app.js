@@ -1,0 +1,605 @@
+// Dashboard for the DSA tracker. Plain JavaScript, no build step.
+// All rules live on the server; this file only shows data and sends your answers.
+import { api } from './http.js';
+
+const $ = (id) => document.getElementById(id);
+const DAY_MS = 86_400_000;
+
+const LEVEL = { EASY: 'Easy', MEDIUM: 'Medium', HARD: 'Hard' };
+
+// ---------- dates (kept as "YYYY-MM-DD" strings, maths done in UTC so DST can't shift a day)
+const toMs = (iso) => Date.parse(iso + 'T00:00:00Z');
+const toIso = (ms) => new Date(ms).toISOString().slice(0, 10);
+const addDays = (iso, n) => toIso(toMs(iso) + n * DAY_MS);
+const diffDays = (a, b) => Math.round((toMs(b) - toMs(a)) / DAY_MS);
+const fmt = (iso, opts = { weekday: 'short', day: 'numeric', month: 'short' }) =>
+  new Intl.DateTimeFormat('en-GB', { ...opts, timeZone: 'UTC' }).format(toMs(iso));
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+let state = null;
+let openCats = null;        // categories you've opened; null = not chosen yet, use the default
+let doneTarget = null;      // the catalog item the dialog is marking done
+
+// ---------- API
+
+async function load() {
+  try {
+    state = await api('/api/dashboard');
+    render(state);
+  } catch (e) {
+    $('plan-line').textContent = `Couldn't load the dashboard: ${e.message}`;
+  }
+}
+
+// ---------- render
+function render(d) {
+  const day = Math.min(Math.max(d.dayOfPlan, 0), d.planDays);
+  $('plan-line').textContent = d.dayOfPlan < 1
+    ? `Plan starts ${fmt(d.planStart)}`
+    : `${fmt(d.today, { weekday: 'long', day: 'numeric', month: 'long' })} · Day ${day} of ${d.planDays}`;
+
+  $('who').textContent = d.username;
+  renderBanner(d);
+  renderTiles(d);
+  renderHeatmap(d);
+  renderDue(d);
+  renderTests(d);
+  renderMemory(d);
+  renderCatalog(d);
+}
+
+function renderBanner(d) {
+  const { daysAway, activeToday } = d.consistency;
+  const el = $('banner');
+  el.hidden = true;
+  if (activeToday || daysAway === 0) return;
+  // "Never miss twice": a nudge after one missed day, a warm welcome after longer. Nothing resets.
+  el.className = 'banner info';
+  el.innerHTML = daysAway === 1
+    ? '<span class="icon" aria-hidden="true">·</span><span>Missed yesterday? That\'s fine. Try not to miss twice: one review today keeps the habit going.</span>'
+    : `<span class="icon" aria-hidden="true">·</span><span>Welcome back. Nothing was reset while you were away. Your reviews waited for you, so start with just one.</span>`;
+  el.hidden = false;
+}
+
+function renderTiles(d) {
+  const h = d.consistency, c = d.counts;
+  $('longterm-count').textContent = d.memory.longTerm;
+
+  $('due-count').textContent = c.dueToday;
+  $('due-sub').innerHTML = c.overdue > 0
+    ? `<span class="alert">${c.overdue} overdue</span>`
+    : (c.dueToday === 0 ? 'All clear' : 'On time');
+
+  $('solved-count').textContent = c.done;
+  $('solved-target').textContent = `/ ${c.target}`;
+  $('solved-bar').style.width = `${Math.min(100, (c.done / c.target) * 100)}%`;
+
+  $('study-days').textContent = h.totalStudyDays;
+  $('week-sub').textContent = h.weekNumber > 0
+    ? `This week: ${h.daysThisWeek} of ${h.weeklyTarget}${h.daysThisWeek >= h.weeklyTarget ? ' ✓' : ''}`
+    : `Your plan starts ${fmt(d.planStart)}`;
+
+  $('calendar-note').textContent = plural(h.totalStudyDays, 'study day');
+}
+
+/** Memory panel: a stacked bar of problems by stage, and the recent recall rate. */
+function renderMemory(d) {
+  const m = d.memory;
+  const total = m.learning + m.strengthening + m.longTerm;
+  const stages = [
+    ['learning', 'Learning', 'gap under 1 week', m.learning],
+    ['strengthening', 'Strengthening', '1–3 weeks', m.strengthening],
+    ['longterm', 'Long-term', '3+ weeks', m.longTerm],
+  ];
+  $('mem-total').textContent = total ? plural(total, 'problem') : '';
+
+  const bar = $('stages');
+  bar.replaceChildren();
+  if (total === 0) bar.append(el('span', 'stage empty-stage'));
+  for (const [key, , , n] of stages) {
+    if (!n) continue;
+    const seg = el('span', `stage ${key}`);
+    seg.style.flexGrow = n;
+    bar.append(seg);
+  }
+  bar.setAttribute('aria-label', stages.map(([, label, , n]) => `${label}: ${n}`).join(', '));
+
+  const legend = $('stage-legend');
+  legend.replaceChildren(...stages.map(([key, label, hint, n]) => {
+    const li = el('li');
+    li.append(el('i', `swatch ${key}`), el('span', 'stage-name', label), el('span', 'stage-hint', hint), el('b', '', String(n)));
+    return li;
+  }));
+
+  const r = d.recall;
+  $('recall').textContent = r.reviews
+    ? `Remembered ${r.remembered} of ${plural(r.reviews, 'review')} in the last ${r.days} days (${Math.round((100 * r.remembered) / r.reviews)}%).`
+    : 'Your recall rate appears after your first reviews.';
+}
+
+function renderHeatmap(d) {
+  const grid = $('heatmap');
+  grid.replaceChildren();
+
+  const counts = new Map(d.activity.map((a) => [a.date, a.activities]));
+  const start = d.planStart;
+  const end = addDays(start, d.planDays - 1);
+
+  // Columns are weeks starting on Monday; pad the first week before the plan starts.
+  const mondayOffset = (new Date(toMs(start)).getUTCDay() + 6) % 7;
+  const gridStart = addDays(start, -mondayOffset);
+  const weeks = Math.ceil((mondayOffset + d.planDays) / 7);
+
+  // First column: weekday labels.
+  grid.append(el('span', 'month'));
+  ['Mon', '', 'Wed', '', 'Fri', '', ''].forEach((t) => grid.append(el('span', 'dow', t)));
+
+  let lastMonth = null;
+  let lastLabel = null;
+  for (let w = 0; w < weeks; w++) {
+    const weekStart = addDays(gridStart, w * 7);
+    // Month label above the first week that contains the 1st (or the plan start).
+    const label = el('span', 'month');
+    for (let i = 0; i < 7; i++) {
+      const iso = addDays(weekStart, i);
+      const m = iso.slice(0, 7);
+      if (iso >= start && iso <= end && m !== lastMonth) {
+        // A month with only a column or two (e.g. the plan starts late in a month)
+        // would collide with the next label, so the newer month wins.
+        if (lastLabel && w - lastLabel.week < 3) lastLabel.node.textContent = '';
+        label.textContent = fmt(iso, { month: 'short' });
+        lastMonth = m;
+        lastLabel = { node: label, week: w };
+        break;
+      }
+    }
+    grid.append(label);
+
+    for (let i = 0; i < 7; i++) {
+      const iso = addDays(weekStart, i);
+      grid.append(dayCell(iso, { start, end, today: d.today, counts }));
+    }
+  }
+}
+
+function dayCell(iso, { start, end, today, counts }) {
+  const cell = el('span', 'cell');
+  if (iso < start || iso > end) {
+    cell.classList.add('pad');
+    return cell;
+  }
+  const n = counts.get(iso) || 0;
+  const dayNo = diffDays(start, iso) + 1;
+  let text;
+
+  if (iso > today) {
+    cell.classList.add('future');
+    text = 'Upcoming';
+  } else if (n > 0) {
+    cell.classList.add(`l${Math.min(n, 4)}`);
+    text = plural(n, 'entry').replace('entrys', 'entries');
+  } else {
+    text = iso === today ? 'Nothing yet today' : 'Rest day';
+  }
+  if (iso === today) cell.classList.add('today');
+
+  const label = `${fmt(iso)} · Day ${dayNo} · ${text}`;
+  cell.setAttribute('role', 'gridcell');
+  cell.setAttribute('aria-label', label);
+  cell.tabIndex = -1;
+  cell.dataset.tip = label;
+  return cell;
+}
+
+function renderDue(d) {
+  const list = $('due-list');
+  list.replaceChildren();
+  $('today-note').textContent = d.consistency.activeToday
+    ? '✓ Studied today'
+    : 'Minimum for today: one review or one new problem';
+
+  if (d.due.length === 0) {
+    const next = allProgress(d)
+      .map((p) => p.nextDueOn)
+      .sort()[0];
+    list.append(el('li', 'empty', next
+      ? `No revisions today. Next one is on ${fmt(next)}.`
+      : 'No revisions yet. Mark a problem done to start.'));
+    return;
+  }
+
+  for (const p of d.due) {
+    const li = el('li', 'due-item');
+
+    const main = el('div');
+    const title = p.link ? el('a', 'due-title', p.name) : el('span', 'due-title', p.name);
+    if (p.link) { title.href = p.link; title.target = '_blank'; title.rel = 'noopener'; }
+    main.append(title, metaLine([
+      LEVEL[p.difficulty],
+      p.reps === 0 && p.lapses === 0 ? 'First review' : `Last gap ${plural(p.intervalDays, 'day')}`,
+      p.overdueDays > 0 ? ['overdue', `! Overdue ${plural(p.overdueDays, 'day')}`] : null,
+      p.lapses ? `Forgot ${p.lapses}×` : null,
+    ]));
+
+    // Try the problem first; your notes are one click away if you need them.
+    const { toggle, panel } = notes(p);
+
+    const answer = el('div', 'answer');
+    const yes = el('button', 'btn', 'Remembered');
+    const no = el('button', 'btn', 'Forgot');
+    yes.type = no.type = 'button';
+    yes.addEventListener('click', () => revise(p, true, [yes, no]));
+    no.addEventListener('click', () => revise(p, false, [yes, no]));
+    answer.append(yes, no);
+
+    li.append(main, toggle, answer, panel);
+    list.append(li);
+  }
+}
+
+/** "Easy · Revision 1 of 2 · ! Overdue 3 days" — parts may be text or [className, text]. */
+function metaLine(parts) {
+  const line = el('div', 'meta');
+  parts.filter(Boolean).forEach((part, i) => {
+    if (i > 0) line.append(el('span', 'sep', '·'));
+    line.append(Array.isArray(part) ? el('span', part[0], part[1]) : document.createTextNode(part));
+  });
+  return line;
+}
+
+// ---------- weekly tests
+function renderTests(d) {
+  const list = $('test-list');
+  list.replaceChildren();
+  if (d.weeklyTests.length === 0) {
+    const firstEnd = addDays(d.planStart, 6);
+    list.append(el('li', 'empty', d.today > firstEnd
+      ? 'Mark problems done during a week and its test appears here at the end of that week.'
+      : `Your first test unlocks on ${fmt(firstEnd)}, the last day of week 1.`));
+    return;
+  }
+  for (const t of d.weeklyTests) {
+    const li = el('li', 'test-row');
+    const main = el('div');
+    main.append(el('div', 'test-title', `Week ${t.weekNumber}`),
+      el('div', 'meta', `${fmt(t.weekStart, { day: 'numeric', month: 'short' })} – ${fmt(t.weekEnd, { day: 'numeric', month: 'short' })} · ${plural(t.problemsDone, 'problem')} done`));
+
+    const side = el('div', 'test-side');
+    if (t.status === 'UPCOMING') {
+      side.append(el('span', 'status', `Unlocks ${fmt(t.weekEnd)}`));
+    } else if (t.status === 'AVAILABLE') {
+      const btn = el('button', 'btn primary', 'Take test');
+      btn.type = 'button';
+      btn.addEventListener('click', () => startTest(t.weekNumber, btn));
+      side.append(btn);
+    } else {
+      const summary = t.status === 'COMPLETED'
+        ? `Patterns ${t.patternsRight}/${t.items} · Solved ${t.solved}/${t.items}${t.withHint ? ` (+${t.withHint} with a hint)` : ''}`
+        : `${t.answered} of ${t.items} answered`;
+      side.append(el('span', 'status', summary));
+      const a = el('a', 'btn', t.status === 'COMPLETED' ? 'Review' : 'Continue');
+      a.href = `/test.html?id=${t.testId}`;
+      side.append(a);
+    }
+    li.append(main, side);
+    list.append(li);
+  }
+}
+
+async function startTest(week, btn) {
+  btn.disabled = true;
+  try {
+    const test = await api(`/api/tests/week/${week}`, { method: 'POST' });
+    location.href = `/test.html?id=${test.id}`;
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false;
+  }
+}
+
+// ---------- NeetCode 150 checklist
+function allProgress(d) {
+  return [...d.catalog.map((c) => c.progress).filter(Boolean), ...d.earlierEntries];
+}
+
+function renderCatalog(d) {
+  const root = $('catalog');
+  root.replaceChildren();
+
+  const done = d.catalog.filter((c) => c.progress).length;
+  $('catalog-summary').textContent = `${done} done · ${d.catalog.length - done} to do`;
+
+  const show = document.querySelector('input[name=show]:checked').value;
+  const query = $('catalog-search').value.trim().toLowerCase();
+  const visible = (c) =>
+    (show === 'all' || (show === 'done') === Boolean(c.progress)) &&
+    (!query || c.name.toLowerCase().includes(query));
+
+  // Group in roadmap order; the server already sends the list in that order.
+  const groups = new Map();
+  for (const c of d.catalog) {
+    if (!groups.has(c.category)) groups.set(c.category, []);
+    groups.get(c.category).push(c);
+  }
+
+  // By default, open the first category that still has work in it.
+  if (openCats === null) {
+    const first = [...groups].find(([, items]) => items.some((c) => !c.progress));
+    openCats = new Set(first ? [first[0]] : []);
+  }
+
+  let shown = 0;
+  for (const [category, items] of groups) {
+    const rows = items.filter(visible);
+    if (rows.length === 0) continue;
+    shown += rows.length;
+    const doneHere = items.filter((c) => c.progress).length;
+    root.append(categoryBlock(category, doneHere, items.length, rows.map(catalogRow),
+      query !== '' || openCats.has(category)));
+  }
+
+  // Problems logged by hand before the NeetCode list existed.
+  const earlier = d.earlierEntries.filter((p) => show !== 'todo' &&
+    (!query || p.name.toLowerCase().includes(query)));
+  if (earlier.length) {
+    shown += earlier.length;
+    root.append(categoryBlock('Earlier entries', earlier.length, earlier.length,
+      earlier.map((p) => catalogRow({ id: null, name: p.name, url: p.link,
+        difficulty: p.initialDifficulty, progress: p })),
+      query !== '' || openCats.has('Earlier entries')));
+  }
+
+  if (shown === 0) root.append(el('p', 'empty', 'No problems match.'));
+}
+
+function categoryBlock(name, doneCount, total, rows, open) {
+  const box = el('details', 'cat');
+  box.open = open;
+  const summary = el('summary');
+  summary.append(el('span', 'cat-name', name), el('span', 'cat-count', `${doneCount} / ${total}`));
+  const bar = el('span', 'cat-bar');
+  bar.setAttribute('aria-hidden', 'true');
+  const fill = el('span', 'cat-bar-fill');
+  fill.style.width = `${(doneCount / total) * 100}%`;
+  bar.append(fill);
+  summary.append(bar);
+  box.append(summary);
+  const list = el('ul', 'cat-list');
+  list.append(...rows);
+  box.append(list);
+  box.addEventListener('toggle', () => {
+    if (box.open) openCats.add(name); else openCats.delete(name);
+  });
+  return box;
+}
+
+function catalogRow(c) {
+  const p = c.progress;
+  const li = el('li', p ? 'row done' : 'row');
+
+  const mark = el('span', 'check', p ? '✓' : '');
+  mark.setAttribute('aria-hidden', 'true');
+
+  const title = el('a', 'row-title', c.name);
+  title.href = c.url; title.target = '_blank'; title.rel = 'noopener';
+  title.title = c.name;
+
+  // Level and status: their own columns on wide screens, one line under the title on phones.
+  const sub = el('div', 'sub');
+  sub.append(el('span', 'level', LEVEL[c.difficulty]));
+  let status;
+  if (!p) status = el('span', 'status', '');
+  else if (p.overdueDays > 0) status = el('span', 'status overdue', `! Overdue ${plural(p.overdueDays, 'day')}`);
+  else if (p.nextDueOn === state.today) status = el('span', 'status', 'Review today');
+  else if (p.mature) status = el('span', 'status mastered', `✓ Next ${fmt(p.nextDueOn)}`);
+  else status = el('span', 'status', `Next ${fmt(p.nextDueOn)}`);
+  if (p) status.title = `Remembered ${plural(p.reps, 'time')}, forgot ${plural(p.lapses, 'time')}. Current gap ${plural(p.intervalDays, 'day')}.`;
+  sub.append(status);
+
+  const actions = el('div', 'actions');
+  let panel = null;
+  if (!p) {
+    const btn = el('button', 'btn link', 'Mark done');
+    btn.type = 'button';
+    btn.addEventListener('click', () => openDone(c));
+    actions.append(btn);
+  } else {
+    const n = notes(p);
+    panel = n.panel;
+    const undo = el('button', 'btn icon', '✕');
+    undo.type = 'button';
+    undo.title = `Undo "${c.name}"`;
+    undo.setAttribute('aria-label', `Undo ${c.name}`);
+    undo.addEventListener('click', () => remove(p));
+    actions.append(n.toggle, undo);
+  }
+
+  li.append(mark, title, sub, actions);
+  if (panel) li.append(panel);
+  return li;
+}
+
+let notesSeq = 0;
+
+/** A "Notes" button and the hidden panel it opens: when you did it, what you learned, your drawing. */
+function notes(p) {
+  const panel = el('div', 'notes');
+  panel.hidden = true;
+  panel.id = `notes-${++notesSeq}`;   // the same problem can appear in Today and in the list
+  panel.append(el('p', 'notes-when',
+    `Done ${fmt(p.solvedOn)} · reviewed ${plural(p.reps + p.lapses, 'time')} · current gap ${plural(p.intervalDays, 'day')}`));
+  if (p.learnings) panel.append(el('p', 'notes-text', p.learnings));
+  if (p.excalidrawUrl) {
+    const a = el('a', '', 'Open drawing in Excalidraw ↗');
+    a.href = p.excalidrawUrl; a.target = '_blank'; a.rel = 'noopener';
+    panel.append(a);
+  }
+  const toggle = el('button', 'btn ghost', 'Notes');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', panel.id);
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+  });
+  return { toggle, panel };
+}
+
+document.querySelectorAll('input[name=show]').forEach((r) =>
+  r.addEventListener('change', () => state && renderCatalog(state)));
+$('catalog-search').addEventListener('input', () => state && renderCatalog(state));
+
+// ---------- actions
+async function revise(p, remembered, buttons) {
+  buttons.forEach((b) => (b.disabled = true));
+  try {
+    const updated = await api(`/api/problems/${p.id}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify({ remembered }),
+    });
+    const when = `${plural(updated.intervalDays, 'day')} (${fmt(updated.nextDueOn)})`;
+    toast(remembered ? `Nice. Next review in ${when}.` : `No problem. You'll see it again in ${when} to relearn it.`);
+    await load();
+  } catch (e) {
+    toast(e.message);
+    buttons.forEach((b) => (b.disabled = false));
+  }
+}
+
+async function remove(p) {
+  if (!confirm(`Undo "${p.name}"? Your notes and revision history for it will be deleted.`)) return;
+  try {
+    await api(`/api/problems/${p.id}`, { method: 'DELETE' });
+    await load();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+// ---------- "Mark done" dialog
+const dialog = $('done-dialog');
+const doneForm = $('done-form');
+
+function openDone(c) {
+  doneTarget = c;
+  doneForm.reset();
+  $('done-error').hidden = true;
+  $('done-title').textContent = c.name;
+  $('done-meta').textContent =
+    `${LEVEL[c.difficulty]} · first review tomorrow, ${fmt(addDays(state.today, 1))}. The gaps then grow as you remember it.`;
+  dialog.showModal();
+  doneForm.learnings.focus();
+}
+
+$('done-cancel').addEventListener('click', () => dialog.close());
+
+doneForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const err = $('done-error');
+  err.hidden = true;
+  const learnings = doneForm.learnings.value.trim();
+  const excalidrawUrl = doneForm.excalidrawUrl.value.trim();
+
+  if (!learnings) {
+    err.textContent = 'Write down what you learned before marking it done.';
+    err.hidden = false;
+    return;
+  }
+  if (excalidrawUrl && !/^https:\/\/\S+$/.test(excalidrawUrl)) {
+    err.textContent = 'The Excalidraw link must start with https://';
+    err.hidden = false;
+    return;
+  }
+
+  const btn = $('done-save');
+  btn.disabled = true;
+  try {
+    const saved = await api(`/api/catalog/${doneTarget.id}/done`, {
+      method: 'POST',
+      body: JSON.stringify({ learnings, excalidrawUrl }),
+    });
+    dialog.close();
+    toast(`Done. First review tomorrow, ${fmt(saved.nextDueOn)}.`);
+    await load();
+  } catch (e) {
+    err.textContent = e.message;
+    err.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- account: settings and sign out
+const settings = $('settings-dialog');
+const settingsForm = $('settings-form');
+
+$('open-settings').addEventListener('click', () => {
+  if (!state) return;
+  settingsForm.startDate.value = state.planStart;
+  $('settings-meta').textContent = `Signed in as ${state.username}`;
+  $('settings-error').hidden = true;
+  settings.showModal();
+});
+$('settings-cancel').addEventListener('click', () => settings.close());
+
+settingsForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const err = $('settings-error');
+  err.hidden = true;
+  if (!settingsForm.startDate.value) {
+    err.textContent = 'Pick a start date.';
+    err.hidden = false;
+    return;
+  }
+  try {
+    await api('/api/me', { method: 'PATCH', body: JSON.stringify({ startDate: settingsForm.startDate.value }) });
+    settings.close();
+    toast(`Start date set to ${fmt(settingsForm.startDate.value)}.`);
+    await load();
+  } catch (e) {
+    err.textContent = e.message;
+    err.hidden = false;
+  }
+});
+
+$('sign-out').addEventListener('click', async () => {
+  await api('/api/auth/signout', { method: 'POST' }).catch(() => {});
+  location.href = '/auth.html#signin';
+});
+
+// ---------- heatmap tooltip (mouse + keyboard)
+const tip = $('tooltip');
+const heatmap = $('heatmap');
+function showTip(cell) {
+  if (!cell?.dataset.tip) return hideTip();
+  const card = heatmap.closest('.card').getBoundingClientRect();
+  const r = cell.getBoundingClientRect();
+  tip.textContent = cell.dataset.tip;
+  tip.style.left = `${r.left - card.left + r.width / 2}px`;
+  tip.style.top = `${r.top - card.top}px`;
+  tip.hidden = false;
+}
+function hideTip() { tip.hidden = true; }
+heatmap.addEventListener('mouseover', (e) => showTip(e.target.closest('.cell')));
+heatmap.addEventListener('mouseleave', hideTip);
+heatmap.addEventListener('focusin', (e) => showTip(e.target.closest('.cell')));
+heatmap.addEventListener('focusout', hideTip);
+
+// ---------- helpers
+function el(tag, cls = '', text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), 3500);
+}
+
+load();

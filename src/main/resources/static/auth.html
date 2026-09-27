@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · DSA Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="auth-page">
+<main class="auth">
+  <h1>DSA Tracker</h1>
+  <p class="auth-tagline">NeetCode 150 with adaptive spaced repetition and weekly pattern tests.</p>
+
+  <!-- Sign up / Sign in toggle (hidden on the forgot and reset views) -->
+  <div class="seg auth-tabs" role="tablist" id="tabs">
+    <label><input type="radio" name="tab" value="signup" checked><span>Sign up</span></label>
+    <label><input type="radio" name="tab" value="signin"><span>Sign in</span></label>
+  </div>
+
+  <p class="auth-note" id="note" role="status" hidden></p>
+
+  <!-- Sign up -->
+  <form class="auth-form" id="signup" novalidate>
+    <label class="field">
+      <span>Username</span>
+      <input name="username" autocomplete="username" maxlength="30" required
+             pattern="[A-Za-z0-9_.\-]{3,30}" placeholder="3–30 letters, numbers, _ . -">
+      <small class="hint" id="username-hint"></small>
+    </label>
+    <label class="field">
+      <span>Email</span>
+      <input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="you@example.com">
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+      <small class="hint">At least 8 characters</small>
+    </label>
+    <label class="field">
+      <span>Confirm password</span>
+      <input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+      <small class="hint" id="match-hint"></small>
+    </label>
+    <label class="field">
+      <span>Start date</span>
+      <input name="startDate" type="date" required>
+      <small class="hint">Day 1 of your 100-day plan. You can change it later.</small>
+    </label>
+    <p class="form-error" role="alert" hidden></p>
+    <button type="submit" class="btn primary block">Create account</button>
+  </form>
+
+  <!-- Sign in -->
+  <form class="auth-form" id="signin" novalidate hidden>
+    <label class="field">
+      <span>Username</span>
+      <input name="username" autocomplete="username" required>
+    </label>
+    <label class="field">
+      <span class="field-row">Password <a href="#" id="to-forgot">Forgot password?</a></span>
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <p class="form-error" role="alert" hidden></p>
+    <button type="submit" class="btn primary block">Sign in</button>
+  </form>
+
+  <!-- Forgot password -->
+  <form class="auth-form" id="forgot" novalidate hidden>
+    <h2>Reset your password</h2>
+    <p class="auth-help">Enter the email you signed up with. We'll send a link that works for 30 minutes.</p>
+    <label class="field">
+      <span>Email</span>
+      <input name="email" type="email" autocomplete="email" required>
+    </label>
+    <p class="form-error" role="alert" hidden></p>
+    <button type="submit" class="btn primary block">Send reset link</button>
+    <a href="#" class="back" data-back>Back to sign in</a>
+  </form>
+
+  <!-- Reset password (opened from the emailed link) -->
+  <form class="auth-form" id="reset" novalidate hidden>
+    <h2>Choose a new password</h2>
+    <label class="field">
+      <span>New password</span>
+      <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+      <small class="hint">At least 8 characters</small>
+    </label>
+    <label class="field">
+      <span>Confirm new password</span>
+      <input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+    </label>
+    <p class="form-error" role="alert" hidden></p>
+    <button type="submit" class="btn primary block">Set new password</button>
+    <a href="#" class="back" data-back>Back to sign in</a>
+  </form>
+</main>
+<script src="auth.js" type="module"></script>
+</body>
+</html>

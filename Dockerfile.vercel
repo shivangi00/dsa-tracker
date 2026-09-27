@@ -1,0 +1,26 @@
+# Vercel builds and runs this file (see DEPLOY.md, "Option B: Vercel").
+# Same two stages as Dockerfile, tuned to start fast: Vercel stops the app after 5 idle minutes,
+# so the next visitor waits for a fresh start.
+
+# ---- build ----
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /src
+COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
+COPY src ./src
+RUN mvn -B -q package -DskipTests
+
+# ---- run ----
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+RUN useradd --system --uid 10001 app
+COPY --from=build /src/target/dsa-tracker-*.jar app.jar
+USER app
+# Vercel sends traffic to $PORT. Also set PORT=8080 in the Vercel project's settings.
+ENV PORT=8080
+EXPOSE 8080
+# Start-up speed over peak speed:
+#   TieredStopAtLevel=1  only the quick JIT compiler (less start-up CPU, which Vercel bills)
+#   UseSerialGC          the simplest collector, right for 1 vCPU
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
