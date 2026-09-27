@@ -1,11 +1,11 @@
-// Sign up, sign in, forgot password and reset password, on one page.
+// Sign up, sign in and password recovery (with a recovery code), on one page.
 // The server repeats every check here; these only give faster feedback.
 import { api as request } from './http.js';
 
 const api = (path, options) => request(path, options, { redirectOn401: false });
 
 const $ = (id) => document.getElementById(id);
-const forms = ['signup', 'signin', 'forgot', 'reset'];
+const forms = ['signup', 'signin', 'recover', 'code'];
 const USERNAME = /^[A-Za-z0-9_.-]{3,30}$/;
 
 
@@ -17,7 +17,8 @@ function show(view, note) {
     document.querySelector(`input[name=tab][value=${view}]`).checked = true;
   }
   setNote(note);
-  document.title = `${view === 'signup' ? 'Sign up' : view === 'signin' ? 'Sign in' : 'Reset password'} · DSA Tracker`;
+  const titles = { signup: 'Sign up', signin: 'Sign in', recover: 'Reset password', code: 'Your recovery code' };
+  document.title = `${titles[view]} · DSA Tracker`;
   const first = $(view).querySelector('input');
   if (first) first.focus();
 }
@@ -48,9 +49,9 @@ async function submitting(form, work) {
 
 document.querySelectorAll('input[name=tab]').forEach((r) =>
   r.addEventListener('change', () => show(r.value)));
-$('to-forgot').addEventListener('click', (e) => { e.preventDefault(); show('forgot'); });
+$('to-forgot').addEventListener('click', (e) => { e.preventDefault(); show('recover'); });
 document.querySelectorAll('[data-back]').forEach((a) =>
-  a.addEventListener('click', (e) => { e.preventDefault(); history.replaceState(null, '', '/auth.html'); show('signin'); }));
+  a.addEventListener('click', (e) => { e.preventDefault(); show('signin'); }));
 
 // ---------- sign up
 const signup = $('signup');
@@ -100,23 +101,22 @@ signup.addEventListener('submit', (ev) => {
   ev.preventDefault();
   const f = signup;
   if (!USERNAME.test(f.username.value.trim())) return showError(f, 'Choose a username of 3–30 letters, numbers, _ . or -');
-  if (!f.email.checkValidity()) return showError(f, 'Enter a valid email address');
   if (f.password.value.length < 8) return showError(f, 'Passwords are at least 8 characters');
   if (f.password.value !== f.confirmPassword.value) return showError(f, 'The passwords don’t match');
   if (!f.startDate.value) return showError(f, 'Pick a start date');
 
   submitting(f, async () => {
-    await api('/api/auth/signup', {
+    const { me, recoveryCode } = await api('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify({
         username: f.username.value.trim(),
-        email: f.email.value.trim(),
         password: f.password.value,
         confirmPassword: f.confirmPassword.value,
         startDate: f.startDate.value,
       }),
     });
-    location.href = '/';
+    f.reset();
+    showCode(me.username, recoveryCode, false);
   });
 });
 
@@ -136,44 +136,83 @@ signin.addEventListener('submit', (ev) => {
   });
 });
 
-// ---------- forgot password
-const forgot = $('forgot');
-forgot.addEventListener('submit', (ev) => {
+// ---------- forgot password: username + recovery code + new password
+const recover = $('recover');
+recover.addEventListener('submit', (ev) => {
   ev.preventDefault();
-  if (!forgot.email.checkValidity() || !forgot.email.value) return showError(forgot, 'Enter a valid email address');
-  submitting(forgot, async () => {
-    const { message } = await api('/api/auth/forgot', {
+  const f = recover;
+  if (!f.username.value.trim()) return showError(f, 'Enter your username');
+  if (f.recoveryCode.value.replace(/[\s-]/g, '').length !== 16) return showError(f, 'Recovery codes have 16 letters and numbers, like K7QM-2XPA-9RTB-HW4N');
+  if (f.password.value.length < 8) return showError(f, 'Passwords are at least 8 characters');
+  if (f.password.value !== f.confirmPassword.value) return showError(f, 'The passwords don’t match');
+  submitting(f, async () => {
+    const { me, recoveryCode } = await api('/api/auth/recover', {
       method: 'POST',
-      body: JSON.stringify({ email: forgot.email.value.trim() }),
+      body: JSON.stringify({
+        username: f.username.value.trim(),
+        recoveryCode: f.recoveryCode.value.trim(),
+        password: f.password.value,
+        confirmPassword: f.confirmPassword.value,
+      }),
     });
-    forgot.reset();
-    show('signin', message);
+    f.reset();
+    showCode(me.username, recoveryCode, true);
   });
 });
 
-// ---------- reset password (from the emailed link: /auth.html?reset=TOKEN)
-const reset = $('reset');
-const token = new URLSearchParams(location.search).get('reset');
-reset.addEventListener('submit', (ev) => {
+// ---------- the recovery code, shown once
+const codeForm = $('code');
+let shownCode = '';
+let shownFor = '';
+
+function showCode(username, code, afterRecovery) {
+  shownCode = code;
+  shownFor = username;
+  $('code-value').textContent = code;
+  $('code-title').textContent = afterRecovery ? 'Password changed. Here’s your new recovery code' : 'Save your recovery code';
+  $('code-help').textContent = afterRecovery
+    ? 'Your old code no longer works, and any other devices were signed out. Save this new code: it’s shown only now.'
+    : 'If you ever forget your password, this code and your username let you set a new one. It’s shown only now.';
+  $('code-saved').checked = false;
+  $('code-continue').disabled = true;
+  show('code');
+}
+
+$('code-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(shownCode);
+    $('code-copy').textContent = 'Copied ✓';
+    setTimeout(() => ($('code-copy').textContent = 'Copy'), 2000);
+  } catch {
+    // No clipboard access: select the text so it can be copied by hand
+    const range = document.createRange();
+    range.selectNodeContents($('code-value'));
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+  }
+});
+
+$('code-download').addEventListener('click', () => {
+  const text = `DSA Tracker recovery code\n\nUsername: ${shownFor}\nRecovery code: ${shownCode}\n\n`
+    + `If you forget your password: on the sign-in page choose "Forgot password?" and enter these.\n`
+    + `The code works once; you'll get a new one when you use it.\n`;
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `dsa-tracker-recovery-code-${shownFor}.txt`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+$('code-saved').addEventListener('change', (e) => { $('code-continue').disabled = !e.target.checked; });
+codeForm.addEventListener('submit', (ev) => {
   ev.preventDefault();
-  if (reset.password.value.length < 8) return showError(reset, 'Passwords are at least 8 characters');
-  if (reset.password.value !== reset.confirmPassword.value) return showError(reset, 'The passwords don’t match');
-  submitting(reset, async () => {
-    await api('/api/auth/reset', {
-      method: 'POST',
-      body: JSON.stringify({ token, password: reset.password.value, confirmPassword: reset.confirmPassword.value }),
-    });
-    history.replaceState(null, '', '/auth.html');   // drop the token from the address bar
-    reset.reset();
-    show('signin', 'Password updated. Sign in with your new password.');
-  });
+  if ($('code-saved').checked) location.href = '/';
 });
 
 // ---------- start
-if (token) {
-  show('reset');
-} else {
-  // Already signed in? Go straight to the tracker.
-  fetch('/api/me').then((r) => { if (r.ok) location.href = '/'; }).catch(() => {});
-  show(location.hash === '#signin' ? 'signin' : 'signup');
-}
+// Already signed in? Go straight to the tracker.
+fetch('/api/me').then((r) => { if (r.ok) location.href = '/'; }).catch(() => {});
+show(location.hash === '#signin' ? 'signin' : location.hash === '#forgot' ? 'recover' : 'signup');

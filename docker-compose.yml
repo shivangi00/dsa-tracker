@@ -1,4 +1,4 @@
-# Local services for development. Start both with: docker compose up -d
+# Local database for development. Start it with: docker compose up -d
 services:
   db:
     image: postgres:16
@@ -11,24 +11,16 @@ services:
     volumes:
       - dsa-data:/var/lib/postgresql/data
 
-  # Catches every email the app sends. Read them at http://localhost:8025
-  mail:
-    image: axllent/mailpit:latest
-    ports:
-      - "1025:1025"     # SMTP: the app sends here
-      - "8025:8025"     # web inbox
-
   # Optional: run the app itself in Docker too (no Java or Maven needed on your machine):
   #   docker compose --profile app up --build
   app:
     profiles: ["app"]
     build: .
-    depends_on: [db, mail]
+    depends_on: [db]
     ports:
       - "8080:8080"
     environment:
       DB_URL: jdbc:postgresql://db:5432/dsatracker    # inside Docker, the database is "db"
-      MAIL_HOST: mail
 
 volumes:
   dsa-data:

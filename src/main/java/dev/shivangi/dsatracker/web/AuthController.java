@@ -1,6 +1,5 @@
 package dev.shivangi.dsatracker.web;
 
-import dev.shivangi.dsatracker.domain.AppUser;
 import dev.shivangi.dsatracker.security.AuthUser;
 import dev.shivangi.dsatracker.security.RateLimitRules;
 import dev.shivangi.dsatracker.security.RateLimiter;
@@ -9,7 +8,6 @@ import dev.shivangi.dsatracker.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
@@ -27,13 +25,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
 
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Map;
 
 /**
- * Public account endpoints (no sign-in needed). Sign-out is handled by Spring Security at
+ * Public account endpoints (no sign-in needed): sign up, sign in, recover with a recovery code. Sign-out is handled by Spring Security at
  * POST /api/auth/signout (see SecurityConfig).
  */
 @RestController
@@ -44,14 +44,17 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository contextRepository;
     private final RateLimiter limiter;
+    private final FindByIndexNameSessionRepository<? extends Session> sessions;
     private final SecurityContextHolderStrategy contextHolder = SecurityContextHolder.getContextHolderStrategy();
 
     public AuthController(AuthService auth, AuthenticationManager authenticationManager,
-                          SecurityContextRepository contextRepository, RateLimiter limiter) {
+                          SecurityContextRepository contextRepository, RateLimiter limiter,
+                          FindByIndexNameSessionRepository<? extends Session> sessions) {
         this.auth = auth;
         this.authenticationManager = authenticationManager;
         this.contextRepository = contextRepository;
         this.limiter = limiter;
+        this.sessions = sessions;
     }
 
     /** Per-account limits: they hold even if an attacker uses many IP addresses. */
@@ -64,7 +67,6 @@ public class AuthController {
 
     public record SignUpRequest(
             @NotBlank @Size(max = 30) String username,
-            @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(max = 72) String password,
             @NotBlank @Size(max = 72) String confirmPassword,
             LocalDate startDate) {
@@ -73,10 +75,16 @@ public class AuthController {
     public record SignInRequest(@NotBlank String username, @NotBlank String password) {
     }
 
-    public record ForgotRequest(@NotBlank @Email String email) {
+    /** Forgot password: username + recovery code + the new password twice. */
+    public record RecoverRequest(
+            @NotBlank @Size(max = 30) String username,
+            @NotBlank @Size(max = 40) String recoveryCode,
+            @NotBlank @Size(max = 72) String password,
+            @NotBlank @Size(max = 72) String confirmPassword) {
     }
 
-    public record ResetRequest(@NotBlank String token, @NotBlank String password, @NotBlank String confirmPassword) {
+    /** The account plus its recovery code, which is shown once and never again. */
+    public record WithCodeView(MeView me, String recoveryCode) {
     }
 
     /** Live check while typing on the sign-up form. */
@@ -85,15 +93,15 @@ public class AuthController {
         return Map.of("available", auth.isUsernameAvailable(username));
     }
 
-    /** Creates the account and signs straight in. */
+    /** Creates the account, signs straight in, and returns the recovery code to show once. */
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
-    public MeView signUp(@Valid @RequestBody SignUpRequest req,
-                         HttpServletRequest request, HttpServletResponse response) {
-        AppUser user = auth.signUp(new AuthService.SignUp(
-                req.username(), req.email(), req.password(), req.confirmPassword(), req.startDate()));
-        startSession(user.getUsername(), req.password(), request, response);
-        return MeView.of(user);
+    public WithCodeView signUp(@Valid @RequestBody SignUpRequest req,
+                               HttpServletRequest request, HttpServletResponse response) {
+        AuthService.WithCode created = auth.signUp(new AuthService.SignUp(
+                req.username(), req.password(), req.confirmPassword(), req.startDate()));
+        startSession(created.user().getUsername(), req.password(), request, response);
+        return new WithCodeView(MeView.of(created.user()), created.recoveryCode());
     }
 
     /** Wrong username or password → 401 (see ApiExceptionHandler). */
@@ -106,19 +114,21 @@ public class AuthController {
         return MeView.of(auth.get(id));
     }
 
-    /** Always 202 with the same message, whether or not the email has an account. */
-    @PostMapping("/forgot")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    public Map<String, String> forgot(@Valid @RequestBody ForgotRequest req) {
-        limit(RateLimitRules.FORGOT_PER_EMAIL, req.email());
-        auth.requestPasswordReset(req.email());
-        return Map.of("message", "If that email has an account, a reset link is on its way. It expires in 30 minutes.");
-    }
-
-    @PostMapping("/reset")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void reset(@Valid @RequestBody ResetRequest req) {
-        auth.resetPassword(req.token(), req.password(), req.confirmPassword());
+    /**
+     * Forgot password. On success: the password is changed, the code is replaced by a new one,
+     * every existing sign-in for this account is ended (in case someone else was signed in),
+     * and this browser is signed in with the new password.
+     */
+    @PostMapping("/recover")
+    public WithCodeView recover(@Valid @RequestBody RecoverRequest req,
+                                HttpServletRequest request, HttpServletResponse response) {
+        limit(RateLimitRules.RECOVER_PER_ACCOUNT, req.username());
+        AuthService.WithCode recovered = auth.recover(
+                req.username(), req.recoveryCode(), req.password(), req.confirmPassword());
+        String username = recovered.user().getUsername();
+        sessions.findByPrincipalName(username).keySet().forEach(sessions::deleteById);
+        startSession(username, req.password(), request, response);
+        return new WithCodeView(MeView.of(recovered.user()), recovered.recoveryCode());
     }
 
     /**

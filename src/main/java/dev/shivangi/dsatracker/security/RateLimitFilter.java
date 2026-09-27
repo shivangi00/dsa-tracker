@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * Limits how often one client (IP address) can hit the public account endpoints. This slows
- * down password guessing, mass sign-ups, and using "forgot password" to spam someone's inbox.
+ * down password guessing, mass sign-ups, and guessing recovery codes.
  *
  * <p>The client IP comes from {@code request.getRemoteAddr()}. Behind a hosting proxy,
  * {@code server.forward-headers-strategy: framework} makes that the visitor's address from
@@ -25,8 +25,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final Map<String, RateLimiter.Rule> RULES = Map.of(
             "POST /api/auth/signin", RateLimitRules.SIGNIN_PER_IP,
             "POST /api/auth/signup", RateLimitRules.SIGNUP_PER_IP,
-            "POST /api/auth/forgot", RateLimitRules.FORGOT_PER_IP,
-            "POST /api/auth/reset", RateLimitRules.RESET_PER_IP,
+            "POST /api/auth/recover", RateLimitRules.RECOVER_PER_IP,
             "GET /api/auth/username-available", RateLimitRules.USERNAME_CHECK_PER_IP);
 
     private final RateLimiter limiter;

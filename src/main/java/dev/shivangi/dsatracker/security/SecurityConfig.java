@@ -24,7 +24,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *
  * <ul>
  *   <li>Pages, scripts, styles and {@code /actuator/health} are public (they hold no data).</li>
- *   <li>{@code /api/auth/**} (sign up, sign in, forgot/reset password) is public.</li>
+ *   <li>{@code /api/auth/**} (sign up, sign in, recover with a recovery code) is public.</li>
  *   <li>Every other {@code /api/**} call needs a signed-in session, or it gets 401.</li>
  * </ul>
  *
@@ -35,7 +35,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
  *
  * <p><b>Headers.</b> A Content-Security-Policy lets pages load scripts and styles only from this
  * site (a strong defence against injected scripts); frames are refused (clickjacking); no
- * Referer is sent, so password-reset links in the address bar never leak to other sites.
+ * Referer is sent, so page addresses never leak to other sites.
  */
 @Configuration
 @EnableWebSecurity

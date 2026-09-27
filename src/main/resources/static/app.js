@@ -26,6 +26,7 @@ async function load() {
   try {
     state = await api('/api/dashboard');
     render(state);
+    if (!load.checkedRecovery) { load.checkedRecovery = true; checkRecoveryCode(); }
   } catch (e) {
     $('plan-line').textContent = `Couldn't load the dashboard: ${e.message}`;
   }
@@ -752,14 +753,66 @@ doneForm.addEventListener('submit', async (ev) => {
 const settings = $('settings-dialog');
 const settingsForm = $('settings-form');
 
-$('open-settings').addEventListener('click', () => {
+let hasRecoveryCode = true;   // assume yes until /api/me says otherwise, so the reminder never flashes
+
+async function checkRecoveryCode() {
+  try {
+    const me = await api('/api/me');
+    hasRecoveryCode = me.hasRecoveryCode;
+  } catch { /* the dashboard already shows load errors */ }
+  $('rc-banner').hidden = hasRecoveryCode;
+}
+
+function openSettings() {
   if (!state) return;
   settingsForm.startDate.value = state.planStart;
   $('settings-meta').textContent = `Signed in as ${state.username}`;
   $('settings-error').hidden = true;
+  $('rc-status').textContent = hasRecoveryCode
+    ? 'If you forget your password, your username and recovery code let you set a new one. Lost the code? Make a new one; the old one then stops working.'
+    : 'You don’t have a recovery code yet. Make one now so you can reset your password if you ever forget it.';
+  $('rc-create').hidden = false;
+  $('rc-result').hidden = true;
+  $('rc-error').hidden = true;
+  $('rc-password').value = '';
   settings.showModal();
-});
+}
+$('open-settings').addEventListener('click', openSettings);
+$('rc-banner-open').addEventListener('click', () => { openSettings(); $('rc-password').focus(); });
 $('settings-cancel').addEventListener('click', () => settings.close());
+
+async function createRecoveryCode() {
+  const err = $('rc-error');
+  err.hidden = true;
+  const password = $('rc-password').value;
+  if (!password) { err.textContent = 'Enter your current password.'; err.hidden = false; return; }
+  $('rc-button').disabled = true;
+  try {
+    const { recoveryCode } = await api('/api/me/recovery-code', { method: 'POST', body: JSON.stringify({ password }) });
+    $('rc-code').textContent = recoveryCode;
+    $('rc-status').textContent = 'Here’s your new recovery code.';
+    $('rc-create').hidden = true;
+    $('rc-result').hidden = false;
+    hasRecoveryCode = true;
+    $('rc-banner').hidden = true;
+  } catch (e) {
+    err.textContent = e.message;
+    err.hidden = false;
+  } finally {
+    $('rc-button').disabled = false;
+    $('rc-password').value = '';
+  }
+}
+$('rc-button').addEventListener('click', createRecoveryCode);
+// Enter in the password box makes the code instead of saving the start date
+$('rc-password').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); createRecoveryCode(); } });
+$('rc-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('rc-code').textContent);
+    $('rc-copy').textContent = 'Copied ✓';
+    setTimeout(() => ($('rc-copy').textContent = 'Copy'), 2000);
+  } catch { /* select-and-copy by hand still works */ }
+});
 
 settingsForm.addEventListener('submit', async (ev) => {
   ev.preventDefault();

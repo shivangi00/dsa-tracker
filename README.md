@@ -9,18 +9,15 @@ A minimalist tracker for working through the **NeetCode 150**, for any number of
 You need Java 21, Maven and Docker.
 
 ```bash
-docker compose up -d          # Postgres on localhost:5433 and Mailpit (email catcher)
+docker compose up -d          # Postgres on localhost:5433
 mvn spring-boot:run           # starts the app; Flyway creates and upgrades the tables
 ```
 
 - App: http://localhost:8080 (you'll land on the sign-up page)
-- Emails the app sends (password resets): http://localhost:8025
 - Tests: `mvn test` (the integration tests start a throwaway Postgres in Docker, so Docker must be running)
 - No Java on your machine? `docker compose --profile app up --build` runs the app in Docker too
 
-**Forgot password locally:** the email goes to Mailpit's inbox at http://localhost:8025, which only exists while `docker compose up -d` is running. If Mailpit isn't running, the reset link is printed in the app's log instead. Real inboxes need a real email provider; see [DEPLOY.md](DEPLOY.md).
-
-**Hosting it for other people:** see [DEPLOY.md](DEPLOY.md) (GitHub → Neon Postgres → Resend email → Vercel, or Render).
+**Hosting it for other people:** see [DEPLOY.md](DEPLOY.md) (GitHub → Neon Postgres → Vercel, or Render). No email service or domain needed.
 
 The **first account** you create takes over any problems logged before accounts existed.
 
@@ -28,9 +25,10 @@ The **first account** you create takes over any problems logged before accounts 
 
 | Feature | How it works |
 | --- | --- |
-| Sign up | Username (3–30 letters, numbers, `_ . -`; checked live as you type; not case-sensitive), email, password (8–72 characters) typed twice, start date |
+| Sign up | Username (3–30 letters, numbers, `_ . -`; checked live as you type; not case-sensitive), password (8–72 characters) typed twice, start date. Then a **recovery code** is shown once, with Copy and Download buttons |
 | Sign in | Username + password. Signs you in with a session cookie that lasts 14 days |
-| Forgot password | Enter your email; if it has an account, a link is emailed. The link works once, for 30 minutes |
+| Forgot password | Username + recovery code + new password. The code works once: using it sets the new password, issues a new code and signs the account out everywhere else. No email needed |
+| Recovery code | 16 characters like `K7QM-2XPA-9RTB-HW4N` (80 random bits, no look-alike letters; case, spaces and dashes don't matter). Settings → **Create a new recovery code** replaces it (asks for the password). Accounts without one see a reminder |
 | Start date | Chosen at sign-up, changeable under **Settings**. It's day 1 of your heatmap; days before it never count as absent |
 | Privacy | Every query is filtered by the signed-in user, so nobody sees anyone else's data |
 
@@ -38,13 +36,14 @@ The **first account** you create takes over any problems logged before accounts 
 
 | Threat | Defence |
 | --- | --- |
-| Stolen database | Passwords hashed with BCrypt; reset tokens stored only as SHA-256 hashes; sessions hold no password or hash |
-| Password guessing, sign-up spam, reset-email spam | Per-IP limits (sign in 10 per 5 min, sign up 5/hour, forgot 5/hour, reset 10/hour) plus per-account limits that hold even across many IPs (20 sign-ins per account per hour, 3 reset emails per inbox per hour). 429 + `Retry-After`. Counts are shared in Postgres |
+| Stolen database | Passwords and recovery codes are stored only as BCrypt hashes; sessions hold no password or hash |
+| Password or recovery-code guessing, sign-up spam | Per-IP limits (sign in 10 per 5 min, sign up 5/hour, recover 10/hour) plus per-account limits that hold even across many IPs (20 sign-ins and 5 recovery attempts per account per hour). 429 + `Retry-After`. Counts are shared in Postgres |
+| Someone else signed in with a stolen password | Recovering the account ends every existing session for it |
 | Another site submitting forms as you (CSRF) | Every POST/PATCH/DELETE needs an `X-XSRF-TOKEN` header matching the `XSRF-TOKEN` cookie, plus `SameSite=Strict` cookies |
 | Injected scripts (XSS) | Content-Security-Policy allows scripts and styles only from this site; the UI builds the page with `textContent`, never raw HTML from users |
 | Clickjacking | `frame-ancestors 'none'` |
 | Session fixation / theft | New session id at sign-in; cookie is `HttpOnly`, `SameSite=Strict`, `Secure` in production |
-| Finding out who has an account | "Forgot password" answers the same way, just as fast (email sent in the background), whether or not the email exists |
+| Finding out who has an account | "Forgot password" gives the same error, in the same time, for an unknown username as for a wrong code |
 | Seeing other people's data | Every query is filtered by the signed-in user id; another user's id gets 404, never 403 |
 | Leaked secrets | No secrets in the repo; everything comes from environment variables (`.env.example` lists them) |
 
@@ -55,7 +54,6 @@ The **first account** you create takes over any problems logged before accounts 
 - **Optimistic locking.** Problems, tests, test items and users carry a `version` column. If two tabs change the same row at once, the second save gets 409 "reload and try again" instead of silently overwriting.
 - **Database rules as the last line.** Unique indexes (username, one catalog problem per user) and CHECK constraints catch races that the Java checks can't; they surface as 409.
 - **Idempotent actions.** Marking a problem done twice or reviewing twice in a day is refused, so double-clicks and retries are harmless.
-- **Slow work off the request thread.** Emails are sent asynchronously.
 - **Graceful shutdown.** In-flight requests finish before a deploy stops the old copy.
 - **Pooled database connections.** In production the app connects through Neon's connection pooler, so many app copies don't exhaust the database's connections; migrations use a direct connection.
 
@@ -116,12 +114,12 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 | Method | Path | Body | Notes |
 | --- | --- | --- | --- |
 | GET | `/api/auth/username-available?username=x` | | `{ available }` |
-| POST | `/api/auth/signup` | `{ username, email, password, confirmPassword, startDate }` | 201, signs you in |
+| POST | `/api/auth/signup` | `{ username, password, confirmPassword, startDate }` | 201 `{ me, recoveryCode }`, signs you in |
 | POST | `/api/auth/signin` | `{ username, password }` | 401 "Wrong username or password" |
 | POST | `/api/auth/signout` | | 204 |
-| POST | `/api/auth/forgot` | `{ email }` | always 202 |
-| POST | `/api/auth/reset` | `{ token, password, confirmPassword }` | 204, or 400 if the link is invalid/expired |
-| GET / PATCH | `/api/me` | `{ startDate }` | your account |
+| POST | `/api/auth/recover` | `{ username, recoveryCode, password, confirmPassword }` | `{ me, recoveryCode }` (the new code); signs out other sessions and signs you in; 400 if they don't match |
+| GET / PATCH | `/api/me` | `{ startDate }` | your account: `{ username, startDate, hasRecoveryCode }` |
+| POST | `/api/me/recovery-code` | `{ password }` | `{ recoveryCode }`: a new code; the old one stops working |
 | GET | `/api/dashboard` | | due reviews, memory stages, recall, study days, weekly tests, all 150 problems with your progress |
 | POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl }` | first review tomorrow |
 | POST | `/api/problems/{id}/reviews` | `{ remembered: true \| false }` | returns the new gap and due date |
@@ -139,18 +137,18 @@ Everything except `/api/auth/**` needs a signed-in session (otherwise 401). Erro
 
 ```
 src/main/java/dev/shivangi/dsatracker/
-  security/      SecurityConfig, CsrfCookieFilter, RateLimiter, DatabaseRateLimiter, RateLimitRules, RateLimitFilter, AuthUser
+  security/      SecurityConfig, CsrfCookieFilter, RateLimiter, DatabaseRateLimiter, RateLimitRules, RateLimitFilter, RecoveryCodes, AuthUser
   domain/        AppUser, CatalogProblem, Pattern, PracticeProblem, Problem, RevisionAttempt,
-                 WeeklyTest, WeeklyTestItem, PasswordResetToken, repositories
+                 WeeklyTest, WeeklyTestItem, repositories
   repetition/    SpacedRepetitionPolicy, ScheduleState          ← the review algorithm (pure Java)
   consistency/   ConsistencyCalculator, ActivityRepository      ← study days, weekly target (pure Java + SQL)
   weekly/        TestBuilder                                    ← picks test questions (pure Java)
   analysis/      CodeStructure, HeuristicComplexityAnalyser, Cx ← the built-in complexity estimate (pure Java)
                  ClaudeComplexityAnalyser, FallbackComplexityAnalyser  ← optional Claude, with the estimate as backup
-  service/       AuthService, MailService, ProblemService, AnalysisService, DashboardService, WeeklyTestService
+  service/       AuthService, ProblemService, AnalysisService, DashboardService, WeeklyTestService
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
 src/main/resources/
-  db/migration/V1…V8      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis
+  db/migration/V1…V9      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes
   static/        http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css
 src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)
 Dockerfile (Render), Dockerfile.vercel + vercel.json (Vercel), docker-compose.yml, .github/workflows/ci.yml, .env.example, DEPLOY.md
@@ -165,12 +163,7 @@ All settings are environment variables; `.env.example` has production values to 
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | Docker Postgres on localhost:5433 | Neon's pooled address, with `?sslmode=require` |
 | `SPRING_FLYWAY_URL` | (same as `DB_URL`) | Neon's direct address, for migrations |
 | `DB_POOL_SIZE`, `DB_MIN_IDLE` | 10, 10 | 3 on Vercel / 5 on Render, and 0 (lets a scale-to-zero database sleep) |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | Mailpit on localhost:1025 | `smtp.resend.com`, 587, `resend`, your API key |
-| `MAIL_SMTP_AUTH`, `MAIL_STARTTLS` | false | true |
-| `MAIL_FROM` | `DSA Tracker <no-reply@dsatracker.local>` | an address on your verified domain |
-| `APP_BASE_URL` | http://localhost:8080 | your public URL (used in reset links) |
 | `COOKIE_SECURE` | false | true (cookies only over HTTPS) |
-| `LOG_RESET_LINKS` | true | false (never write reset links to logs) |
 | `RATE_LIMITS_ENABLED` | true | true |
 | `ANTHROPIC_API_KEY` | (empty: built-in estimate) | optional: a key from console.anthropic.com makes Analyse use Claude |
 | `ANALYSIS_MODEL` | `claude-haiku-4-5-20251001` | any Claude model id |
@@ -185,4 +178,5 @@ All settings are environment variables; `.env.example` has production values to 
 1. **Deploy** it: [DEPLOY.md](DEPLOY.md).
 2. **Package by feature** (optional refactor): group code as `auth/`, `problems/`, `reviews/`, `tests/` instead of by layer once the app grows.
 3. **Wake-up time** on Vercel: if it becomes a problem, try Spring Boot's class-data sharing (CDS) or move to an always-on instance.
-4. **Account deletion and data export** (useful for GDPR, since UK users' emails are personal data).
+4. **Account deletion and data export** (useful for GDPR).
+5. **Password reset by email** as well as recovery codes, once there's a domain to send from.

@@ -65,17 +65,19 @@ class RateLimitIntegrationTest {
     }
 
     @Test
-    void oneInboxGetsAtMostThreeResetEmailsAnHourWhateverTheAddress() throws Exception {
-        for (int i = 0; i < 3; i++) {
+    void oneAccountGetsAtMostFiveRecoveryAttemptsAnHourWhateverTheAddress() throws Exception {
+        String body = "{\"username\":\"victim\",\"recoveryCode\":\"AAAA-BBBB-CCCC-DDDD\","
+                + "\"password\":\"password123\",\"confirmPassword\":\"password123\"}";
+        for (int i = 0; i < 5; i++) {
             String ip = "198.51.100." + i;   // a different address every time
-            mvc.perform(post("/api/auth/forgot").with(csrf()).contentType(APPLICATION_JSON)
+            mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
                             .with(r -> { r.setRemoteAddr(ip); return r; })
-                            .content("{\"email\":\"victim@example.com\"}"))
-                    .andExpect(status().isAccepted());
+                            .content(body))
+                    .andExpect(status().isBadRequest());
         }
-        mvc.perform(post("/api/auth/forgot").with(csrf()).contentType(APPLICATION_JSON)
+        mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
                         .with(r -> { r.setRemoteAddr("198.51.100.99"); return r; })
-                        .content("{\"email\":\"Victim@Example.com\"}"))
+                        .content(body.replace("victim", "Victim")))
                 .andExpect(status().isTooManyRequests());
     }
 

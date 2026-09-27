@@ -71,7 +71,7 @@ public class DatabaseRateLimiter implements RateLimiter {
         return decision;
     }
 
-    /** SHA-256 of "rule:key", so the table never holds a raw IP address or email. */
+    /** SHA-256 of "rule:key", so the table never holds a raw IP address or username. */
     static String bucket(Rule rule, String key) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")

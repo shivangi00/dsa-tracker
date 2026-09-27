@@ -6,12 +6,12 @@ import dev.shivangi.dsatracker.analysis.ComplexityAnalyser;
 import dev.shivangi.dsatracker.analysis.FallbackComplexityAnalyser;
 import dev.shivangi.dsatracker.analysis.HeuristicComplexityAnalyser;
 import dev.shivangi.dsatracker.consistency.ConsistencyCalculator;
+import dev.shivangi.dsatracker.security.RecoveryCodes;
 import dev.shivangi.dsatracker.repetition.SpacedRepetitionPolicy;
 import dev.shivangi.dsatracker.weekly.TestBuilder;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableAsync;
 
 import java.time.Clock;
 import java.time.ZoneId;
@@ -19,7 +19,6 @@ import java.util.Random;
 
 @Configuration
 @EnableConfigurationProperties(AppProperties.class)
-@EnableAsync   // lets MailService send emails in the background
 public class AppConfig {
 
     /**
@@ -39,6 +38,11 @@ public class AppConfig {
     @Bean
     public ConsistencyCalculator consistencyCalculator() {
         return new ConsistencyCalculator();
+    }
+
+    @Bean
+    public RecoveryCodes recoveryCodes() {
+        return new RecoveryCodes();
     }
 
     @Bean

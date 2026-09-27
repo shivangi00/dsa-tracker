@@ -15,7 +15,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -49,19 +52,38 @@ class ApiIntegrationTest {
 
     // ---------- helpers
 
-    /** Signs up a new user and returns their session cookie. */
-    private Cookie signUp(String username) throws Exception {
+    /** A signed-up user: their session cookie and the recovery code shown at sign-up. */
+    private record NewUser(Cookie session, String recoveryCode) {
+    }
+
+    private NewUser signUpWithCode(String username) throws Exception {
         MvcResult result = mvc.perform(post("/api/auth/signup").with(csrf())
                         .contentType(APPLICATION_JSON)
                         .content("""
-                                {"username":"%s","email":"%s@example.com",
-                                 "password":"password123","confirmPassword":"password123"}
-                                """.formatted(username, username)))
+                                {"username":"%s","password":"password123","confirmPassword":"password123"}
+                                """.formatted(username)))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.me.hasRecoveryCode").value(true))
                 .andReturn();
         Cookie session = result.getResponse().getCookie("SESSION");
         assertNotNull(session, "sign-up should start a session");
-        return session;
+        String code = JsonPath.read(result.getResponse().getContentAsString(), "$.recoveryCode");
+        return new NewUser(session, code);
+    }
+
+    /** Signs up a new user and returns their session cookie. */
+    private Cookie signUp(String username) throws Exception {
+        return signUpWithCode(username).session();
+    }
+
+    private static String recoverBody(String username, String code, String newPassword) {
+        return """
+                {"username":"%s","recoveryCode":"%s","password":"%s","confirmPassword":"%s"}
+                """.formatted(username, code, newPassword, newPassword);
+    }
+
+    private static String signInBody(String username, String password) {
+        return "{\"username\":\"%s\",\"password\":\"%s\"}".formatted(username, password);
     }
 
     /** Marks NeetCode problem {@code catalogId} done and returns the new problem's id. */
@@ -103,8 +125,7 @@ class ApiIntegrationTest {
         signUp("erin");
         mvc.perform(post("/api/auth/signup").with(csrf()).contentType(APPLICATION_JSON)
                         .content("""
-                                {"username":"ERIN","email":"other@example.com",
-                                 "password":"password123","confirmPassword":"password123"}
+                                {"username":"ERIN","password":"password123","confirmPassword":"password123"}
                                 """))
                 .andExpect(status().isConflict());
         mvc.perform(get("/api/auth/username-available").param("username", "Erin"))
@@ -159,6 +180,84 @@ class ApiIntegrationTest {
         markDone(gina, 3);
         mvc.perform(post("/api/tests/week/1").with(csrf()).cookie(gina))
                 .andExpect(status().isConflict());
+    }
+
+    // ---------- recovery codes (forgot password without email)
+
+    @Test
+    void theRecoveryCodeSetsANewPasswordAndIsReplaced() throws Exception {
+        NewUser lena = signUpWithCode("lena");
+        assertTrue(lena.recoveryCode().matches("[0-9A-Z]{4}(-[0-9A-Z]{4}){3}"));
+
+        // Typed in lower case with spaces: still accepted
+        String typed = lena.recoveryCode().toLowerCase().replace("-", " ");
+        String body = mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(recoverBody("LENA", typed, "brand-new-pass")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.me.username").value("lena"))
+                .andReturn().getResponse().getContentAsString();
+        String newCode = JsonPath.read(body, "$.recoveryCode");
+        assertNotEquals(lena.recoveryCode(), newCode);
+
+        // The old code is used up; the new password works; the old one doesn't
+        mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(recoverBody("lena", lena.recoveryCode(), "another-pass-1")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/signin").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(signInBody("lena", "brand-new-pass")))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/auth/signin").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(signInBody("lena", "password123")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void recoverySignsOutEveryOtherSession() throws Exception {
+        NewUser moe = signUpWithCode("moe");   // usernames are 3–30 characters
+        mvc.perform(get("/api/dashboard").cookie(moe.session())).andExpect(status().isOk());
+
+        mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(recoverBody("moe", moe.recoveryCode(), "brand-new-pass")))
+                .andExpect(status().isOk());
+
+        // Whoever was signed in with the old password (maybe someone who stole it) is out
+        mvc.perform(get("/api/dashboard").cookie(moe.session())).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void aWrongCodeAndAnUnknownUserGetTheSameAnswer() throws Exception {
+        signUp("nia");
+        String wrongCode = mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(recoverBody("nia", "AAAA-BBBB-CCCC-DDDD", "brand-new-pass")))
+                .andExpect(status().isBadRequest())
+                .andReturn().getResponse().getContentAsString();
+        String unknownUser = mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(recoverBody("nobody-here", "AAAA-BBBB-CCCC-DDDD", "brand-new-pass")))
+                .andExpect(status().isBadRequest())
+                .andReturn().getResponse().getContentAsString();
+        String wrongCodeMessage = JsonPath.read(wrongCode, "$.detail");
+        String unknownUserMessage = JsonPath.read(unknownUser, "$.detail");
+        assertEquals(wrongCodeMessage, unknownUserMessage);
+    }
+
+    @Test
+    void aNewCodeFromSettingsNeedsThePasswordAndReplacesTheOldOne() throws Exception {
+        NewUser omar = signUpWithCode("omar");
+        mvc.perform(post("/api/me/recovery-code").with(csrf()).cookie(omar.session()).contentType(APPLICATION_JSON)
+                        .content("{\"password\":\"wrong-password\"}"))
+                .andExpect(status().isBadRequest());
+        String body = mvc.perform(post("/api/me/recovery-code").with(csrf()).cookie(omar.session()).contentType(APPLICATION_JSON)
+                        .content("{\"password\":\"password123\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String fresh = JsonPath.read(body, "$.recoveryCode");
+
+        mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(recoverBody("omar", omar.recoveryCode(), "brand-new-pass")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/auth/recover").with(csrf()).contentType(APPLICATION_JSON)
+                        .content(recoverBody("omar", fresh, "brand-new-pass")))
+                .andExpect(status().isOk());
     }
 
     // ---------- notes, code and analysis

@@ -19,6 +19,11 @@
   </header>
 
   <div id="banner" class="banner" role="status" hidden></div>
+  <div id="rc-banner" class="banner warning" role="status" hidden>
+    <span class="icon" aria-hidden="true">!</span>
+    <span>You don't have a recovery code yet. Without one, a forgotten password can't be reset.</span>
+    <button type="button" class="btn link banner-action" id="rc-banner-open">Create one</button>
+  </div>
 
   <!-- Four headline numbers in one quiet row -->
   <!-- Four headline numbers. None of them can drop to zero because of a missed day. -->
@@ -145,6 +150,25 @@
       <input name="startDate" type="date" required>
       <small class="hint">Day 1 of your 100-day plan. Days before it never count as absent.</small>
     </label>
+    <section class="settings-section" aria-labelledby="rc-title">
+      <h3 id="rc-title">Recovery code</h3>
+      <p class="hint" id="rc-status"></p>
+      <div class="rc-create" id="rc-create">
+        <label class="field">
+          <span>Current password</span>
+          <input id="rc-password" type="password" autocomplete="current-password">
+        </label>
+        <button type="button" class="btn" id="rc-button">Create a new recovery code</button>
+      </div>
+      <div id="rc-result" hidden>
+        <div class="recovery-code" id="rc-code"></div>
+        <div class="code-actions">
+          <button type="button" class="btn" id="rc-copy">Copy</button>
+        </div>
+        <p class="hint">Save it now: it won't be shown again. Your previous code no longer works.</p>
+      </div>
+      <p class="form-error" id="rc-error" role="alert" hidden></p>
+    </section>
     <p class="form-error" id="settings-error" role="alert" hidden></p>
     <div class="dialog-actions">
       <button type="button" class="btn ghost" id="settings-cancel">Cancel</button>

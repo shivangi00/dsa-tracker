@@ -26,7 +26,7 @@ public class AppUser {
     @Column(nullable = false)
     private String username;
 
-    @Column(nullable = false)
+    /** Only on accounts made before V9, when sign-up asked for it. */
     private String email;
 
     /** A BCrypt hash. The password itself is never stored. */
@@ -36,19 +36,31 @@ public class AppUser {
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
+    /** BCrypt hash of the one-time recovery code; null until one is made. */
+    @Column(name = "recovery_code_hash")
+    private String recoveryCodeHash;
+
     protected AppUser() {
         // for JPA
     }
 
-    public AppUser(String username, String email, String passwordHash, LocalDate startDate) {
+    public AppUser(String username, String passwordHash, LocalDate startDate) {
         this.username = username;
-        this.email = email;
         this.passwordHash = passwordHash;
         this.startDate = startDate;
     }
 
     public void changePasswordHash(String newHash) {
         this.passwordHash = newHash;
+    }
+
+    /** Replaces the recovery code: the old one stops working. */
+    public void replaceRecoveryCodeHash(String newHash) {
+        this.recoveryCodeHash = newHash;
+    }
+
+    public boolean hasRecoveryCode() {
+        return recoveryCodeHash != null;
     }
 
     public void changeStartDate(LocalDate newStart) {
@@ -60,4 +72,5 @@ public class AppUser {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public LocalDate getStartDate() { return startDate; }
+    public String getRecoveryCodeHash() { return recoveryCodeHash; }
 }

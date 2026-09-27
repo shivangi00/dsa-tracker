@@ -11,7 +11,7 @@
   <h1>DSA Tracker</h1>
   <p class="auth-tagline">NeetCode 150 with adaptive spaced repetition and weekly pattern tests.</p>
 
-  <!-- Sign up / Sign in toggle (hidden on the forgot and reset views) -->
+  <!-- Sign up / Sign in toggle (hidden on the recover and recovery-code views) -->
   <div class="seg auth-tabs" role="tablist" id="tabs">
     <label><input type="radio" name="tab" value="signup" checked><span>Sign up</span></label>
     <label><input type="radio" name="tab" value="signin"><span>Sign in</span></label>
@@ -26,10 +26,6 @@
       <input name="username" autocomplete="username" maxlength="30" required
              pattern="[A-Za-z0-9_.\-]{3,30}" placeholder="3–30 letters, numbers, _ . -">
       <small class="hint" id="username-hint"></small>
-    </label>
-    <label class="field">
-      <span>Email</span>
-      <input name="email" type="email" autocomplete="email" maxlength="254" required placeholder="you@example.com">
     </label>
     <label class="field">
       <span>Password</span>
@@ -64,22 +60,19 @@
     <button type="submit" class="btn primary block">Sign in</button>
   </form>
 
-  <!-- Forgot password -->
-  <form class="auth-form" id="forgot" novalidate hidden>
+  <!-- Forgot password: username + recovery code + new password -->
+  <form class="auth-form" id="recover" novalidate hidden>
     <h2>Reset your password</h2>
-    <p class="auth-help">Enter the email you signed up with. We'll send a link that works for 30 minutes.</p>
+    <p class="auth-help">Use the recovery code you saved when you signed up. It works once; you'll get a new one straight after.</p>
     <label class="field">
-      <span>Email</span>
-      <input name="email" type="email" autocomplete="email" required>
+      <span>Username</span>
+      <input name="username" autocomplete="username" maxlength="30" required>
     </label>
-    <p class="form-error" role="alert" hidden></p>
-    <button type="submit" class="btn primary block">Send reset link</button>
-    <a href="#" class="back" data-back>Back to sign in</a>
-  </form>
-
-  <!-- Reset password (opened from the emailed link) -->
-  <form class="auth-form" id="reset" novalidate hidden>
-    <h2>Choose a new password</h2>
+    <label class="field">
+      <span>Recovery code</span>
+      <input name="recoveryCode" class="code-field" autocomplete="off" autocapitalize="characters" spellcheck="false"
+             maxlength="40" required placeholder="XXXX-XXXX-XXXX-XXXX">
+    </label>
     <label class="field">
       <span>New password</span>
       <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
@@ -91,7 +84,25 @@
     </label>
     <p class="form-error" role="alert" hidden></p>
     <button type="submit" class="btn primary block">Set new password</button>
+    <p class="auth-help small">Lost your code too? Without it the password can't be reset. If you're still signed in somewhere, make a new code in Settings.</p>
     <a href="#" class="back" data-back>Back to sign in</a>
+  </form>
+
+  <!-- Shown once, after sign-up or a recovery: the recovery code to save -->
+  <form class="auth-form" id="code" novalidate hidden>
+    <h2 id="code-title">Save your recovery code</h2>
+    <p class="auth-help" id="code-help">If you ever forget your password, this code and your username let you set a new one. It's shown only now.</p>
+    <div class="recovery-code" id="code-value" aria-live="polite"></div>
+    <div class="code-actions">
+      <button type="button" class="btn" id="code-copy">Copy</button>
+      <button type="button" class="btn" id="code-download">Download as a file</button>
+    </div>
+    <p class="auth-help small">Keep it somewhere safe that isn't this browser: a password manager, or a note on your phone.</p>
+    <label class="confirm-check">
+      <input type="checkbox" id="code-saved">
+      <span>I've saved my recovery code</span>
+    </label>
+    <button type="submit" class="btn primary block" id="code-continue" disabled>Continue to the tracker</button>
   </form>
 </main>
 <script src="auth.js" type="module"></script>
