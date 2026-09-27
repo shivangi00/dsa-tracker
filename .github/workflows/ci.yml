@@ -1,0 +1,24 @@
+# Runs on every push and pull request: compiles, runs the unit tests, and runs the integration
+# tests against a real Postgres (Testcontainers uses the Docker that GitHub's runners provide).
+# A red cross on GitHub means something broke; Render only deploys what you push to main.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build and test
+        run: mvn -B verify
+      - name: Check the Docker image builds
+        run: docker build -t dsa-tracker .

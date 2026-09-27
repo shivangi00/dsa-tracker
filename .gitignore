@@ -3,3 +3,7 @@ target/
 *.iml
 .vscode/
 .DS_Store
+# Secrets: never commit these
+.env
+.env.*
+!.env.example
