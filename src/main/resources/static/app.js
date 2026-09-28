@@ -654,6 +654,7 @@ function analysisBox(a) {
     el('span', 'source', a.source === 'claude' ? 'Analysed by Claude' : 'Built-in estimate'));
   head.append(time, space, meta);
   box.append(head);
+  if (a.recommendation) box.append(recommendationBox(a.recommendation, a.confidence));
   if (a.reasons && a.reasons.length) {
     const details = el('details', 'analysis-why');
     details.append(el('summary', '', 'How this was worked out'));
@@ -663,6 +664,38 @@ function analysisBox(a) {
     box.append(details);
   }
   return box;
+}
+
+const VERDICTS = {
+  faster: 'Faster approach available',
+  leaner: 'Less memory, same speed',
+  optimal: 'Matches the best known',
+  check: 'Worth a second look',
+  fixed: 'Fixed-size input',
+};
+
+/** How the solution compares with the best known approaches, with the idea behind a toggle. */
+function recommendationBox(r, confidence) {
+  const box = el('div', `rec rec-${r.verdict}`);
+  box.append(el('p', 'rec-title', VERDICTS[r.verdict] || 'Best known approach'));
+  box.append(el('p', 'rec-msg', r.message));
+  if (confidence === 'low' && (r.verdict === 'faster' || r.verdict === 'leaner')) {
+    box.append(el('p', 'rec-hedge', 'The analysis above is a low-confidence estimate, so check it before rewriting.'));
+  }
+  box.append(approachLine(r.verdict === 'optimal' ? 'Best known' : r.verdict === 'fixed' ? 'Usual approach' : 'Try', r.approach));
+  if (r.further) box.append(approachLine('Going further', r.further));
+  return box;
+}
+
+function approachLine(label, a) {
+  const wrap = el('div', 'rec-approach');
+  const line = el('p', 'rec-line');
+  line.append(el('span', 'rec-label', label), el('strong', '', a.name),
+    el('span', 'rec-cx', `${a.time} time · ${a.space} space`));
+  const idea = el('details', 'rec-idea');
+  idea.append(el('summary', '', 'Show the idea'), el('p', '', a.idea));
+  wrap.append(line, idea);
+  return wrap;
 }
 
 document.querySelectorAll('input[name=show]').forEach((r) =>
@@ -704,6 +737,9 @@ function openDone(c) {
   doneTarget = c;
   doneForm.reset();
   $('done-error').hidden = true;
+  $('done-lang').value = lastLanguage();
+  $('done-analysis').replaceChildren();
+  $('done-analyse-status').textContent = '';
   $('done-title').textContent = c.name;
   $('done-meta').textContent =
     `${LEVEL[c.difficulty]} · first review tomorrow, ${fmt(addDays(state.today, 1))}. The gaps then grow as you remember it.`;
@@ -712,6 +748,47 @@ function openDone(c) {
 }
 
 $('done-cancel').addEventListener('click', () => dialog.close());
+
+// Your code, analysed before anything is saved. Esc in the code box first ends Tab-indenting;
+// it only closes the window if pressed again.
+const doneCode = $('done-code');
+// First Esc: stop Tab-indenting (and keep the window open). Registered before indentWithTab,
+// which is what records that first Esc; a second Esc then closes the window as usual.
+doneCode.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !doneCode.dataset.tabExit) e.preventDefault();
+});
+doneCode.addEventListener('keydown', indentWithTab);
+const clearDoneAnalysis = () => { $('done-analysis').replaceChildren(); $('done-analyse-status').textContent = ''; };
+doneCode.addEventListener('input', clearDoneAnalysis);
+$('done-lang').addEventListener('change', clearDoneAnalysis);
+
+$('done-analyse').addEventListener('click', async () => {
+  const err = $('done-error');
+  err.hidden = true;
+  if (!doneCode.value.trim()) {
+    err.textContent = 'Add your code first, then analyse it.';
+    err.hidden = false;
+    doneCode.focus();
+    return;
+  }
+  const btn = $('done-analyse');
+  btn.disabled = true;
+  btn.textContent = 'Analysing…';
+  try {
+    const result = await api('/api/analysis/preview', {
+      method: 'POST',
+      body: JSON.stringify({ code: doneCode.value, codeLanguage: $('done-lang').value, catalogId: doneTarget && doneTarget.id }),
+    });
+    $('done-analysis').replaceChildren(analysisBox(result));
+    $('done-analyse-status').textContent = 'Saved with your notes when you mark it done.';
+  } catch (e) {
+    err.textContent = e.message;
+    err.hidden = false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyse';
+  }
+});
 
 doneForm.addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -734,12 +811,16 @@ doneForm.addEventListener('submit', async (ev) => {
   const btn = $('done-save');
   btn.disabled = true;
   try {
+    const code = doneCode.value.trim() ? doneCode.value : '';
+    const codeLanguage = code ? $('done-lang').value : null;
     const saved = await api(`/api/catalog/${doneTarget.id}/done`, {
       method: 'POST',
-      body: JSON.stringify({ learnings, excalidrawUrl }),
+      body: JSON.stringify({ learnings, excalidrawUrl, code, codeLanguage }),
     });
+    if (codeLanguage) rememberLanguage(codeLanguage);
     dialog.close();
-    toast(`Done. First review tomorrow, ${fmt(saved.nextDueOn)}.`);
+    const complexity = saved.analysis ? ` Time ${saved.analysis.time}, space ${saved.analysis.space}.` : '';
+    toast(`Done. First review tomorrow, ${fmt(saved.nextDueOn)}.${complexity}`);
     await load();
   } catch (e) {
     err.textContent = e.message;

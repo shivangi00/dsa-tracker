@@ -1,8 +1,10 @@
 package dev.shivangi.dsatracker.web;
 
+import dev.shivangi.dsatracker.analysis.ApproachRecommender;
 import dev.shivangi.dsatracker.analysis.CodeLanguage;
 import dev.shivangi.dsatracker.domain.Problem;
 import dev.shivangi.dsatracker.security.AuthUser;
+import dev.shivangi.dsatracker.security.TooManyRequestsException;
 import dev.shivangi.dsatracker.service.AnalysisService;
 import dev.shivangi.dsatracker.service.DashboardService;
 import dev.shivangi.dsatracker.service.ProblemService;
@@ -37,10 +39,13 @@ public class ProblemController {
     private final ProblemService problems;
     private final DashboardService dashboard;
     private final AnalysisService analysis;
+    private final ApproachRecommender approaches;
     private final Clock clock;
 
-    public ProblemController(ProblemService problems, DashboardService dashboard, AnalysisService analysis, Clock clock) {
+    public ProblemController(ProblemService problems, DashboardService dashboard, AnalysisService analysis,
+                             ApproachRecommender approaches, Clock clock) {
         this.analysis = analysis;
+        this.approaches = approaches;
         this.clock = clock;
         this.problems = problems;
         this.dashboard = dashboard;
@@ -51,7 +56,17 @@ public class ProblemController {
             @NotBlank @Size(max = 2000) String learnings,
             @Size(max = 500)
             @Pattern(regexp = "^$|^https://\\S+$", message = "must be an https:// link")
-            String excalidrawUrl) {
+            String excalidrawUrl,
+            @Size(max = ProblemService.MAX_CODE_LENGTH) String code,
+            CodeLanguage codeLanguage) {
+    }
+
+    /**
+     * Code to analyse before it's saved (the Mark as done window). {@code catalogId}, optional, is the
+     * NeetCode problem it solves, so the answer can suggest a better approach.
+     */
+    public record PreviewRequest(@Size(max = ProblemService.MAX_CODE_LENGTH) String code, CodeLanguage codeLanguage,
+                                 Integer catalogId) {
     }
 
     /** Edited notes and code. Sent whole: the page always has every field. */
@@ -77,7 +92,15 @@ public class ProblemController {
     @ResponseStatus(HttpStatus.CREATED)
     public ProblemView markDone(@AuthenticationPrincipal AuthUser me, @PathVariable int catalogId,
                                 @Valid @RequestBody MarkDoneRequest req) {
-        var saved = problems.markDone(me.id(), catalogId, req.learnings(), req.excalidrawUrl());
+        Problem saved = problems.markDone(me.id(), catalogId, req.learnings(), req.excalidrawUrl(),
+                req.code(), req.codeLanguage());
+        if (saved.getCode() != null) {
+            try {
+                saved = analysis.analyse(me.id(), saved.getId());   // saved with its analysis
+            } catch (TooManyRequestsException e) {
+                // Over the daily analysis limit: the problem and code are saved; analyse later today.
+            }
+        }
         return view(saved);
     }
 
@@ -96,6 +119,12 @@ public class ProblemController {
                 req.code(), req.codeLanguage()));
     }
 
+    /** Analyse code that isn't saved yet: nothing is stored. */
+    @PostMapping("/analysis/preview")
+    public AnalysisView previewAnalysis(@AuthenticationPrincipal AuthUser me, @Valid @RequestBody PreviewRequest req) {
+        return AnalysisView.of(analysis.preview(me.id(), req.code(), req.codeLanguage()), req.catalogId(), approaches);
+    }
+
     /** Analyse the saved code's time and space complexity. */
     @PostMapping("/problems/{id}/analysis")
     public ProblemView analyse(@AuthenticationPrincipal AuthUser me, @PathVariable long id) {
@@ -103,7 +132,7 @@ public class ProblemController {
     }
 
     private ProblemView view(Problem p) {
-        return ProblemView.of(p, 0, LocalDate.now(clock));
+        return ProblemView.of(p, 0, LocalDate.now(clock), approaches);
     }
 
     /** Undo a "done" (and its reviews). */

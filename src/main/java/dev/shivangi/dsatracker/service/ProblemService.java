@@ -36,9 +36,19 @@ public class ProblemService {
         this.clock = clock;
     }
 
-    /** Marks a NeetCode 150 problem as done today. The first review is due tomorrow. */
+    /** Marks a NeetCode 150 problem as done today, without code. */
     @Transactional
     public Problem markDone(Long userId, int catalogId, String learnings, String excalidrawUrl) {
+        return markDone(userId, catalogId, learnings, excalidrawUrl, null, null);
+    }
+
+    /**
+     * Marks a NeetCode 150 problem as done today, optionally with your code. The first review is
+     * due tomorrow.
+     */
+    @Transactional
+    public Problem markDone(Long userId, int catalogId, String learnings, String excalidrawUrl,
+                            String code, CodeLanguage language) {
         LocalDate today = LocalDate.now(clock);
 
         CatalogProblem catalog = catalogs.findById(catalogId)
@@ -56,8 +66,14 @@ public class ProblemService {
             throw new BadRequestException("The Excalidraw link must start with https://");
         }
 
+        String solution = checkCode(code, language);
+
         // Always today: past days can't be back-filled.
-        return problems.save(new Problem(userId, catalog, notes, drawing, today, policy.onFirstSolve(today)));
+        Problem problem = new Problem(userId, catalog, notes, drawing, today, policy.onFirstSolve(today));
+        if (solution != null) {
+            problem.editNotes(notes, drawing, solution, language, today);
+        }
+        return problems.save(problem);
     }
 
     /** Records a review: remembered (true) or forgot (false). */
@@ -99,6 +115,17 @@ public class ProblemService {
         if (drawing != null && !drawing.startsWith("https://")) {
             throw new BadRequestException("The Excalidraw link must start with https://");
         }
+        String solution = checkCode(code, language);
+        try {
+            problem.editNotes(notes, drawing, solution, solution == null ? null : language, LocalDate.now(clock));
+        } catch (IllegalStateException e) {
+            throw new ConflictException(e.getMessage());
+        }
+        return problem;
+    }
+
+    /** Blank code means none; otherwise it must fit and have a language. Returns the code to store. */
+    static String checkCode(String code, CodeLanguage language) {
         String solution = code == null || code.isBlank() ? null : code.stripTrailing();
         if (solution != null && solution.length() > MAX_CODE_LENGTH) {
             throw new BadRequestException("Code can be at most " + MAX_CODE_LENGTH + " characters");
@@ -106,12 +133,7 @@ public class ProblemService {
         if (solution != null && language == null) {
             throw new BadRequestException("Choose the language of your code");
         }
-        try {
-            problem.editNotes(notes, drawing, solution, solution == null ? null : language, LocalDate.now(clock));
-        } catch (IllegalStateException e) {
-            throw new ConflictException(e.getMessage());
-        }
-        return problem;
+        return solution;
     }
 
     /** The code to analyse, as saved. Read in its own short transaction (see AnalysisService). */

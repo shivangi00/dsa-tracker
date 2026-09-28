@@ -26,10 +26,11 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
-    # Migrations use the app's database by default. When DB_URL points at a connection pooler
-    # (Neon's "-pooler" host), set SPRING_FLYWAY_URL to the direct URL: Spring reads it as
-    # spring.flyway.url, and Flyway reuses DB_USER / DB_PASSWORD. (Not set here, so tests keep
-    # using the database Testcontainers provides.)
+    # Migrations use the app's own database connection (DB_URL, DB_USER, DB_PASSWORD).
+    # Only if DB_URL ever points at a connection pooler (Neon's "-pooler" host), give Flyway the
+    # direct address with SPRING_FLYWAY_URL, and then ALSO SPRING_FLYWAY_USER and
+    # SPRING_FLYWAY_PASSWORD: with its own URL, Flyway doesn't borrow the app's login.
+    # (Nothing is set here, so tests keep using the database Testcontainers provides.)
   session:
     # Sign-ins are stored in Postgres (tables from V6), not in server memory.
     jdbc:

@@ -1,5 +1,6 @@
 package dev.shivangi.dsatracker.service;
 
+import dev.shivangi.dsatracker.analysis.CodeLanguage;
 import dev.shivangi.dsatracker.analysis.ComplexityAnalyser;
 import dev.shivangi.dsatracker.analysis.ComplexityAnalysis;
 import dev.shivangi.dsatracker.domain.Problem;
@@ -29,13 +30,30 @@ public class AnalysisService {
         this.limiter = limiter;
     }
 
-    public Problem analyse(Long userId, long problemId) {
-        ProblemService.CodeToAnalyse code = problems.codeToAnalyse(userId, problemId);
+    /**
+     * Analyses code that isn't saved anywhere yet: the "Analyse" button in the Mark as done
+     * window, before the problem exists. Same limits as saved analyses.
+     */
+    public ComplexityAnalysis preview(Long userId, String code, CodeLanguage language) {
+        String solution = ProblemService.checkCode(code, language);
+        if (solution == null) {
+            throw new BadRequestException("Add your code first, then analyse it");
+        }
+        limit(userId);
+        return analyser.analyse(solution, language);
+    }
 
+    private void limit(Long userId) {
         RateLimiter.Decision decision = limiter.tryAcquire(RateLimitRules.ANALYSES_PER_USER, String.valueOf(userId));
         if (!decision.allowed()) {
             throw new TooManyRequestsException(decision.retryAfterSeconds());
         }
+    }
+
+    public Problem analyse(Long userId, long problemId) {
+        ProblemService.CodeToAnalyse code = problems.codeToAnalyse(userId, problemId);
+
+        limit(userId);
 
         ComplexityAnalysis result = analyser.analyse(code.code(), code.language());
         return problems.saveAnalysis(userId, problemId, code, result);

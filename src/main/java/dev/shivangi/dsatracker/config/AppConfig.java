@@ -1,6 +1,8 @@
 package dev.shivangi.dsatracker.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.shivangi.dsatracker.analysis.ApproachRecommender;
+import dev.shivangi.dsatracker.analysis.BestApproaches;
 import dev.shivangi.dsatracker.analysis.ClaudeComplexityAnalyser;
 import dev.shivangi.dsatracker.analysis.ComplexityAnalyser;
 import dev.shivangi.dsatracker.analysis.FallbackComplexityAnalyser;
@@ -62,5 +64,11 @@ public class AppConfig {
             return estimate;
         }
         return new FallbackComplexityAnalyser(new ClaudeComplexityAnalyser(json, key, props.analysisModel()), estimate);
+    }
+
+    /** Best known approaches for each NeetCode 150 problem, to suggest a better one after an analysis. */
+    @Bean
+    public ApproachRecommender approachRecommender(ObjectMapper json) {
+        return new ApproachRecommender(BestApproaches.load(json));
     }
 }

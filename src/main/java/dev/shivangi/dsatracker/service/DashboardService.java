@@ -1,5 +1,6 @@
 package dev.shivangi.dsatracker.service;
 
+import dev.shivangi.dsatracker.analysis.ApproachRecommender;
 import dev.shivangi.dsatracker.config.AppProperties;
 import dev.shivangi.dsatracker.consistency.ActivityRepository;
 import dev.shivangi.dsatracker.consistency.ActivityRepository.DayActivity;
@@ -39,12 +40,13 @@ public class DashboardService {
     private final WeeklyTestService weeklyTests;
     private final SpacedRepetitionPolicy policy;
     private final AppProperties props;
+    private final ApproachRecommender approaches;
     private final Clock clock;
 
     public DashboardService(UserRepository users, CatalogRepository catalogs, ProblemRepository problems,
                             ActivityRepository activity, ConsistencyCalculator consistency,
                             WeeklyTestService weeklyTests, SpacedRepetitionPolicy policy,
-                            AppProperties props, Clock clock) {
+                            AppProperties props, ApproachRecommender approaches, Clock clock) {
         this.users = users;
         this.catalogs = catalogs;
         this.problems = problems;
@@ -53,6 +55,7 @@ public class DashboardService {
         this.weeklyTests = weeklyTests;
         this.policy = policy;
         this.props = props;
+        this.approaches = approaches;
         this.clock = clock;
     }
 
@@ -109,6 +112,6 @@ public class DashboardService {
     }
 
     private ProblemView view(Problem p, LocalDate today) {
-        return ProblemView.of(p, policy.overdueDays(p.schedule(), today), today);
+        return ProblemView.of(p, policy.overdueDays(p.schedule(), today), today, approaches);
     }
 }

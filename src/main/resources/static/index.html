@@ -131,6 +131,27 @@
       <input name="excalidrawUrl" type="url" maxlength="500" pattern="https://.*"
              placeholder="https://excalidraw.com/#json=…">
     </label>
+    <div class="done-code">
+      <div class="code-head">
+        <label class="code-label" for="done-code">Your code <em>optional</em></label>
+        <label class="sr-only" for="done-lang">Language</label>
+        <select class="lang-select" id="done-lang" name="codeLanguage">
+          <option value="JAVA">Java</option>
+          <option value="PYTHON">Python</option>
+          <option value="JAVASCRIPT">JavaScript</option>
+          <option value="CPP">C++</option>
+        </select>
+      </div>
+      <textarea class="code-input" id="done-code" name="code" rows="8" maxlength="10000" spellcheck="false"
+                autocapitalize="off" autocomplete="off" aria-describedby="done-code-hint"
+                placeholder="Paste or type your solution"></textarea>
+      <p class="hint" id="done-code-hint">Tab indents. Press Esc, then Tab, to move on.</p>
+      <div class="notes-actions">
+        <button type="button" class="btn" id="done-analyse" title="Estimate the time and space complexity of your code">Analyse</button>
+        <span class="save-status" id="done-analyse-status" aria-live="polite"></span>
+      </div>
+      <div class="analysis-slot" id="done-analysis"></div>
+    </div>
     <p class="form-error" id="done-error" role="alert" hidden></p>
     <div class="dialog-actions">
       <button type="button" class="btn ghost" id="done-cancel">Cancel</button>

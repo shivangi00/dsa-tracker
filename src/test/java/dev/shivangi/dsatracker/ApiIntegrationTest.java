@@ -292,6 +292,55 @@ class ApiIntegrationTest {
     }
 
     @Test
+    void codeCanBeAnalysedAndSavedInTheMarkDoneWindow() throws Exception {
+        Cookie pia = signUp("pia");
+        String code = "def f(nums):\\n    for x in nums:\\n        for y in nums:\\n            pass\\n";
+
+        // Preview: analysed, nothing saved
+        mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(pia).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + code + "\",\"codeLanguage\":\"PYTHON\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.time").value("O(n²)"));
+        mvc.perform(get("/api/dashboard").cookie(pia)).andExpect(jsonPath("$.counts.done").value(0));
+
+        // Mark done with the code: saved together with its analysis
+        mvc.perform(post("/api/catalog/1/done").with(csrf()).cookie(pia).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"Nested loops.\",\"code\":\"" + code + "\",\"codeLanguage\":\"PYTHON\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").exists())
+                .andExpect(jsonPath("$.analysis.time").value("O(n²)"));
+    }
+
+    @Test
+    void analysisRecommendsABetterApproach() throws Exception {
+        Cookie ria = signUp("ria");
+        String brute = "def f(nums):\\n    for i in range(len(nums)):\\n        for j in range(i + 1, len(nums)):\\n"
+                + "            if nums[i] == nums[j]:\\n                return True\\n    return False\\n";
+
+        // Preview for Contains Duplicate (catalog id 1): O(n²) → the hash set approach
+        mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + brute + "\",\"codeLanguage\":\"PYTHON\",\"catalogId\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendation.verdict").value("faster"))
+                .andExpect(jsonPath("$.recommendation.approach.name").value("Hash set"))
+                .andExpect(jsonPath("$.recommendation.approach.time").value("O(n)"));
+
+        // Without a catalog id there's nothing to compare with
+        mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + brute + "\",\"codeLanguage\":\"PYTHON\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendation").doesNotExist());
+
+        // Saved: the problem's analysis carries the recommendation, on the dashboard too
+        mvc.perform(post("/api/catalog/1/done").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"Brute force first.\",\"code\":\"" + brute + "\",\"codeLanguage\":\"PYTHON\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.analysis.recommendation.verdict").value("faster"));
+        mvc.perform(get("/api/dashboard").cookie(ria))
+                .andExpect(jsonPath("$.catalog[0].progress.analysis.recommendation.approach.name").value("Hash set"));
+    }
+
+    @Test
     void notesAreFrozenOnceTheDayIsOver() throws Exception {
         Cookie ivan = signUp("ivan");
         long id = markDone(ivan, 1);

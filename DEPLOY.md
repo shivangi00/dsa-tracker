@@ -203,59 +203,58 @@ Neon runs PostgreSQL for you. It pauses when nobody is using the site and wakes 
 4. **Region:** **AWS Europe (London)**, `eu-west-2`. It's close to the app's Render region (Frankfurt) and to you.
 5. Click **Create**. Neon creates a database called **`neondb`** and a user (a "role") called **`neondb_owner`**. You'll use both.
 
-### 4.2 Copy the two connection strings
+### 4.2 Copy the connection string
 
 A **connection string** is one line containing everything needed to reach the database: address, database name, username and password.
 
 1. On the project dashboard, click **Connect**.
 2. Check the dropdowns show **Branch: main**, **Database: neondb**, **Role: neondb_owner**.
-3. Turn **Connection pooling ON** and copy the string. Save it in your notes as **"pooled"**.
-4. Turn **Connection pooling OFF** and copy again. Save it as **"direct"**.
+3. Make sure **Connection pooling** is **OFF** (the address must *not* contain `-pooler`), then copy the string into your notes.
 
-They look like this (yours will have different letters):
+It looks like this (yours will have different letters):
 
 ```
-postgresql://neondb_owner:npg_AbC123xyz@ep-cool-river-a1b2c3d4-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+postgresql://neondb_owner:npg_AbC123xyz@ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
 ```
 
-The only difference between the two is `-pooler` in the host name. The app uses the **pooled** one for everyday requests, so several copies of the app can share a few database connections. The **direct** one is used once, at start-up, to create and upgrade the tables, because Neon's docs say schema changes need a direct connection.
+This is the **direct** connection. Render runs one copy of the app, so it doesn't need Neon's connection pooler, and the direct address works for everything, including creating the tables.
 
-### 4.3 Turn them into the app's four database settings
+### 4.3 Turn it into the app's three database settings
 
-> **Where do these go?** Nowhere yet. In this step you only **write the four values into your private notes file** (from step 1.3). You'll paste them into Render's settings page in [step 5.1](#51-create-the-web-service), which is how the app receives them.
+> **Where do these go?** Nowhere yet. In this step you only **write the three values into your private notes file** (from step 1.3). You'll paste them into Render's settings page in [step 5.1](#51-create-the-web-service), which is how the app receives them.
 >
 > They do **not** go into any file in the project: not `application.yml`, not `.env.example`, and not a new `.env` file. The app doesn't read `.env` files; online it only reads the values you type into Render. That's what keeps your database password out of GitHub. (On your laptop the app doesn't need them at all: it falls back to the local Docker database.)
 
-Java expects the connection in a slightly different format ("JDBC"), with the user and password as separate settings. Take the pooled string apart:
+Java expects the connection in a slightly different format ("JDBC"), with the user and password as separate settings. Take the string apart:
 
 ```
-postgresql:// neondb_owner : npg_AbC123xyz @ ep-cool-river-a1b2c3d4-pooler.eu-west-2.aws.neon.tech /neondb ?sslmode=require&channel_binding=require
-              └── user ──┘   └─ password ─┘   └──────────────────────── host ─────────────────────┘ └ db ┘
+postgresql:// neondb_owner : npg_AbC123xyz @ ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech /neondb ?sslmode=require&channel_binding=require
+              └── user ──┘   └─ password ─┘   └───────────────────── host ───────────────────┘ └ db ┘
 ```
 
-Then write these four lines into your notes file (with your own values):
+Then write these three lines into your notes file (with your own values):
 
 | Setting | Value |
 | --- | --- |
-| `DB_URL` | `jdbc:postgresql://ep-cool-river-a1b2c3d4-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require` |
-| `SPRING_FLYWAY_URL` | the same, **without** `-pooler`: `jdbc:postgresql://ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech/neondb?sslmode=require` |
+| `DB_URL` | `jdbc:postgresql://ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech/neondb?sslmode=require` |
 | `DB_USER` | `neondb_owner` |
 | `DB_PASSWORD` | `npg_AbC123xyz` |
 
-Rules:
-- Start both URLs with `jdbc:postgresql://`.
-- **Remove** the `user:password@` part from the URLs; it goes in `DB_USER` and `DB_PASSWORD` instead.
+Rules for `DB_URL`:
+- Start it with `jdbc:postgresql://`, with nothing before it (no space, no quotes, no `DB_URL=`).
+- **Remove** the `user:password@` part; it goes in `DB_USER` and `DB_PASSWORD` instead.
 - **Keep** `?sslmode=require`: it encrypts the connection.
 - **Drop** `&channel_binding=require`. It's written for other tools, and the plain SSL setting is what the Java driver needs here.
 
 Your notes file should now contain something like this (your values will differ):
 
 ```
-DB_URL=jdbc:postgresql://ep-cool-river-a1b2c3d4-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require
-SPRING_FLYWAY_URL=jdbc:postgresql://ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech/neondb?sslmode=require
+DB_URL=jdbc:postgresql://ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech/neondb?sslmode=require
 DB_USER=neondb_owner
 DB_PASSWORD=npg_AbC123xyz
 ```
+
+(The `NAME=value` form is just for your notes. In Render, the name and the value go in separate boxes.)
 
 You don't create any tables. When the app starts for the first time, Flyway runs the migration files `V1`…`V9` and builds everything, including the 150 NeetCode problems.
 
@@ -285,12 +284,11 @@ Render builds your repo's `Dockerfile` into a container and keeps **one copy of 
 | **Root Directory** | leave empty |
 | **Instance Type** | **Free** (or **Starter** to stay awake) |
 
-5. **Environment Variables:** click **Add Environment Variable** for each row. This is where the four values from your notes (step 4.3) go:
+5. **Environment Variables:** click **Add Environment Variable** for each row. This is where the three values from your notes (step 4.3) go:
 
 | Name | Value |
 | --- | --- |
-| `DB_URL` | from your notes, step 4.3 (pooled, starts with `jdbc:`) |
-| `SPRING_FLYWAY_URL` | from your notes, step 4.3 (direct, no `-pooler`) |
+| `DB_URL` | from your notes, step 4.3 (starts with `jdbc:postgresql://`, no `-pooler`) |
 | `DB_USER` | from your notes: `neondb_owner` |
 | `DB_PASSWORD` | from your notes: your Neon password |
 | `DB_POOL_SIZE` | `5` |
@@ -349,8 +347,7 @@ Don't use Render's own free Postgres: free databases there are deleted after 30 
 
 | Name | Value |
 | --- | --- |
-| `DB_URL` | from your notes, step 4.3 (pooled, starts with `jdbc:`) |
-| `SPRING_FLYWAY_URL` | from your notes, step 4.3 (direct, no `-pooler`) |
+| `DB_URL` | from your notes, step 4.3 |
 | `DB_USER` | from your notes: `neondb_owner` |
 | `DB_PASSWORD` | from your notes: your Neon password |
 | `DB_POOL_SIZE` | `3` |
@@ -363,8 +360,7 @@ It looks like this in Vercel, one row per setting:
 
 ```
 Key                 Value
-DB_URL              jdbc:postgresql://ep-cool-river-a1b2c3d4-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require
-SPRING_FLYWAY_URL   jdbc:postgresql://ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech/neondb?sslmode=require
+DB_URL              jdbc:postgresql://ep-cool-river-a1b2c3d4.eu-west-2.aws.neon.tech/neondb?sslmode=require
 DB_USER             neondb_owner
 DB_PASSWORD         npg_AbC123xyz
 DB_POOL_SIZE        3
@@ -480,7 +476,7 @@ GitHub runs the tests, and Render builds and releases the new version automatica
 pg_dump "postgresql://neondb_owner:PASSWORD@DIRECT-HOST/neondb?sslmode=require" > backup-$(date +%F).sql
 ```
 
-Use the **direct** connection string here, not the pooled one.
+Use the connection string from step 4.2 (without `-pooler`).
 
 **Someone lost their password and their recovery code.** Without the code it can't be reset from the site, by design. If you know it's genuinely them, you can delete their account in Neon's SQL Editor (`DELETE FROM users WHERE username = '…';`) so they can sign up again; their progress goes with it.
 
@@ -507,6 +503,8 @@ Find the symptom, then check the likely causes in order.
 | First visit takes about a minute | The free instance was asleep | Normal on the free plan; Starter never sleeps |
 | **On Vercel:** build succeeded, but every page is a **500** error, and the logs stop part-way through start-up (the Spring logo, "Tomcat initialized") without `Started DsaTrackerApplication` | Vercel stopped the app before it finished starting | Use Render (section 5). This app starts too slowly for Vercel |
 | **On Vercel:** site shows **404 NOT_FOUND** | `PORT` isn't `8080` | Add `PORT` = `8080`, redeploy |
+| Logs: `'url' must start with "jdbc"` | `DB_URL` isn't in JDBC form | In Render → **Environment**, set `DB_URL` to exactly `jdbc:postgresql://<host>/neondb?sslmode=require`: no `postgresql://user:password@`, no `DB_URL=`, no spaces or quotes (4.3) |
+| Logs: `SCRAM-based authentication, but no password was provided` | A `SPRING_FLYWAY_URL` setting is left over from an older version of this guide | Delete `SPRING_FLYWAY_URL` in Render → **Environment** (`DB_URL` alone is enough), or, if you keep it, also add `SPRING_FLYWAY_USER` and `SPRING_FLYWAY_PASSWORD` with the same values as `DB_USER` and `DB_PASSWORD` |
 | Logs: `password authentication failed for user` | Wrong `DB_USER` or `DB_PASSWORD` | Copy them again from Neon (4.2); watch for spaces at the end |
 | Logs: `The connection attempt failed` or `UnknownHostException` | Mistake in `DB_URL` | Check it starts with `jdbc:postgresql://`, has no `user:password@`, and ends with `/neondb?sslmode=require` |
 | Logs: `SSL` or `ssl off` errors | `?sslmode=require` missing | Add it to both URLs |
@@ -538,7 +536,7 @@ Still stuck? Copy the **first** error line from the log, plus what you were doin
 | **Environment variable** | A named setting (like `DB_PASSWORD`) given to the app when it starts, instead of being written in the code |
 | **Connection string** | One line with everything needed to reach a database: host, database, user, password, options |
 | **JDBC** | The standard way Java programs talk to databases; its URLs start with `jdbc:` |
-| **Connection pooling** | Reusing a few open database connections instead of opening a new one per request |
+| **Connection pool** | A few open database connections the app reuses, instead of opening a new one per request |
 | **Migration** | A numbered SQL file (`V1__…`) that creates or changes tables; Flyway runs each one once |
 | **Container / Docker image** | The app plus everything it needs to run (Java, the jar), packed into one unit that runs the same everywhere |
 | **DNS** | The internet's address book, mapping names like `tracker.yourdomain.dev` to servers (only needed for your own domain) |

@@ -1,6 +1,6 @@
 # Runs on every push and pull request: compiles, runs the unit tests, and runs the integration
 # tests against a real Postgres (Testcontainers uses the Docker that GitHub's runners provide).
-# A red cross on GitHub means something broke; Render only deploys what you push to main.
+# A red cross on GitHub means something broke. Vercel (or Render) deploys what you push to main.
 name: CI
 
 on:

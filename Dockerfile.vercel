@@ -23,4 +23,7 @@ EXPOSE 8080
 #   TieredStopAtLevel=1  only the quick JIT compiler (less start-up CPU, which Vercel bills)
 #   UseSerialGC          the simplest collector, right for 1 vCPU
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:TieredStopAtLevel=1 -XX:+UseSerialGC"
+# Vercel only waits a short time for a new copy of the app to be ready. Lazy initialisation starts
+# the web server first and builds everything else (database, security, ...) on the first request.
+ENV SPRING_MAIN_LAZYINITIALIZATION=true
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
