@@ -1,7 +1,10 @@
 package dev.shivangi.dsatracker.domain;
 
+import dev.shivangi.dsatracker.repetition.Rating;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -9,7 +12,7 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 
-/** One Remembered/Forgot answer on a review. Never updated, only inserted. */
+/** One rating given at a review. Never updated, only inserted. */
 @Entity
 @Table(name = "revision_attempts")
 public class RevisionAttempt {
@@ -24,9 +27,14 @@ public class RevisionAttempt {
     @Column(name = "attempted_on", nullable = false)
     private LocalDate attemptedOn;
 
-    /** true = remembered, false = forgot. */
+    /** false for Again (or Forgot, before ratings existed); kept for the recall rate. */
     @Column(nullable = false)
     private boolean solved;
+
+    /** Again / Hard / Good / Easy. Null for answers given before ratings existed. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rating")
+    private Rating rating;
 
     @Column(name = "interval_before")
     private Integer intervalBefore;
@@ -38,11 +46,12 @@ public class RevisionAttempt {
         // for JPA
     }
 
-    public RevisionAttempt(Long problemId, LocalDate attemptedOn, boolean solved,
+    public RevisionAttempt(Long problemId, LocalDate attemptedOn, Rating rating,
                            int intervalBefore, int intervalAfter) {
         this.problemId = problemId;
         this.attemptedOn = attemptedOn;
-        this.solved = solved;
+        this.rating = rating;
+        this.solved = rating.solved();
         this.intervalBefore = intervalBefore;
         this.intervalAfter = intervalAfter;
     }
@@ -51,4 +60,5 @@ public class RevisionAttempt {
     public Long getProblemId() { return problemId; }
     public LocalDate getAttemptedOn() { return attemptedOn; }
     public boolean isSolved() { return solved; }
+    public Rating getRating() { return rating; }
 }

@@ -8,6 +8,7 @@ import dev.shivangi.dsatracker.domain.Problem;
 import dev.shivangi.dsatracker.domain.ProblemRepository;
 import dev.shivangi.dsatracker.domain.RevisionAttempt;
 import dev.shivangi.dsatracker.domain.RevisionAttemptRepository;
+import dev.shivangi.dsatracker.repetition.Rating;
 import dev.shivangi.dsatracker.repetition.ScheduleState;
 import dev.shivangi.dsatracker.repetition.SpacedRepetitionPolicy;
 import org.springframework.stereotype.Service;
@@ -39,16 +40,17 @@ public class ProblemService {
     /** Marks a NeetCode 150 problem as done today, without code. */
     @Transactional
     public Problem markDone(Long userId, int catalogId, String learnings, String excalidrawUrl) {
-        return markDone(userId, catalogId, learnings, excalidrawUrl, null, null);
+        return markDone(userId, catalogId, learnings, excalidrawUrl, null, null, Rating.GOOD);
     }
 
     /**
-     * Marks a NeetCode 150 problem as done today, optionally with your code. The first review is
-     * due tomorrow.
+     * Marks a NeetCode 150 problem as done today, optionally with your code. {@code rating} is how it
+     * went for you (null counts as GOOD, "Medium"); it sets when the first review is due.
      */
     @Transactional
     public Problem markDone(Long userId, int catalogId, String learnings, String excalidrawUrl,
-                            String code, CodeLanguage language) {
+                            String code, CodeLanguage language, Rating rating) {
+        Rating first = rating == null ? Rating.GOOD : rating;
         LocalDate today = LocalDate.now(clock);
 
         CatalogProblem catalog = catalogs.findById(catalogId)
@@ -69,16 +71,16 @@ public class ProblemService {
         String solution = checkCode(code, language);
 
         // Always today: past days can't be back-filled.
-        Problem problem = new Problem(userId, catalog, notes, drawing, today, policy.onFirstSolve(today));
+        Problem problem = new Problem(userId, catalog, notes, drawing, today, first, policy.onFirstSolve(today, first));
         if (solution != null) {
             problem.editNotes(notes, drawing, solution, language, today);
         }
         return problems.save(problem);
     }
 
-    /** Records a review: remembered (true) or forgot (false). */
+    /** Records a review: Again, Hard, Good or Easy. */
     @Transactional
-    public Problem review(Long userId, long problemId, boolean remembered) {
+    public Problem review(Long userId, long problemId, Rating rating) {
         LocalDate today = LocalDate.now(clock);
         Problem problem = problems.findByIdAndUserId(problemId, userId)
                 .orElseThrow(() -> new NotFoundException("No problem with id " + problemId));
@@ -86,13 +88,13 @@ public class ProblemService {
         ScheduleState before = problem.schedule();
         ScheduleState after;
         try {
-            after = policy.onReview(before, today, remembered);
+            after = policy.onReview(before, today, rating);
         } catch (IllegalStateException e) {
             throw new ConflictException(e.getMessage());
         }
 
         problem.apply(after);
-        attempts.save(new RevisionAttempt(problem.getId(), today, remembered,
+        attempts.save(new RevisionAttempt(problem.getId(), today, rating,
                 before.intervalDays(), after.intervalDays()));
         return problem;
     }

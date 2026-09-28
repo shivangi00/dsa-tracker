@@ -86,13 +86,13 @@ class ApiIntegrationTest {
         return "{\"username\":\"%s\",\"password\":\"%s\"}".formatted(username, password);
     }
 
-    /** Marks NeetCode problem {@code catalogId} done and returns the new problem's id. */
+    /** Marks NeetCode problem {@code catalogId} done (no rating, so Medium) and returns the new problem's id. */
     private long markDone(Cookie session, int catalogId) throws Exception {
         String body = mvc.perform(post("/api/catalog/" + catalogId + "/done").with(csrf()).cookie(session)
                         .contentType(APPLICATION_JSON)
                         .content("{\"learnings\":\"Use a hash map of value to index.\"}"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.intervalDays").value(1))
+                .andExpect(jsonPath("$.intervalDays").value(3))
                 .andReturn().getResponse().getContentAsString();
         return ((Number) JsonPath.read(body, "$.id")).longValue();
     }
@@ -159,7 +159,7 @@ class ApiIntegrationTest {
     }
 
     @Test
-    void aProblemCanBeMarkedDoneOnceAndItsReviewIsDueTomorrow() throws Exception {
+    void aProblemCanBeMarkedDoneOnlyOnceAndIsntReviewableUntilDue() throws Exception {
         Cookie bob = signUp("bob");
         long id = markDone(bob, 3);
 
@@ -168,10 +168,58 @@ class ApiIntegrationTest {
                 .andExpect(status().isConflict());
         mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(bob).contentType(APPLICATION_JSON)
                         .content("{\"remembered\":true}"))
-                .andExpect(status().isConflict());   // not due until tomorrow
+                .andExpect(status().isConflict());   // not due for 3 days
         mvc.perform(get("/api/dashboard").cookie(bob))
                 .andExpect(jsonPath("$.consistency.activeToday").value(true))
                 .andExpect(jsonPath("$.consistency.totalStudyDays").value(1));
+    }
+
+    @Test
+    void yourRatingsDecideTheSchedule() throws Exception {
+        Cookie tara = signUp("tara");
+
+        // Rated when marking done: Forgot → tomorrow, Easy → 5 days
+        String forgot = mvc.perform(post("/api/catalog/4/done").with(csrf()).cookie(tara).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"Needed the hint.\",\"rating\":\"AGAIN\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.intervalDays").value(1))
+                .andExpect(jsonPath("$.firstRating").value("AGAIN"))
+                .andReturn().getResponse().getContentAsString();
+        mvc.perform(post("/api/catalog/2/done").with(csrf()).cookie(tara).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"Counting letters.\",\"rating\":\"EASY\"}"))
+                .andExpect(jsonPath("$.intervalDays").value(5));
+        mvc.perform(get("/api/dashboard").cookie(tara))
+                .andExpect(jsonPath("$.firstGaps.AGAIN").value(1))
+                .andExpect(jsonPath("$.firstGaps.EASY").value(5));
+
+        // Make the Forgot one due today: the buttons get each rating's gap
+        long id = ((Number) JsonPath.read(forgot, "$.id")).longValue();
+        jdbc.update("UPDATE problems SET solved_on = solved_on - 1, last_reviewed_on = last_reviewed_on - 1, "
+                + "next_due_on = next_due_on - 1 WHERE id = ?", id);
+        mvc.perform(get("/api/dashboard").cookie(tara))
+                .andExpect(jsonPath("$.due[0].reviewGaps.AGAIN").value(1))
+                .andExpect(jsonPath("$.due[0].reviewGaps.HARD").value(2))
+                .andExpect(jsonPath("$.due[0].reviewGaps.GOOD").value(3))
+                .andExpect(jsonPath("$.due[0].reviewGaps.EASY").value(4));
+
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(tara).contentType(APPLICATION_JSON)
+                        .content("{\"rating\":\"EASY\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.intervalDays").value(4))
+                .andExpect(jsonPath("$.reps").value(1))
+                .andExpect(jsonPath("$.reviewGaps").isEmpty());   // not due any more
+
+        // A review needs a rating
+        jdbc.update("UPDATE problems SET next_due_on = next_due_on - 4 WHERE id = ?", id);
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(tara).contentType(APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        // The older {remembered: false} still works, as Again
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(tara).contentType(APPLICATION_JSON)
+                        .content("{\"remembered\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.intervalDays").value(1))
+                .andExpect(jsonPath("$.lapses").value(1));
     }
 
     @Test

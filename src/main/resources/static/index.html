@@ -121,6 +121,23 @@
       <h2 id="done-title">Mark as done</h2>
       <p class="dialog-meta" id="done-meta"></p>
     </div>
+    <fieldset class="rating" id="done-rating">
+      <legend>How did it go for you? <em>sets your first review</em></legend>
+      <div class="rating-options">
+        <label class="rating-opt rate-again"><input type="radio" name="rating" value="AGAIN">
+          <span class="rating-name">Forgot</span><span class="rating-hint">Needed a hint or the solution</span>
+          <span class="rating-when" data-rating="AGAIN"></span></label>
+        <label class="rating-opt rate-hard"><input type="radio" name="rating" value="HARD">
+          <span class="rating-name">Hard</span><span class="rating-hint">Solved it, with real effort</span>
+          <span class="rating-when" data-rating="HARD"></span></label>
+        <label class="rating-opt rate-good"><input type="radio" name="rating" value="GOOD">
+          <span class="rating-name">Medium</span><span class="rating-hint">Solved it with normal effort</span>
+          <span class="rating-when" data-rating="GOOD"></span></label>
+        <label class="rating-opt rate-easy"><input type="radio" name="rating" value="EASY">
+          <span class="rating-name">Easy</span><span class="rating-hint">Quick and confident</span>
+          <span class="rating-when" data-rating="EASY"></span></label>
+      </div>
+    </fieldset>
     <label class="field">
       <span>What did you learn?</span>
       <textarea name="learnings" rows="5" maxlength="2000" required

@@ -2,6 +2,7 @@ package dev.shivangi.dsatracker.domain;
 
 import dev.shivangi.dsatracker.analysis.CodeLanguage;
 import dev.shivangi.dsatracker.analysis.ComplexityAnalysis;
+import dev.shivangi.dsatracker.repetition.Rating;
 import dev.shivangi.dsatracker.repetition.ScheduleState;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -64,6 +65,11 @@ public class Problem {
     @Column(name = "initial_difficulty", nullable = false)
     private Difficulty difficulty;
 
+    /** How the first solve went, in your judgement. Null for problems logged before ratings existed. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "first_rating")
+    private Rating firstRating;
+
     // ---- review schedule (see ScheduleState) ----
     @Column(name = "interval_days", nullable = false)
     private int intervalDays;
@@ -118,7 +124,8 @@ public class Problem {
 
     /** A NeetCode problem marked done by {@code userId} on {@code solvedOn}. */
     public Problem(Long userId, CatalogProblem catalog, String learnings, String excalidrawUrl,
-                   LocalDate solvedOn, ScheduleState schedule) {
+                   LocalDate solvedOn, Rating firstRating, ScheduleState schedule) {
+        this.firstRating = firstRating;
         this.userId = userId;
         this.catalogId = catalog.getId();
         this.name = catalog.getName();
@@ -128,6 +135,10 @@ public class Problem {
         this.excalidrawUrl = excalidrawUrl;
         this.solvedOn = solvedOn;
         apply(schedule);
+    }
+
+    public Rating getFirstRating() {
+        return firstRating;
     }
 
     /** The schedule fields as an immutable value the policy can work on. */

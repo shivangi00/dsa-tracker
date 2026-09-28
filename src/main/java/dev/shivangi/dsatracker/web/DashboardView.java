@@ -2,11 +2,16 @@ package dev.shivangi.dsatracker.web;
 
 import dev.shivangi.dsatracker.consistency.ConsistencySummary;
 import dev.shivangi.dsatracker.domain.Difficulty;
+import dev.shivangi.dsatracker.repetition.Rating;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
-/** The JSON behind GET /api/dashboard, for the signed-in user. */
+/**
+ * The JSON behind GET /api/dashboard, for the signed-in user. {@code firstGaps}: days until the first
+ * review for each rating in the Mark as done window.
+ */
 public record DashboardView(
         String username,
         LocalDate today,
@@ -21,7 +26,8 @@ public record DashboardView(
         List<ProblemView> due,
         List<TestViews.Summary> weeklyTests,
         List<CatalogItem> catalog,
-        List<ProblemView> earlierEntries) {
+        List<ProblemView> earlierEntries,
+        Map<Rating, Integer> firstGaps) {
 
     /** How many solved problems sit at each memory stage, by their current review gap. */
     public record Memory(int learning, int strengthening, int longTerm) {

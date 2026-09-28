@@ -1,6 +1,6 @@
 # DSA Tracker
 
-A minimalist tracker for working through the **NeetCode 150**, for any number of people. Each person signs up, picks a start date, and each day marks problems done with what they learned (plus an optional Excalidraw link). Reviews are scheduled by an adaptive spaced-repetition algorithm, a weekly test checks you can spot the same patterns in new problems, and motivation comes from long-term memory rather than streaks.
+A minimalist tracker for working through the **NeetCode 150**, for any number of people. Each person signs up, picks a start date, and each day marks problems done with what they learned (plus an optional Excalidraw link). Reviews are scheduled by an Anki-style spaced-repetition algorithm driven by your own Forgot / Hard / Medium / Easy ratings, a weekly test checks you can spot the same patterns in new problems, and motivation comes from long-term memory rather than streaks.
 
 **Stack:** Java 21 · Spring Boot 3.5 · Spring Security · PostgreSQL 16 · Flyway · plain HTML/CSS/JS (no build step) · Spring Session (sessions in Postgres) · Docker · GitHub Actions CI
 
@@ -59,19 +59,32 @@ The **first account** you create takes over any problems logged before accounts 
 
 ## The review algorithm
 
-Adaptive spaced repetition, similar to Anki's SM-2 but with only two answers: **Remembered** or **Forgot**.
+Anki-style (SM-2) spaced repetition driven by **your own ratings**. The same problem can be easy for one person and hard for another, so the schedule follows how it went for you, not NeetCode's difficulty label.
 
-| Situation | Next gap | Example |
-| --- | --- | --- |
-| You solve it (mark done) | 1 day | Day 1 → review day 2 |
-| First successful review | 4 days | day 2 → day 6 |
-| Each later success | gap × ease (ease starts at 2.25) | 4 → 9 → 20 → 45 … |
-| Success, but late | gap × ease + half the days you were late | gap 20, 16 days late → 53 |
-| Forgot | a fifth of the gap, kept between 3 and 7 days; ease − 0.2 (never below 1.3) | gap 20 → 4 days |
+**When you mark a problem done**, you rate how it went. The rating sets the first review and the *ease* (how fast gaps grow):
 
-- **Missing days resets nothing.** A review stays due until you do it; the answer then decides the next gap.
-- **Relearning is fast:** after forgetting, the gap climbs back (4 → 8 → 16 → 33) in a few steps.
+| Your rating | Meaning | First review | Ease | Then, pressing Good each time |
+|---|---|---|---|---|
+| Forgot | needed a hint or the solution | tomorrow | 2.30 | 1 → 3 → 7 → 17 → 42 days |
+| Hard | solved it, with real effort | in 2 days | 2.35 | 2 → 5 → 12 → 29 → 73 |
+| Medium | solved it with normal effort | in 3 days | 2.50 | 3 → 8 → 20 → 50 → 125 |
+| Easy | quick and confident | in 5 days | 2.65 | 5 → 13 → 34 → 90 |
+
+**At each review** you press Again, Hard, Good or Easy. Each button shows the gap it would give, as in Anki (d = days late):
+
+| Button | Next gap | Ease |
+|---|---|---|
+| Again | tomorrow | − 0.20 |
+| Hard | (gap + d/4) × 1.2 | − 0.15 |
+| Good | (gap + d/2) × ease | + 0.05 while below 2.5 |
+| Easy | (gap + d) × ease × 1.3 | + 0.15 |
+
+- **No "ease hell".** In plain SM-2, a few bad days can push the ease down for good. Here each Good nudges it back towards 2.5.
+- **Late but remembered earns a bonus**, since the memory outlasted the schedule.
+- Every successful answer grows the gap by at least a day, and Hard < Good < Easy always. Ease never drops below 1.3.
+- **Missing days resets nothing.** A review stays due until you do it; your rating then decides the next gap.
 - A problem is **mature** once its gap reaches 21 days. Gaps are capped at 365 days.
+- Problems logged before ratings existed keep their schedule; your next rating takes over from there.
 
 ## Motivation without streaks
 
@@ -81,7 +94,7 @@ Streaks drop to zero after one missed day, which is exactly when people give up,
 | --- | --- |
 | Long-term memory | Problems with a review gap of 21+ days (you'd remember them for 3+ weeks) |
 | Memory bar | Every solved problem by stage: learning (< 1 week), strengthening (1–3 weeks), long-term (3+ weeks) |
-| Recall rate | Reviews remembered in the last 30 days, e.g. "11 of 14 (79%)" |
+| Recall rate | Reviews in the last 30 days that weren't Again, e.g. "11 of 14 (79%)" |
 | Study days | Total days you've studied; it only goes up |
 | This week: 3 of 5 | Days against a flexible weekly target (2 rest days built in; `app.weekly-target-days`) |
 | Daily minimum | "One review or one new problem"; ✓ once done |
@@ -129,9 +142,9 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 | GET / PATCH | `/api/me` | `{ startDate }` | your account: `{ username, startDate, hasRecoveryCode }` |
 | POST | `/api/me/recovery-code` | `{ password }` | `{ recoveryCode }`: a new code; the old one stops working |
 | GET | `/api/dashboard` | | due reviews, memory stages, recall, study days, weekly tests, all 150 problems with your progress |
-| POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl, code?, codeLanguage? }` | first review tomorrow; code (if any) is saved and analysed |
+| POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl, code?, codeLanguage?, rating }` | `rating` is AGAIN / HARD / GOOD / EASY (shown as Forgot / Hard / Medium / Easy; missing = GOOD) and sets the first review; code (if any) is saved and analysed |
 | POST | `/api/analysis/preview` | `{ code, codeLanguage, catalogId? }` | analyses code without saving it (the Mark as done window); with `catalogId`, includes a recommendation |
-| POST | `/api/problems/{id}/reviews` | `{ remembered: true \| false }` | returns the new gap and due date |
+| POST | `/api/problems/{id}/reviews` | `{ rating: AGAIN \| HARD \| GOOD \| EASY }` | returns the new gap and due date (the older `{ remembered }` still works) |
 | PATCH | `/api/problems/{id}/notes` | `{ learnings, excalidrawUrl, code, codeLanguage }` | only on the day it was solved, else 409 |
 | POST | `/api/problems/{id}/analysis` | | analyses the saved code; only on the day it was solved |
 | DELETE | `/api/problems/{id}` | | undo "done" |
@@ -158,7 +171,7 @@ src/main/java/dev/shivangi/dsatracker/
   service/       AuthService, ProblemService, AnalysisService, DashboardService, WeeklyTestService
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
 src/main/resources/
-  db/migration/V1…V9      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes
+  db/migration/V1…V10      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   static/        http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css
 src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)

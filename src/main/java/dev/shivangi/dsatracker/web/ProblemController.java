@@ -3,14 +3,16 @@ package dev.shivangi.dsatracker.web;
 import dev.shivangi.dsatracker.analysis.ApproachRecommender;
 import dev.shivangi.dsatracker.analysis.CodeLanguage;
 import dev.shivangi.dsatracker.domain.Problem;
+import dev.shivangi.dsatracker.repetition.Rating;
+import dev.shivangi.dsatracker.repetition.SpacedRepetitionPolicy;
 import dev.shivangi.dsatracker.security.AuthUser;
 import dev.shivangi.dsatracker.security.TooManyRequestsException;
 import dev.shivangi.dsatracker.service.AnalysisService;
+import dev.shivangi.dsatracker.service.BadRequestException;
 import dev.shivangi.dsatracker.service.DashboardService;
 import dev.shivangi.dsatracker.service.ProblemService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
@@ -40,25 +42,32 @@ public class ProblemController {
     private final DashboardService dashboard;
     private final AnalysisService analysis;
     private final ApproachRecommender approaches;
+    private final SpacedRepetitionPolicy policy;
     private final Clock clock;
 
     public ProblemController(ProblemService problems, DashboardService dashboard, AnalysisService analysis,
-                             ApproachRecommender approaches, Clock clock) {
+                             ApproachRecommender approaches, SpacedRepetitionPolicy policy, Clock clock) {
         this.analysis = analysis;
         this.approaches = approaches;
+        this.policy = policy;
         this.clock = clock;
         this.problems = problems;
         this.dashboard = dashboard;
     }
 
-    /** What you type when marking a problem done. Name, link and difficulty come from NeetCode. */
+    /**
+     * What you type when marking a problem done. Name, link and difficulty come from NeetCode.
+     * {@code rating}: how it went for you (Forgot / Hard / Medium / Easy = AGAIN / HARD / GOOD / EASY);
+     * it decides the first review. Missing means GOOD.
+     */
     public record MarkDoneRequest(
             @NotBlank @Size(max = 2000) String learnings,
             @Size(max = 500)
             @Pattern(regexp = "^$|^https://\\S+$", message = "must be an https:// link")
             String excalidrawUrl,
             @Size(max = ProblemService.MAX_CODE_LENGTH) String code,
-            CodeLanguage codeLanguage) {
+            CodeLanguage codeLanguage,
+            Rating rating) {
     }
 
     /**
@@ -79,8 +88,20 @@ public class ProblemController {
             CodeLanguage codeLanguage) {
     }
 
-    /** {@code remembered}: true if you could solve it again from memory. */
-    public record ReviewRequest(@NotNull Boolean remembered) {
+    /**
+     * {@code rating}: Again / Hard / Good / Easy. The older {@code remembered} (true = Good,
+     * false = Again) is still accepted so existing clients keep working.
+     */
+    public record ReviewRequest(Rating rating, Boolean remembered) {
+        Rating resolved() {
+            if (rating != null) {
+                return rating;
+            }
+            if (remembered != null) {
+                return remembered ? Rating.GOOD : Rating.AGAIN;
+            }
+            throw new BadRequestException("Choose Again, Hard, Good or Easy");
+        }
     }
 
     @GetMapping("/dashboard")
@@ -93,7 +114,7 @@ public class ProblemController {
     public ProblemView markDone(@AuthenticationPrincipal AuthUser me, @PathVariable int catalogId,
                                 @Valid @RequestBody MarkDoneRequest req) {
         Problem saved = problems.markDone(me.id(), catalogId, req.learnings(), req.excalidrawUrl(),
-                req.code(), req.codeLanguage());
+                req.code(), req.codeLanguage(), req.rating());
         if (saved.getCode() != null) {
             try {
                 saved = analysis.analyse(me.id(), saved.getId());   // saved with its analysis
@@ -107,7 +128,7 @@ public class ProblemController {
     @PostMapping("/problems/{id}/reviews")
     public ProblemView review(@AuthenticationPrincipal AuthUser me, @PathVariable long id,
                               @Valid @RequestBody ReviewRequest req) {
-        var updated = problems.review(me.id(), id, req.remembered());
+        var updated = problems.review(me.id(), id, req.resolved());
         return view(updated);
     }
 
@@ -132,7 +153,7 @@ public class ProblemController {
     }
 
     private ProblemView view(Problem p) {
-        return ProblemView.of(p, 0, LocalDate.now(clock), approaches);
+        return ProblemView.of(p, 0, LocalDate.now(clock), approaches, policy);
     }
 
     /** Undo a "done" (and its reviews). */

@@ -8,10 +8,10 @@ import java.time.LocalDate;
  *
  * @param intervalDays   the gap that was scheduled after the last review (how long the
  *                       memory is expected to last)
- * @param ease           growth factor applied to the interval on each successful review;
- *                       starts at 2.25 and drops a little after each lapse
+ * @param ease           growth factor applied to the interval on each Good review; set by your
+ *                       first rating (2.3–2.65), lowered by Again and Hard, raised by Easy
  * @param reps           successful reviews so far (the first solve doesn't count)
- * @param lapses         times you forgot it on review
+ * @param lapses         times you pressed Again on a review
  * @param lastReviewedOn the day of the last review, or of the first solve
  * @param nextDueOn      the day the next review is due
  */

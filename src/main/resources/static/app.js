@@ -15,6 +15,10 @@ const diffDays = (a, b) => Math.round((toMs(b) - toMs(a)) / DAY_MS);
 const fmt = (iso, opts = { weekday: 'short', day: 'numeric', month: 'short' }) =>
   new Intl.DateTimeFormat('en-GB', { ...opts, timeZone: 'UTC' }).format(toMs(iso));
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** "tomorrow", "in 3 days" */
+const inDays = (n) => (n === 1 ? 'tomorrow' : `in ${n} days`);
+/** Short gap for a button: "1 day", "8 days", "2.3 mo" */
+const gapLabel = (n) => (n < 60 ? plural(n, 'day') : `${(n / 30).toFixed(1).replace(/\.0$/, '')} mo`);
 
 let state = null;
 let openCats = null;        // categories you've opened; null = not chosen yet, use the default
@@ -192,6 +196,13 @@ function dayCell(iso, { start, end, today, counts }) {
   return cell;
 }
 
+const REVIEW_RATINGS = [
+  ['AGAIN', 'Again', "Couldn't solve it without help"],
+  ['HARD', 'Hard', 'Solved it, with real effort'],
+  ['GOOD', 'Good', 'Solved it with normal effort'],
+  ['EASY', 'Easy', 'Quick and confident'],
+];
+
 function renderDue(d) {
   const list = $('due-list');
   list.replaceChildren();
@@ -225,13 +236,21 @@ function renderDue(d) {
     // Try the problem first; your notes are one click away if you need them.
     const { toggle, panel } = notes(p);
 
+    // Rate it as in Anki; each button shows when you'd see the problem next.
     const answer = el('div', 'answer');
-    const yes = el('button', 'btn', 'Remembered');
-    const no = el('button', 'btn', 'Forgot');
-    yes.type = no.type = 'button';
-    yes.addEventListener('click', () => revise(p, true, [yes, no]));
-    no.addEventListener('click', () => revise(p, false, [yes, no]));
-    answer.append(yes, no);
+    answer.setAttribute('role', 'group');
+    answer.setAttribute('aria-label', `How did "${p.name}" go?`);
+    const buttons = REVIEW_RATINGS.map(([rating, label, hint]) => {
+      const b = el('button', `btn rate rate-${rating.toLowerCase()}`);
+      b.type = 'button';
+      const gap = p.reviewGaps && p.reviewGaps[rating];
+      b.append(el('span', 'rate-name', label));
+      if (gap) b.append(el('span', 'rate-gap', gapLabel(gap)));
+      b.title = gap ? `${hint}. Next review ${inDays(gap)}.` : hint;
+      return b;
+    });
+    buttons.forEach((b, i) => b.addEventListener('click', () => revise(p, REVIEW_RATINGS[i][0], buttons)));
+    answer.append(...buttons);
 
     li.append(main, toggle, answer, panel);
     list.append(li);
@@ -703,15 +722,17 @@ document.querySelectorAll('input[name=show]').forEach((r) =>
 $('catalog-search').addEventListener('input', () => state && renderCatalog(state));
 
 // ---------- actions
-async function revise(p, remembered, buttons) {
+async function revise(p, rating, buttons) {
   buttons.forEach((b) => (b.disabled = true));
   try {
     const updated = await api(`/api/problems/${p.id}/reviews`, {
       method: 'POST',
-      body: JSON.stringify({ remembered }),
+      body: JSON.stringify({ rating }),
     });
-    const when = `${plural(updated.intervalDays, 'day')} (${fmt(updated.nextDueOn)})`;
-    toast(remembered ? `Nice. Next review in ${when}.` : `No problem. You'll see it again in ${when} to relearn it.`);
+    const when = `${inDays(updated.intervalDays)} (${fmt(updated.nextDueOn)})`;
+    toast(rating === 'AGAIN'
+      ? `No problem. You'll see it again ${when} to relearn it.`
+      : `${rating === 'EASY' ? 'Great' : 'Nice'}. Next review ${when}.`);
     await load();
   } catch (e) {
     toast(e.message);
@@ -742,12 +763,17 @@ function openDone(c) {
   $('done-analyse-status').textContent = '';
   $('done-title').textContent = c.name;
   $('done-meta').textContent =
-    `${LEVEL[c.difficulty]} · first review tomorrow, ${fmt(addDays(state.today, 1))}. The gaps then grow as you remember it.`;
+    `${LEVEL[c.difficulty]} on NeetCode. Rate it for yourself: your rating decides the first review.`;
+  document.querySelectorAll('#done-rating .rating-when').forEach((span) => {
+    const gap = state.firstGaps && state.firstGaps[span.dataset.rating];
+    span.textContent = gap ? `Review ${inDays(gap)}` : '';
+  });
   dialog.showModal();
   doneForm.learnings.focus();
 }
 
 $('done-cancel').addEventListener('click', () => dialog.close());
+$('done-rating').addEventListener('change', () => { $('done-error').hidden = true; });
 
 // Your code, analysed before anything is saved. Esc in the code box first ends Tab-indenting;
 // it only closes the window if pressed again.
@@ -802,6 +828,13 @@ doneForm.addEventListener('submit', async (ev) => {
     err.hidden = false;
     return;
   }
+  const rating = doneForm.rating.value;
+  if (!rating) {
+    err.textContent = 'Choose how it went: Forgot, Hard, Medium or Easy.';
+    err.hidden = false;
+    doneForm.querySelector('input[name=rating]').focus();
+    return;
+  }
   if (excalidrawUrl && !/^https:\/\/\S+$/.test(excalidrawUrl)) {
     err.textContent = 'The Excalidraw link must start with https://';
     err.hidden = false;
@@ -815,12 +848,12 @@ doneForm.addEventListener('submit', async (ev) => {
     const codeLanguage = code ? $('done-lang').value : null;
     const saved = await api(`/api/catalog/${doneTarget.id}/done`, {
       method: 'POST',
-      body: JSON.stringify({ learnings, excalidrawUrl, code, codeLanguage }),
+      body: JSON.stringify({ learnings, excalidrawUrl, code, codeLanguage, rating }),
     });
     if (codeLanguage) rememberLanguage(codeLanguage);
     dialog.close();
     const complexity = saved.analysis ? ` Time ${saved.analysis.time}, space ${saved.analysis.space}.` : '';
-    toast(`Done. First review tomorrow, ${fmt(saved.nextDueOn)}.${complexity}`);
+    toast(`Done. First review ${inDays(saved.intervalDays)}, ${fmt(saved.nextDueOn)}.${complexity}`);
     await load();
   } catch (e) {
     err.textContent = e.message;
