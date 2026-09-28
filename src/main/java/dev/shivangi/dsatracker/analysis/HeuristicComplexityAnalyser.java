@@ -94,7 +94,8 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             "(?i)^(i|j|k|idx|index|start|end|left|right|l|r|lo|hi|pos|n|m|amount|target|remain|rem|remaining|sum|total|row|col|"
                     + "c|x|y|mask|count|cap|capacity|w|day|days|steps|step|buy|holding|prev|last|a|b|i1|i2|p1|p2|curr|cur)$");
 
-    private static final Pattern OUTPUT_VAR = Pattern.compile("(?i)^\\s*([\\w<>\\[\\],.\\s]*?\\s)?(res|result|results|ans|answer|answers|output|out|ret)\\s*=");
+    private static final Pattern OUTPUT_VAR = Pattern.compile("(?i)^\\s*([\\w<>\\[\\],.\\s]*?\\s)?(res|result|results|ans|answer|answers|output|out|ret)\\s*(\\[\\s*\\])?\\s*=");
+    private static final Pattern RETURNED = Pattern.compile("\\breturn\\s+(\\w+)\\s*;?\\s*$");
     private static final Pattern NEW_2D = Pattern.compile("new\\s+\\w+\\s*\\[([^\\]]+)\\]\\s*\\[([^\\]]+)\\]");
     private static final Pattern NEW_1D = Pattern.compile("new\\s+\\w+\\s*\\[([^\\]]+)\\](?!\\s*\\[)");
     private static final Pattern PY_2D = Pattern.compile("\\[\\s*\\[[^\\]]*\\]\\s*\\*\\s*\\(?([^\\]\\n]+?)\\)?\\s+for\\s+\\w+\\s+in\\s+range\\s*\\(([^)]*)\\)\\s*\\]");
@@ -652,6 +653,13 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             boolean growing = root.descendants().stream().anyMatch(n -> n.kind == Kind.LOOP)
                     || fnInfo.values().stream().anyMatch(f -> !f.depth.equals(Cx.ONE));
             boolean skippedOutput = false;
+            Set<String> returned = new HashSet<>();   // whatever is returned is the answer: not extra space
+            for (String l : lines) {
+                Matcher r = RETURNED.matcher(l);
+                if (r.find() && !r.group(1).matches("true|false|null|None|True|False|\\d+")) {
+                    returned.add(r.group(1));
+                }
+            }
             for (int i = 0; i < lines.length; i++) {
                 String line = lines[i];
                 int no = i + 1;
@@ -663,7 +671,7 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 if (line.isBlank() || line.strip().startsWith("return")) {
                     continue;
                 }
-                if (OUTPUT_VAR.matcher(line).find()) {
+                if (OUTPUT_VAR.matcher(line).find() || declaresAny(line, returned)) {
                     skippedOutput = true;
                     continue;
                 }
@@ -796,6 +804,16 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 }
             }
             return null;
+        }
+
+        /** True if {@code line} assigns one of {@code names} ("int[] res = …", "res [] = …", "res = …"). */
+        static boolean declaresAny(String line, Set<String> names) {
+            for (String n : names) {
+                if (Pattern.compile("(^|[^\\w.])" + Pattern.quote(n) + "\\s*(\\[\\s*\\])?\\s*=(?!=)").matcher(line).find()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /** sorted((a, b, c)) or sorted([x, y]): a literal handful of values, not the input. */

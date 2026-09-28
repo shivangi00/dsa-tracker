@@ -67,4 +67,21 @@ class BestApproachesTest {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
+
+    @Test
+    void everyProblemHasInterviewTips() throws IOException {
+        Map<Integer, String> catalog = catalogNames();
+        approaches.forEach((id, problem) -> {
+            int n = problem.tips().size();
+            assertTrue(n >= 2 && n <= 4, "problem " + id + " has " + n + " tips");
+            problem.tips().forEach(t -> assertTrue(!t.isBlank() && t.length() <= 220, id + ": " + t));
+        });
+        Matcher m = java.util.regex.Pattern.compile("\"id\":(\\d+),\"problem\":\"([^\"]+)\"").matcher(resource(BestApproaches.TIPS));
+        int seen = 0;
+        while (m.find()) {
+            assertEquals(catalog.get(Integer.parseInt(m.group(1))), m.group(2));
+            seen++;
+        }
+        assertEquals(150, seen);
+    }
 }

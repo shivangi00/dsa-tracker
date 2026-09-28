@@ -122,6 +122,7 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
   - **Built-in estimate** (always available, free, nothing leaves the server): reads the code's structure. Nested loops multiply; fixed loops (26 letters, 4 directions) are O(1); halving loops are O(log n); sliding windows and monotonic stacks are amortised; sort is O(n log n), heap operations O(log n). Recursion is classified as tree traversal, visit-once DFS/BFS, divide and conquer, memoised, backtracking or exponential. Space counts arrays, maps, 2-D tables and recursion depth, not the returned answer. It uses k for the size of each item (Group Anagrams is O(n·k)) and m·n for grids. Tested on 33 NeetCode solutions.
   - **Claude** (optional): set `ANTHROPIC_API_KEY` and Analyse asks Claude instead; if Claude can't be reached, the built-in estimate answers. Limited to 50 analyses per user per day.
 - **The working is shown step by step** for *your* code: time steps then space steps, in line order (outer loop before inner), each ending with the total, so you can check the reasoning and spot mistakes.
+- **Talking points for an interview**, under the analysis (collapsed): 2–3 points for each of the 150 problems (edge cases, clarifying questions, trade-offs), from `interview-tips.json`. With Claude analysis on, Claude adds points about your own code, such as an edge case it handles or misses.
 - Changing the code clears its old analysis, since that analysis described different code.
 - **Better approach suggestions**, shown separately below your analysis as a nudge (the approach itself stays behind *Show a hint*, so you can try first). After every analysis, the result is compared with the best known approaches for that NeetCode problem (a hand-written list of 1–2 approaches for each of the 150, in `best-approaches.json`: name, time, space and the idea in a sentence or two). You see one of:
   - **Faster approach available**: its complexity, and the idea behind a *Show the idea* toggle (plus the memory it costs, if it uses more than yours).
@@ -174,6 +175,7 @@ src/main/java/dev/shivangi/dsatracker/
 src/main/resources/
   db/migration/V1…V10      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
+  interview-tips.json     interview talking points for each of the 150 problems
   static/        http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css
 src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)
 Dockerfile (Render), Dockerfile.vercel + vercel.json (Vercel, kept in case its limits change), docker-compose.yml, .github/workflows/ci.yml, .env.example, DEPLOY.md

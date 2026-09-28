@@ -35,7 +35,9 @@ public final class ClaudeComplexityAnalyser implements ComplexityAnalyser {
             reasons are the working, in plain words, each under 200 characters: first the time steps, each
             starting "Time: " and naming the line ("Time: Line 3: ..."), in line order, ending with
             "Time: total → O(...)" and why; then the space steps the same way, starting "Space: " and ending
-            with "Space: total → O(...)". Use 3 to 10 reasons.""";
+            with "Space: total → O(...)". Then 1 to 3 reasons starting "Interview: " with points about THIS
+            code worth saying in an interview: an edge case it handles well or misses, a bug risk, or a
+            trade-off. Use 4 to 12 reasons.""";
 
     private final HttpClient http;
     private final ObjectMapper json;
@@ -103,8 +105,8 @@ public final class ClaudeComplexityAnalyser implements ComplexityAnalyser {
         String space = bigO(answer.path("space").asText());
         List<String> reasons = new ArrayList<>();
         for (JsonNode r : answer.path("reasons")) {
-            String s = r.asText().strip();
-            if (!s.isEmpty() && reasons.size() < 10) {
+            String s = r.asText().replaceAll("\\s+", " ").strip();   // one line each: stored newline-separated
+            if (!s.isEmpty() && reasons.size() < 12) {
                 reasons.add(s.length() > 300 ? s.substring(0, 300) + "…" : s);
             }
         }

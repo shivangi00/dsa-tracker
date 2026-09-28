@@ -606,4 +606,13 @@ class HeuristicComplexityAnalyserTest {
         ComplexityAnalysis a = analyser.analyse(code, CodeLanguage.PYTHON);
         assertEquals("O(n³)", a.time(), String.join("\n", a.reasons()));
     }
+
+    @Test
+    void theReturnedArrayIsNotExtraSpace() {
+        String code = "int[] firstK(int[] nums, int k) {\n    int out2 [] = new int [k];\n    for (int i = 0; i < k; i++) {\n"
+                + "        out2[i] = nums[i];\n    }\n    return out2;\n}\n";
+        ComplexityAnalysis a = analyser.analyse(code, CodeLanguage.JAVA);
+        assertEquals("O(1)", a.space(), String.join("\n", a.reasons()));
+        assertTrue(a.reasons().stream().anyMatch(r -> r.contains("isn't counted as extra space")));
+    }
 }

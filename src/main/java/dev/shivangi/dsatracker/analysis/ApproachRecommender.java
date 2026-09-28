@@ -26,6 +26,11 @@ public class ApproachRecommender {
         this.byCatalogId = Map.copyOf(byCatalogId);
     }
 
+    /** Interview talking points for a NeetCode problem; empty for anything else. */
+    public List<String> tips(Integer catalogId) {
+        return problem(catalogId).tips();
+    }
+
     private KnownProblem problem(Integer catalogId) {
         return catalogId == null ? UNKNOWN : byCatalogId.getOrDefault(catalogId, UNKNOWN);
     }

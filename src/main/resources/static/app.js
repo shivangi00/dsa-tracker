@@ -681,7 +681,25 @@ function analysisBox(a) {
   if (a.reasons && a.reasons.length) box.append(workingBox(a.reasons));
   wrap.append(box);
   if (a.recommendation) wrap.append(recommendationBox(a.recommendation, a.confidence));
+  const aboutYourCode = (a.reasons || []).filter((r) => r.startsWith('Interview: ')).map((r) => r.slice(11));
+  if (aboutYourCode.length || (a.interviewTips && a.interviewTips.length)) {
+    wrap.append(talkingPoints(aboutYourCode, a.interviewTips || []));
+  }
   return wrap;
+}
+
+/** What to say out loud in an interview: points about your code (Claude only), then the problem's. */
+function talkingPoints(aboutYourCode, tips) {
+  const details = el('details', 'talking');
+  details.append(el('summary', '', 'Talking points for an interview'));
+  for (const [title, items] of [['About your code', aboutYourCode], ['For this problem', tips]]) {
+    if (!items.length) continue;
+    if (aboutYourCode.length) details.append(el('p', 'why-head', title));
+    const list = el('ul');
+    for (const t of items) list.append(el('li', '', t));
+    details.append(list);
+  }
+  return details;
 }
 
 /** The working, grouped into Time and Space steps (each ending with its total), then any notes. */
@@ -692,6 +710,7 @@ function workingBox(reasons) {
   const groups = { Time: [], Space: [] };
   const notes = [];
   for (const r of reasons) {
+    if (r.startsWith('Interview: ')) continue;   // shown under Talking points
     const m = /^(Time|Space): (.*)$/s.exec(r);
     if (m) groups[m[1]].push(m[2]); else notes.push(r);
   }

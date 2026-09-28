@@ -8,11 +8,18 @@ import java.util.List;
  * @param approaches the best known approaches (at least one that isn't advanced)
  * @param fixedSize  null, or why the input size is bounded ("the board is always 9×9"): then every
  *                   loop is effectively constant and comparing complexities would only mislead
+ * @param tips       interview talking points for the problem (edge cases, trade-offs), from
+ *                   {@code interview-tips.json}
  */
-public record KnownProblem(List<Approach> approaches, String fixedSize) {
+public record KnownProblem(List<Approach> approaches, String fixedSize, List<String> tips) {
 
     public KnownProblem {
         approaches = List.copyOf(approaches);
+        tips = List.copyOf(tips);
+    }
+
+    public KnownProblem(List<Approach> approaches, String fixedSize) {
+        this(approaches, fixedSize, List.of());
     }
 
     public static KnownProblem of(Approach... approaches) {
