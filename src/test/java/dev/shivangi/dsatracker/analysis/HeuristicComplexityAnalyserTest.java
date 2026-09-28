@@ -2,6 +2,8 @@ package dev.shivangi.dsatracker.analysis;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static dev.shivangi.dsatracker.analysis.CodeLanguage.CPP;
 import static dev.shivangi.dsatracker.analysis.CodeLanguage.JAVA;
 import static dev.shivangi.dsatracker.analysis.CodeLanguage.JAVASCRIPT;
@@ -561,5 +563,47 @@ class HeuristicComplexityAnalyserTest {
     void garbageNeverThrows() {
         ComplexityAnalysis a = analyser.analyse("}}}{{{ ((( for while )))", JAVA);
         assertFalse(a.time().isEmpty());
+    }
+
+    @Test
+    void sortedMakesACopySoItCountsAsSpace() {
+        ComplexityAnalysis a = analyser.analyse("def f(s, t):\n    return sorted(s) == sorted(t)\n", CodeLanguage.PYTHON);
+        assertEquals("O(n log n) / O(n)", a.time() + " / " + a.space());
+        assertTrue(a.reasons().stream().anyMatch(r -> r.startsWith("Space: Line 2: sorted() builds a new sorted copy")));
+    }
+
+    @Test
+    void stepsAreSplitIntoTimeThenSpaceInLineOrderWithTotals() {
+        String code = "def f(nums):\n    seen = set()\n    for i in range(len(nums)):\n        for j in range(len(nums)):\n"
+                + "            seen.add(nums[i] + nums[j])\n    return len(seen)\n";
+        List<String> r = analyser.analyse(code, CodeLanguage.PYTHON).reasons();
+        int outer = indexOf(r, "Time: Line 3"), inner = indexOf(r, "Time: Line 4"), timeTotal = indexOf(r, "Time: total → O(n²)");
+        int space = indexOf(r, "Space: Line 2"), spaceTotal = indexOf(r, "Space: total → O(n)");
+        assertTrue(outer >= 0 && outer < inner && inner < timeTotal && timeTotal < space && space < spaceTotal, String.join("\n", r));
+    }
+
+    @Test
+    void codeWithNothingThatGrowsSaysSoForBoth() {
+        List<String> r = analyser.analyse("def f(a, b):\n    return a + b\n", CodeLanguage.PYTHON).reasons();
+        assertTrue(r.get(0).startsWith("Time: no loops"), String.join("\n", r));
+        assertTrue(r.get(1).startsWith("Space: only single variables"), String.join("\n", r));
+    }
+
+    private static int indexOf(List<String> lines, String prefix) {
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).startsWith(prefix)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    @Test
+    void sortingAHandfulOfValuesIsConstant() {
+        String code = "def threeSum(nums):\n    res = set()\n    for i in range(len(nums)):\n        for j in range(i + 1, len(nums)):\n"
+                + "            for k in range(j + 1, len(nums)):\n                if nums[i] + nums[j] + nums[k] == 0:\n"
+                + "                    res.add(tuple(sorted((nums[i], nums[j], nums[k]))))\n    return [list(t) for t in res]\n";
+        ComplexityAnalysis a = analyser.analyse(code, CodeLanguage.PYTHON);
+        assertEquals("O(n³)", a.time(), String.join("\n", a.reasons()));
     }
 }

@@ -658,10 +658,15 @@ function indentWithTab(e) {
   box.dispatchEvent(new Event('input'));
 }
 
-/** Time and space, how sure the analysis is, and the steps behind it. */
+/**
+ * The analysis of YOUR code (time, space and the working), then, separately, a nudge towards a
+ * better approach if one exists, with the approach itself behind a hint so you can try first.
+ */
 function analysisBox(a) {
+  const wrap = el('div', 'analysis-wrap');
   const box = el('section', 'analysis');
-  box.setAttribute('aria-label', 'Complexity analysis');
+  box.setAttribute('aria-label', 'Complexity of your code');
+  box.append(el('p', 'analysis-title', 'Your code'));
   const head = el('div', 'analysis-head');
   const time = el('div', 'metric');
   time.append(el('span', 'metric-label', 'Time'), el('span', 'metric-value', a.time));
@@ -673,48 +678,86 @@ function analysisBox(a) {
     el('span', 'source', a.source === 'claude' ? 'Analysed by Claude' : 'Built-in estimate'));
   head.append(time, space, meta);
   box.append(head);
-  if (a.recommendation) box.append(recommendationBox(a.recommendation, a.confidence));
-  if (a.reasons && a.reasons.length) {
-    const details = el('details', 'analysis-why');
-    details.append(el('summary', '', 'How this was worked out'));
-    const list = el('ul');
-    for (const r of a.reasons) list.append(el('li', '', r));
-    details.append(list);
-    box.append(details);
+  if (a.reasons && a.reasons.length) box.append(workingBox(a.reasons));
+  wrap.append(box);
+  if (a.recommendation) wrap.append(recommendationBox(a.recommendation, a.confidence));
+  return wrap;
+}
+
+/** The working, grouped into Time and Space steps (each ending with its total), then any notes. */
+function workingBox(reasons) {
+  const details = el('details', 'analysis-why');
+  details.open = true;
+  details.append(el('summary', '', "How your code's complexity was worked out"));
+  const groups = { Time: [], Space: [] };
+  const notes = [];
+  for (const r of reasons) {
+    const m = /^(Time|Space): (.*)$/s.exec(r);
+    if (m) groups[m[1]].push(m[2]); else notes.push(r);
   }
-  return box;
+  if (!groups.Time.length && !groups.Space.length) {
+    // analysed before steps were grouped: show them as they are
+    const list = el('ul');
+    for (const r of notes) list.append(el('li', '', r));
+    details.append(list);
+    return details;
+  }
+  for (const [name, steps] of Object.entries(groups)) {
+    if (!steps.length) continue;
+    const group = el('div', 'why-group');
+    group.append(el('p', 'why-head', name));
+    const list = el('ol');
+    for (const step of steps) {
+      if (/^total\b/i.test(step)) {
+        // "total → O(n³). Why…": the result in bold, the why in normal text
+        const [, result, why] = /^total\s*(.*?\.)(\s.*)?$/is.exec(step) || [null, step.replace(/^total\s*/i, ''), ''];
+        const li = el('li', 'why-total');
+        li.append(el('strong', '', `Total ${result}`), document.createTextNode(why || ''));
+        list.append(li);
+      } else {
+        list.append(el('li', '', step));
+      }
+    }
+    group.append(list);
+    details.append(group);
+  }
+  if (notes.length) {
+    const small = el('div', 'why-notes');
+    for (const n of notes) small.append(el('p', '', n));
+    details.append(small);
+  }
+  return details;
 }
 
 const VERDICTS = {
-  faster: 'Faster approach available',
-  leaner: 'Less memory, same speed',
-  optimal: 'Matches the best known',
+  faster: 'Can you make it faster?',
+  leaner: 'Can you use less memory?',
+  optimal: 'Already optimal',
   check: 'Worth a second look',
   fixed: 'Fixed-size input',
 };
 
-/** How the solution compares with the best known approaches, with the idea behind a toggle. */
+/** A nudge, not an answer: what's possible, with the approach behind a toggle. */
 function recommendationBox(r, confidence) {
   const box = el('div', `rec rec-${r.verdict}`);
   box.append(el('p', 'rec-title', VERDICTS[r.verdict] || 'Best known approach'));
   box.append(el('p', 'rec-msg', r.message));
-  if (confidence === 'low' && (r.verdict === 'faster' || r.verdict === 'leaner')) {
+  const nudge = r.verdict === 'faster' || r.verdict === 'leaner';
+  if (confidence === 'low' && nudge) {
     box.append(el('p', 'rec-hedge', 'The analysis above is a low-confidence estimate, so check it before rewriting.'));
   }
-  box.append(approachLine(r.verdict === 'optimal' ? 'Best known' : r.verdict === 'fixed' ? 'Usual approach' : 'Try', r.approach));
-  if (r.further) box.append(approachLine('Going further', r.further));
+  box.append(approachHint(nudge ? 'Show a hint' : 'Compare with the known approach', r.approach));
+  if (r.further) box.append(approachHint('Going further (advanced)', r.further));
   return box;
 }
 
-function approachLine(label, a) {
-  const wrap = el('div', 'rec-approach');
-  const line = el('p', 'rec-line');
-  line.append(el('span', 'rec-label', label), el('strong', '', a.name),
-    el('span', 'rec-cx', `${a.time} time · ${a.space} space`));
+function approachHint(label, a) {
   const idea = el('details', 'rec-idea');
-  idea.append(el('summary', '', 'Show the idea'), el('p', '', a.idea));
-  wrap.append(line, idea);
-  return wrap;
+  idea.append(el('summary', '', label));
+  const line = el('p', 'rec-line');
+  line.append(el('strong', '', a.name), el('span', 'rec-cx', `${a.time} time · ${a.space} space`));
+  idea.append(line, el('p', 'rec-text', a.idea));
+  return idea;
 }
 
 document.querySelectorAll('input[name=show]').forEach((r) =>

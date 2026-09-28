@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +50,8 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
 
     private static final Pattern SORT = Pattern.compile(
             "\\b(Arrays|Collections)\\.sort\\s*\\(|\\.sort\\s*\\(|\\bsorted\\s*\\(|\\bstd::sort\\s*\\(|(^|[^.\\w])sort\\s*\\(");
+    private static final Pattern SORTED_COPY = Pattern.compile("\\bsorted\\s*\\(|\\.sorted\\s*\\(");
+    private static final Pattern LINE_PREFIX = Pattern.compile("^Line (\\d+):");
     private static final Pattern PY_HEAP_OP = Pattern.compile("\\bheapq\\.(heappush|heappop|heappushpop|heapreplace)\\s*\\(");
     private static final Pattern LINEAR_CALL = Pattern.compile(
             "\\.stream\\s*\\(|\\.substring\\s*\\(|\\.indexOf\\s*\\(|\\.index\\s*\\(|\\.join\\s*\\(|\\.split\\s*\\("
@@ -190,7 +191,13 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
         final Set<String> heapVars = new HashSet<>();
         final Map<Node, Fn> fnInfo = new IdentityHashMap<>();
         final Set<Node> inProgress = new HashSet<>();
-        final LinkedHashSet<String> reasons = new LinkedHashSet<>();
+        /** One step of the explanation: which part (time or space), the line it's about, the text. */
+        record Step(boolean space, int line, String text) {
+        }
+
+        final List<Step> steps = new ArrayList<>();
+        final Set<String> seen = new HashSet<>();
+        boolean inSpace;
         int confidence = 3;   // 3 high, 2 medium, 1 low
         Cx globalTime = Cx.ONE;
 
@@ -221,7 +228,54 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
         }
 
         void reason(String r) {
-            reasons.add(r);
+            if (!seen.add((inSpace ? "S" : "T") + r)) {
+                return;
+            }
+            Matcher m = LINE_PREFIX.matcher(r);
+            steps.add(new Step(inSpace, m.find() ? Integer.parseInt(m.group(1)) : Integer.MAX_VALUE, r));
+        }
+
+        /** The first line of the cleaned code containing {@code stmt}, as "Line N: ", or "" if not found. */
+        String lineOf(String stmt) {
+            String want = stmt.strip();
+            if (want.isEmpty()) {
+                return "";
+            }
+            String[] lines = clean.split("\n", -1);
+            for (int i = 0; i < lines.length; i++) {
+                if (lines[i].contains(want)) {
+                    return "Line " + (i + 1) + ": ";
+                }
+            }
+            return "";
+        }
+
+        /**
+         * Time steps then space steps, each in line order (outer loop before inner) and each ending
+         * with the total, so the explanation reads like working it out by hand.
+         */
+        List<String> explain(Cx time, Cx space) {
+            List<String> out = new ArrayList<>();
+            for (boolean isSpace : new boolean[] {false, true}) {
+                String label = isSpace ? "Space: " : "Time: ";
+                List<Step> part = steps.stream().filter(st -> st.space() == isSpace)
+                        .sorted(java.util.Comparator.comparingInt(Step::line)).limit(8).toList();
+                part.forEach(st -> out.add(label + Character.toUpperCase(st.text().charAt(0)) + st.text().substring(1)));
+                Cx total = isSpace ? space : time;
+                String t = total.format(grid);
+                if (part.isEmpty()) {
+                    out.add(label + (isSpace
+                            ? "only single variables, which don't grow with the input → O(1)."
+                            : "no loops, recursion or growing work: every step runs a fixed number of times → O(1)."));
+                } else if (isSpace) {
+                    out.add(label + "total → " + t + ". The largest structure (or the recursion depth) decides it.");
+                } else {
+                    out.add(label + "total → " + t + (part.size() > 1
+                            ? ". Loops inside loops multiply; parts that run one after another add, and the biggest one wins."
+                            : "."));
+                }
+            }
+            return out;
         }
 
         void lower(int to) {
@@ -241,11 +295,7 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             time = Cx.max(time, globalTime);
             Cx space = space(depth);
 
-            List<String> out = new ArrayList<>();
-            reasons.stream().limit(10).forEach(out::add);
-            if (out.isEmpty()) {
-                out.add("No loops, recursion or growing data structures: every step runs a fixed number of times.");
-            }
+            List<String> out = explain(time, space);
             out.add(grid
                     ? "m × n is the size of the grid (m rows, n columns)."
                     : "n is the size of the input (for two inputs, the larger one)."
@@ -309,24 +359,26 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 if (stmt.isBlank()) {
                     continue;
                 }
-                if (SORT.matcher(stmt).find()) {
+                if (SORT.matcher(stmt).find() && sortsFixedValues(stmt)) {
+                    reason(lineOf(stmt) + "sorting a fixed handful of values (like 3 numbers) is O(1).");
+                } else if (SORT.matcher(stmt).find()) {
                     boolean item = !grid && identifiers(stmt).stream().anyMatch(ctx.elements()::contains);
                     if (item) {
                         c = Cx.max(c, Cx.K_LOG_K);
-                        reason("Sorting each item (size k)" + where + " costs O(k log k).");
+                        reason(lineOf(stmt) + "sorting each item (size k)" + where + " costs O(k log k).");
                     } else {
                         c = Cx.max(c, Cx.N_LOG_N);
-                        reason("Sorting costs O(n log n)" + where + ".");
+                        reason(lineOf(stmt) + "sorting costs O(n log n)" + where + ".");
                     }
                 }
                 if (PY_HEAP_OP.matcher(stmt).find() || heapOp(stmt)) {
                     c = Cx.max(c, Cx.LOG);
-                    reason("Each heap (priority queue) push or pop costs O(log n)" + where + ".");
+                    reason(lineOf(stmt) + "each heap (priority queue) push or pop costs O(log n)" + where + ".");
                 }
                 int fors = count(Pattern.compile("\\bfor\\b"), stmt);
                 if (lang.usesIndentation() && fors > 0 && (stmt.contains("[") || stmt.contains("(") || stmt.contains("{"))) {
                     c = Cx.max(c, Cx.power(fors));
-                    reason("A comprehension goes over the input" + where + " → " + Cx.power(fors).format(grid) + ".");
+                    reason(lineOf(stmt) + "a comprehension goes over the input" + where + " → " + Cx.power(fors).format(grid) + ".");
                 }
                 if (LINEAR_CALL.matcher(stmt).find()) {
                     c = Cx.max(c, Cx.N);
@@ -400,7 +452,7 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 }
             }
             if (!ctx.loops.isEmpty() && isAmortised(loop, ctx.loops.get(ctx.loops.size() - 1))) {
-                reason("Line " + loop.line + ": this inner loop only moves forward (each element is added and removed at most once over the whole run), so it's O(1) amortised per outer step, not O(n).");
+                reason("Line " + loop.line + ": this inner loop only moves forward: over the whole run it takes at most about n steps in total, so it adds O(n) overall instead of multiplying (O(1) amortised per outer step).");
                 lower(2);
                 return Cx.ONE;
             }
@@ -594,6 +646,7 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
         // ------------------------------------------------------------------ space
 
         Cx space(Cx depth) {
+            inSpace = true;
             Cx space = Cx.ONE;
             String[] lines = clean.split("\n", -1);
             boolean growing = root.descendants().stream().anyMatch(n -> n.kind == Kind.LOOP)
@@ -602,6 +655,11 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             for (int i = 0; i < lines.length; i++) {
                 String line = lines[i];
                 int no = i + 1;
+                if (!line.isBlank() && SORTED_COPY.matcher(line).find() && !sortsFixedValues(line)) {
+                    reason("Line " + no + ": sorted() builds a new sorted copy → O(n) space.");
+                    space = Cx.max(space, Cx.N);
+                    continue;
+                }
                 if (line.isBlank() || line.strip().startsWith("return")) {
                     continue;
                 }
@@ -612,6 +670,11 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 Cx found = null;
                 String what = null;
                 Matcher m;
+                if (SORT.matcher(line).find() && !SORTED_COPY.matcher(line).find()) {
+                    reason("Line " + no + ": sorting in place still uses some memory inside the sort (O(log n) for most "
+                            + "built-in sorts, up to O(n) for Python's and for sorting objects in Java). Not counted here, "
+                            + "but worth mentioning in an interview.");
+                }
                 if ((m = NEW_2D.matcher(line)).find() || (m = CPP_2D.matcher(line)).find()) {
                     found = dims(m.group(1), m.group(2));
                     what = "a 2-D table";
@@ -733,6 +796,24 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 }
             }
             return null;
+        }
+
+        /** sorted((a, b, c)) or sorted([x, y]): a literal handful of values, not the input. */
+        static boolean sortsFixedValues(String stmt) {
+            Matcher m = Pattern.compile("\\bsorted\\s*\\(").matcher(stmt);
+            if (!m.find()) {
+                return false;
+            }
+            String args = argsAt(stmt, m.end() - 1);
+            if (args == null) {
+                return false;
+            }
+            String a = args.strip();
+            if (a.length() < 2 || !((a.startsWith("(") && a.endsWith(")")) || (a.startsWith("[") && a.endsWith("]")))) {
+                return false;
+            }
+            String inner = a.substring(1, a.length() - 1);
+            return topLevelComma(inner) && !inner.matches("(?s).*\\bfor\\b.*");
         }
 
         static boolean topLevelComma(String args) {
