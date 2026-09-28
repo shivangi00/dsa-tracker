@@ -71,6 +71,7 @@ app:
   zone: Europe/London
   plan-days: 100
   target-problems: 150
+  last-new-problem-day: 85            # new problems stop here; days 86–100 are for revisions
   weekly-target-days: 5               # study days per week to aim for; 2 rest days built in
   rate-limits-enabled: ${RATE_LIMITS_ENABLED:true}
   # Optional. With a key, "Analyse" asks Claude; without one it uses the built-in estimate.

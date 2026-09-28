@@ -166,27 +166,83 @@ textarea { resize: vertical; }
 .cat-bar-fill { display: block; height: 100%; background: var(--accent); }
 .cat-list { list-style: none; margin: 0 0 10px; padding: 0; }
 
-/* Every row uses the same five columns so the list reads as a table. */
-.row { display: grid; grid-template-columns: 16px minmax(0, 1fr) 64px 132px 108px; gap: 12px; align-items: center; padding: 7px 8px; margin: 0 -8px; border-radius: 6px; }
-.row:hover { background: var(--tint); }
-.check { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ink-3); display: grid; place-items: center; font-size: 10px; font-weight: 800; color: var(--accent-ink); }
-.row.done .check { background: var(--accent); box-shadow: none; }
+/* The problems table: Problem · NeetCode · Solved · Revision 1–3 · actions. */
+.section.wide { margin-top: 44px; }
+.table-legend { margin: 4px 0 8px; font-size: 12px; color: var(--ink-3); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 80px repeat(4, 112px) 104px; gap: 10px; align-items: center; padding: 6px 8px; margin: 0 -8px; border-radius: 6px; }
+.row:not(.row-head):hover { background: var(--tint); }
+.row-head { padding-top: 2px; padding-bottom: 2px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
 .row-title { text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-title:hover { text-decoration: underline; }
-.row.done .row-title { color: var(--ink-2); }
 .level { font-size: 12px; color: var(--ink-3); }
-.status { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.status.overdue { color: var(--critical); font-weight: 600; }
-.status.mastered { color: var(--good); font-weight: 600; }
+.tcell { font-size: 12px; min-width: 0; display: flex; align-items: center; gap: 4px 6px; flex-wrap: wrap; }
+.tcell.muted, .muted { color: var(--ink-3); }
+.small { font-size: 12px; }
+.tcell.compact { display: none; }
+.stage { font: inherit; background: none; border: 0; padding: 2px 4px; margin: -2px -4px; border-radius: 5px; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 1px; color: var(--ink); }
+.stage:hover { background: var(--raised); box-shadow: 0 0 0 1px var(--line); }
+.stage:focus-visible { outline: 2px solid var(--accent); }
+.stage-date { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stage-rating { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.stage-rating.r-again { color: var(--critical); }
+.stage-rating.r-hard { color: var(--warning); }
+.stage-rating.r-good { color: var(--good); }
+.stage-rating.r-easy { color: var(--accent); }
+.btn.stage-due { padding: 4px 10px; font-weight: 600; color: var(--accent); border-color: var(--accent); }
+.btn.stage-due.overdue { color: var(--critical); border-color: var(--critical); }
+.stage-late { font-size: 11px; color: var(--critical); font-weight: 600; }
+.stage-next { color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.stage-tries { font-size: 11px; color: var(--ink-3); }
+.dots { display: inline-flex; gap: 3px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.dot.on { background: var(--good); box-shadow: none; }
+.next { color: var(--ink-2); white-space: nowrap; }
+.next.overdue { color: var(--critical); font-weight: 600; }
 .actions { display: flex; justify-content: flex-end; gap: 2px; }
+.status { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The panel under a problem: revise form and attempt history */
+.panel { grid-column: 1 / -1; margin: 4px 0 8px; padding: 12px 14px; border-radius: 8px; background: var(--tint); font-size: 13px; display: grid; gap: 14px; }
+.revise { display: grid; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.revise h3 { margin: 0; font-size: 14px; }
+.revise-now { justify-self: start; }
+.btn.link.next { padding: 0; }
+.revise .hint { margin: -6px 0 0; }
+.rate-prompt { margin: 4px 0 0; font-weight: 600; font-size: 13px; }
+.history-toggle > summary { cursor: pointer; font-weight: 600; font-size: 12px; color: var(--accent); width: fit-content; }
+.history-toggle[open] > summary { margin-bottom: 10px; }
+.history-body { display: grid; gap: 10px; }
+.trail { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.trail-step { padding: 1px 8px; border-radius: 999px; background: var(--raised); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.trail-sep { color: var(--ink-3); }
+.attempt { background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; }
+.attempt.editable { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+.attempt-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.attempt-head .meta { margin: 0; }
+.attempt .notes-text { margin: 0; }
+.drawing-link { color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 500; width: fit-content; }
+.drawing-link:hover { text-decoration: underline; }
+.improved-tag { display: inline-block; padding: 0 7px; border-radius: 999px; background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); font-weight: 700; font-size: 11px; line-height: 18px; }
+.version { border-top: 1px solid var(--line); padding-top: 6px; }
+.version > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; list-style: none; }
+.version > summary::-webkit-details-marker { display: none; }
+.version > summary::before { content: "›"; color: var(--ink-3); transition: transform .15s; display: inline-block; }
+.version[open] > summary::before { transform: rotate(90deg); }
+.v-name { font-weight: 600; }
+.v-lang { font-size: 12px; color: var(--ink-3); }
+.v-cx { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.version .code-view { margin-top: 8px; }
+.version .notes-actions { margin-top: 8px; }
+.new-version { border-top: 1px dashed var(--line); padding-top: 8px; display: grid; gap: 6px; }
+.new-version .analysis-slot:empty { display: none; }
 
 /* Notes panel under a row */
-.notes { grid-column: 2 / -1; margin: 4px 0 6px; padding: 10px 12px; border-radius: 6px; background: var(--tint); font-size: 13px; }
+.notes { margin: 4px 0 6px; padding: 10px 12px; border-radius: 6px; background: var(--tint); font-size: 13px; }
 .notes-when { color: var(--ink-3); font-size: 12px; margin: 0 0 4px; }
 .notes-text { white-space: pre-wrap; margin: 0; }
 .notes a { display: inline-block; margin-top: 6px; color: var(--accent); text-decoration: none; font-size: 12px; font-weight: 500; }
 .notes a:hover { text-decoration: underline; }
-.due-item .notes { grid-column: 1 / -1; margin: 0; }
+.due-item .panel { grid-column: 1 / -1; margin: 0; }
 
 /* Notes: editable on the day you solve a problem, frozen afterwards */
 .editable-tag { color: var(--good); font-weight: 600; }
@@ -253,6 +309,21 @@ textarea { resize: vertical; }
 .rec-cx { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; color: var(--ink-2); }
 .rec-idea summary { cursor: pointer; font-size: 12px; font-weight: 500; color: var(--accent); width: fit-content; }
 .rec-text { margin-top: 4px !important; font-size: 13px; color: var(--ink-2); }
+
+/* Plan: pace for new problems and the next two weeks of revisions */
+.pace { margin: 12px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.pace b { color: var(--ink); }
+.pace-late { color: var(--critical); font-weight: 600; }
+.pace-ok { color: var(--good); font-weight: 600; }
+.workload-head { display: flex; justify-content: space-between; margin-top: 16px; font-size: 12px; color: var(--ink-3); }
+.workload { position: relative; display: flex; gap: 3px; height: 96px; margin-top: 6px; align-items: flex-end; }
+.wl-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.wl-n { font-size: 10px; color: var(--ink-2); height: 12px; font-variant-numeric: tabular-nums; }
+.wl-stack { height: 60px; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.wl-bar { width: 72%; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 0; }
+.wl-bar.over { background: var(--warning); }
+.wl-label { font-size: 10px; color: var(--ink-3); height: 14px; }
+.wl-cap { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--ink-3); pointer-events: none; opacity: .6; }
 
 /* ------------------------------------------------------------------
    Heatmap
@@ -448,20 +519,23 @@ a.btn { text-decoration: none; display: inline-block; }
   .stat-value { font-size: 24px; }
   .toolbar input[type=search] { width: 100%; }
 
-  /* Row: title and actions on top, level and status underneath */
-  .row { grid-template-columns: 16px minmax(0, 1fr) auto; grid-template-areas: "chk title act" ". sub act"; row-gap: 0; }
-  .row .check { grid-area: chk; }
+  /* Row: title and actions on top, NeetCode level and revision progress underneath */
+  .row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title act" "sub sub"; row-gap: 2px; }
+  .row-head { display: none; }
   .row .row-title { grid-area: title; white-space: normal; }
-  .row .sub { grid-area: sub; display: flex; gap: 10px; }
   .row .actions { grid-area: act; }
-  .row .notes { grid-column: 1 / -1; }
-
+  .row .level { display: none; }
+  .row .tcell.solved, .row .tcell.rev { display: none; }
+  .row:not(.done) .tcell.solved { display: flex; grid-area: act; }
+  .row:not(.done) .actions { display: none; }
+  .row .tcell.compact { display: flex; grid-area: sub; gap: 8px; }
+  .row .panel { grid-column: 1 / -1; }
   .due-item { grid-template-columns: minmax(0, 1fr) auto; }
   .due-item .answer { grid-column: 1 / -1; }
   .due-item .answer .btn { flex: 1; }
 }
 
-/* On wide screens the level and status sit in their own columns. */
-@media (min-width: 641px) {
-  .row .sub { display: contents; }
+/* Medium screens: the table gets tighter before it collapses. */
+@media (min-width: 641px) and (max-width: 900px) {
+  .row { grid-template-columns: minmax(0, 1fr) 72px repeat(4, 96px) 92px; gap: 6px; }
 }

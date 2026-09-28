@@ -14,6 +14,7 @@ import java.util.List;
 public record AnalysisView(String time, String space, List<String> reasons, String confidence, String source,
                            Recommendation recommendation, List<String> interviewTips) {
 
+
     /** Null when there's no analysis. */
     public static AnalysisView of(ComplexityAnalysis a, Integer catalogId, ApproachRecommender approaches) {
         if (a == null) {

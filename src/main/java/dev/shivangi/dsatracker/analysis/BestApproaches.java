@@ -31,7 +31,7 @@ public final class BestApproaches {
             Map<Integer, List<String>> tips = parseTips(json, read(TIPS));
             Map<Integer, KnownProblem> merged = new LinkedHashMap<>();
             byId.forEach((id, p) -> merged.put(id, new KnownProblem(p.approaches(), p.fixedSize(),
-                    tips.getOrDefault(id, List.of()))));
+                    tips.getOrDefault(id, List.of()), p.name(), p.entry())));
             return merged;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -70,7 +70,12 @@ public final class BestApproaches {
                         a.path("idea").asText(), a.path("advanced").asBoolean()));
             }
             String fixedSize = problem.path("fixedSize").asText("");
-            KnownProblem known = new KnownProblem(list, fixedSize.isBlank() ? null : fixedSize);
+            List<String> entry = new ArrayList<>();
+            for (JsonNode e : problem.path("entry")) {
+                entry.add(e.asText());
+            }
+            KnownProblem known = new KnownProblem(list, fixedSize.isBlank() ? null : fixedSize, List.of(),
+                    problem.path("problem").asText(), entry);
             if (byId.put(problem.path("id").asInt(), known) != null) {
                 throw new IllegalStateException("Duplicate id " + problem.path("id").asInt() + " in " + RESOURCE);
             }

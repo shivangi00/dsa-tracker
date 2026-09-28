@@ -10,7 +10,7 @@ import dev.shivangi.dsatracker.security.TooManyRequestsException;
 import org.springframework.stereotype.Service;
 
 /**
- * "Analyse": read the saved code, work out its complexity, store the result.
+ * "Analyse": read a saved version of your code, work out its complexity, store the result with it.
  *
  * <p>Deliberately NOT one transaction. Analysis can call an outside service (Claude) that takes
  * seconds; holding a database connection that long would starve other requests of the small
@@ -32,13 +32,15 @@ public class AnalysisService {
 
     /**
      * Analyses code that isn't saved anywhere yet: the "Analyse" button in the Mark as done
-     * window, before the problem exists. Same limits as saved analyses.
+     * window, before the problem exists. Same limits as saved analyses. With {@code catalogId}, the
+     * code must look like a solution to that problem.
      */
-    public ComplexityAnalysis preview(Long userId, String code, CodeLanguage language) {
+    public ComplexityAnalysis preview(Long userId, String code, CodeLanguage language, Integer catalogId) {
         String solution = ProblemService.checkCode(code, language);
         if (solution == null) {
             throw new BadRequestException("Add your code first, then analyse it");
         }
+        problems.requireSolutionTo(catalogId, solution, language);
         limit(userId);
         return analyser.analyse(solution, language);
     }
@@ -50,12 +52,13 @@ public class AnalysisService {
         }
     }
 
-    public Problem analyse(Long userId, long problemId) {
-        ProblemService.CodeToAnalyse code = problems.codeToAnalyse(userId, problemId);
+    /** Analyses a saved version of your code (on its attempt's day) and stores the result with it. */
+    public Problem analyse(Long userId, long versionId) {
+        ProblemService.CodeToAnalyse code = problems.codeToAnalyse(userId, versionId);
 
         limit(userId);
 
         ComplexityAnalysis result = analyser.analyse(code.code(), code.language());
-        return problems.saveAnalysis(userId, problemId, code, result);
+        return problems.saveAnalysis(userId, versionId, result);
     }
 }

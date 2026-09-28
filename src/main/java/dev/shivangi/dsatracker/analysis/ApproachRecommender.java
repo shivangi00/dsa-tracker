@@ -26,6 +26,21 @@ public class ApproachRecommender {
         this.byCatalogId = Map.copyOf(byCatalogId);
     }
 
+    /**
+     * Empty if {@code code} could be a solution to the NeetCode problem (or the problem isn't one
+     * we know); otherwise a message saying what a solution should define.
+     */
+    public Optional<String> wrongProblem(Integer catalogId, String code, CodeLanguage language) {
+        KnownProblem p = problem(catalogId);
+        if (p.entry().isEmpty() || code == null || SolutionMatcher.definesAny(code, language, p.entry())) {
+            return Optional.empty();
+        }
+        String first = p.entry().get(0);
+        String what = Character.isUpperCase(first.charAt(0)) ? "a class named " + first : "a function named " + first;
+        return Optional.of("This doesn't look like a solution to " + p.name() + ": on LeetCode it defines "
+                + what + ". Check you pasted the code for this problem.");
+    }
+
     /** Interview talking points for a NeetCode problem; empty for anything else. */
     public List<String> tips(Integer catalogId) {
         return problem(catalogId).tips();
@@ -103,7 +118,7 @@ public class ApproachRecommender {
     }
 
     /** True when {@code a} is clearly smaller than {@code b}. */
-    static boolean better(ComplexityExpression.Size a, ComplexityExpression.Size b) {
+    public static boolean better(ComplexityExpression.Size a, ComplexityExpression.Size b) {
         if (a.exponential() && b.exponential()) {
             return false;
         }

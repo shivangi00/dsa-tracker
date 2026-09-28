@@ -44,6 +44,8 @@ class BestApproachesTest {
         approaches.forEach((id, problem) -> {
             List<Approach> list = problem.approaches();
             assertTrue(list.stream().anyMatch(a -> !a.advanced()), "problem " + id + " needs a usual approach");
+            assertTrue(!problem.entry().isEmpty(), "problem " + id + " needs LeetCode's function or class name");
+            assertTrue(problem.name() != null && !problem.name().isBlank(), "problem " + id + " needs a name");
             for (Approach a : list) {
                 assertTrue(!a.name().isBlank() && !a.idea().isBlank(), "problem " + id + " has a blank field");
                 assertTrue(ComplexityExpression.evaluate(a.time()).isPresent(), id + ": can't read " + a.time());

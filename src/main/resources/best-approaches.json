@@ -1,312 +1,312 @@
 [
-{"id":1,"problem":"Contains Duplicate","approaches":[
+{"id":1,"problem":"Contains Duplicate","entry":["containsDuplicate", "hasDuplicate"],"approaches":[
  {"name":"Hash set","time":"O(n)","space":"O(n)","idea":"Walk the array once, adding each number to a set; if it is already there, you have found a duplicate."},
  {"name":"Sort, then compare neighbours","time":"O(n log n)","space":"O(1)","idea":"After sorting, equal values sit next to each other, so one pass comparing nums[i] with nums[i-1] finds a duplicate without extra memory."}]},
-{"id":2,"problem":"Valid Anagram","approaches":[
+{"id":2,"problem":"Valid Anagram","entry":["isAnagram"],"approaches":[
  {"name":"Count letters in a 26-slot array","time":"O(n)","space":"O(1)","idea":"Add 1 for each letter of s and subtract 1 for each letter of t; the strings are anagrams exactly when every count ends at zero."}]},
-{"id":3,"problem":"Two Sum","approaches":[
+{"id":3,"problem":"Two Sum","entry":["twoSum"],"approaches":[
  {"name":"One-pass hash map","time":"O(n)","space":"O(n)","idea":"For each number, check whether target - number is already in a map of value → index; if not, store the current number and move on."}]},
-{"id":4,"problem":"Group Anagrams","approaches":[
+{"id":4,"problem":"Group Anagrams","entry":["groupAnagrams"],"approaches":[
  {"name":"Letter-count key","time":"O(n·k)","space":"O(n·k)","idea":"Use a tuple of 26 letter counts as the map key instead of the sorted word: counting is O(k) per word, sorting is O(k log k)."}]},
-{"id":5,"problem":"Top K Frequent Elements","approaches":[
+{"id":5,"problem":"Top K Frequent Elements","entry":["topKFrequent"],"approaches":[
  {"name":"Bucket sort by frequency","time":"O(n)","space":"O(n)","idea":"Count frequencies, then put each number in bucket[frequency] (frequencies are at most n); read buckets from the highest down until you have k numbers."},
  {"name":"Min-heap of size k","time":"O(n log k)","space":"O(n)","idea":"Count frequencies, then keep a heap of the k most frequent seen so far, popping the smallest whenever it grows past k."}]},
-{"id":6,"problem":"Product of Array Except Self","approaches":[
+{"id":6,"problem":"Product of Array Except Self","entry":["productExceptSelf"],"approaches":[
  {"name":"Prefix and suffix products in the output array","time":"O(n)","space":"O(n)","idea":"Fill the answer left to right with the product of everything before i, then sweep right to left multiplying in a running product of everything after i. Only O(1) extra besides the output, and no division."}]},
-{"id":7,"problem":"Valid Sudoku","fixedSize":"the board is always 9×9","approaches":[
+{"id":7,"problem":"Valid Sudoku","fixedSize":"the board is always 9×9","entry":["isValidSudoku"],"approaches":[
  {"name":"One pass with row, column and box sets","time":"O(n²)","space":"O(n²)","idea":"Visit each cell once and check its digit against a set for its row, its column and its 3×3 box (box index = (r // 3) * 3 + c // 3). With the board fixed at 9×9 this is effectively constant."}]},
-{"id":8,"problem":"Encode and Decode Strings","approaches":[
+{"id":8,"problem":"Encode and Decode Strings","entry":["encode"],"approaches":[
  {"name":"Length prefix","time":"O(n)","space":"O(n)","idea":"Write each string as its length, a separator such as '#', then the string itself. Decoding reads the number, skips the separator and takes exactly that many characters, so any character can appear in the strings."}]},
-{"id":9,"problem":"Longest Consecutive Sequence","approaches":[
+{"id":9,"problem":"Longest Consecutive Sequence","entry":["longestConsecutive"],"approaches":[
  {"name":"Hash set, counting only from sequence starts","time":"O(n)","space":"O(n)","idea":"Put every number in a set. Only start counting at x when x - 1 is not in the set, then walk x + 1, x + 2, …; each number is visited a constant number of times overall."}]},
-{"id":10,"problem":"Valid Palindrome","approaches":[
+{"id":10,"problem":"Valid Palindrome","entry":["isPalindrome"],"approaches":[
  {"name":"Two pointers","time":"O(n)","space":"O(1)","idea":"Move one pointer from each end, skipping non-alphanumeric characters and comparing lowercase letters, instead of building a cleaned copy of the string."}]},
-{"id":11,"problem":"Two Sum II Input Array Is Sorted","approaches":[
+{"id":11,"problem":"Two Sum II Input Array Is Sorted","entry":["twoSum"],"approaches":[
  {"name":"Two pointers","time":"O(n)","space":"O(1)","idea":"Start at both ends: if the sum is too big move the right pointer left, if too small move the left pointer right. Sorting makes a hash map unnecessary."}]},
-{"id":12,"problem":"3Sum","approaches":[
+{"id":12,"problem":"3Sum","entry":["threeSum"],"approaches":[
  {"name":"Sort, then two pointers for each first number","time":"O(n²)","space":"O(1)","idea":"Sort, fix nums[i], and run a two-pointer search on the rest for pairs summing to -nums[i]. Skip equal neighbours to avoid duplicate triplets without a set."}]},
-{"id":13,"problem":"Container With Most Water","approaches":[
+{"id":13,"problem":"Container With Most Water","entry":["maxArea"],"approaches":[
  {"name":"Two pointers from the ends","time":"O(n)","space":"O(1)","idea":"Start with the widest container and always move the shorter wall inward: moving the taller one can never give more water."}]},
-{"id":14,"problem":"Trapping Rain Water","approaches":[
+{"id":14,"problem":"Trapping Rain Water","entry":["trap"],"approaches":[
  {"name":"Two pointers with running maxima","time":"O(n)","space":"O(1)","idea":"Keep leftMax and rightMax while moving pointers inward. Move the side with the smaller max: the water above that bar is fully decided by its own side's max."},
  {"name":"Prefix and suffix maximum arrays","time":"O(n)","space":"O(n)","idea":"Precompute the tallest bar to the left and right of every index; water at i is min(leftMax[i], rightMax[i]) - height[i]."}]},
-{"id":15,"problem":"Best Time to Buy And Sell Stock","approaches":[
+{"id":15,"problem":"Best Time to Buy And Sell Stock","entry":["maxProfit"],"approaches":[
  {"name":"One pass tracking the lowest price","time":"O(n)","space":"O(1)","idea":"Keep the cheapest price seen so far; at each day the best sale is price - cheapest. No need to try every pair."}]},
-{"id":16,"problem":"Longest Substring Without Repeating Characters","approaches":[
+{"id":16,"problem":"Longest Substring Without Repeating Characters","entry":["lengthOfLongestSubstring"],"approaches":[
  {"name":"Sliding window with last-seen index","time":"O(n)","space":"O(n)","idea":"Store each character's last index. When a character repeats inside the window, jump the left edge straight past its previous position. Memory is bounded by the alphabet size."}]},
-{"id":17,"problem":"Longest Repeating Character Replacement","approaches":[
+{"id":17,"problem":"Longest Repeating Character Replacement","entry":["characterReplacement"],"approaches":[
  {"name":"Sliding window with the top count","time":"O(n)","space":"O(1)","idea":"Keep letter counts for the window and the highest count seen. The window is valid while length - maxCount ≤ k; otherwise slide the left edge by one. The counts need only 26 slots."}]},
-{"id":18,"problem":"Permutation In String","approaches":[
+{"id":18,"problem":"Permutation In String","entry":["checkInclusion"],"approaches":[
  {"name":"Fixed-size window with 26 counts","time":"O(n)","space":"O(1)","idea":"Slide a window of len(s1) over s2, adding the entering letter and removing the leaving one; track how many of the 26 counts match so each step is O(1)."}]},
-{"id":19,"problem":"Minimum Window Substring","approaches":[
+{"id":19,"problem":"Minimum Window Substring","entry":["minWindow"],"approaches":[
  {"name":"Sliding window with a 'have vs need' counter","time":"O(n + m)","space":"O(m)","idea":"Expand right until every needed character is covered (track how many are satisfied, not a full comparison), then shrink left while still valid, recording the smallest window."}]},
-{"id":20,"problem":"Sliding Window Maximum","approaches":[
+{"id":20,"problem":"Sliding Window Maximum","entry":["maxSlidingWindow"],"approaches":[
  {"name":"Monotonic deque","time":"O(n)","space":"O(n)","idea":"Keep indices in a deque with decreasing values: pop smaller values from the back before pushing, drop the front when it leaves the window. The front is always the maximum."}]},
-{"id":21,"problem":"Valid Parentheses","approaches":[
+{"id":21,"problem":"Valid Parentheses","entry":["isValid"],"approaches":[
  {"name":"Stack","time":"O(n)","space":"O(n)","idea":"Push opening brackets; on a closing bracket the top of the stack must be its match. The string is valid when the stack ends empty."}]},
-{"id":22,"problem":"Min Stack","approaches":[
+{"id":22,"problem":"Min Stack","entry":["MinStack"],"approaches":[
  {"name":"Store the minimum with each entry","time":"O(1)","space":"O(n)","idea":"Push (value, min so far) pairs, or keep a second stack of minimums, so getMin reads the top instead of scanning."}]},
-{"id":23,"problem":"Evaluate Reverse Polish Notation","approaches":[
+{"id":23,"problem":"Evaluate Reverse Polish Notation","entry":["evalRPN"],"approaches":[
  {"name":"Stack","time":"O(n)","space":"O(n)","idea":"Push numbers; on an operator pop two, apply it (second popped is the left operand) and push the result."}]},
-{"id":24,"problem":"Generate Parentheses","approaches":[
+{"id":24,"problem":"Generate Parentheses","entry":["generateParenthesis"],"approaches":[
  {"name":"Backtracking with open/close counts","time":"O(4ⁿ/√n)","space":"O(n)","idea":"Only add '(' while open < n and ')' while close < open, so every string built is valid and nothing is generated then filtered."}]},
-{"id":25,"problem":"Daily Temperatures","approaches":[
+{"id":25,"problem":"Daily Temperatures","entry":["dailyTemperatures"],"approaches":[
  {"name":"Monotonic stack","time":"O(n)","space":"O(n)","idea":"Keep a stack of indices still waiting for a warmer day. Each new temperature pops every colder day and fills in its wait; each index is pushed and popped once."}]},
-{"id":26,"problem":"Car Fleet","approaches":[
+{"id":26,"problem":"Car Fleet","entry":["carFleet"],"approaches":[
  {"name":"Sort by position, count arrival times","time":"O(n log n)","space":"O(n)","idea":"Process cars from closest to the target. A car forms a new fleet only if it arrives later than the fleet ahead of it; otherwise it joins that fleet."}]},
-{"id":27,"problem":"Largest Rectangle In Histogram","approaches":[
+{"id":27,"problem":"Largest Rectangle In Histogram","entry":["largestRectangleArea"],"approaches":[
  {"name":"Monotonic stack","time":"O(n)","space":"O(n)","idea":"Keep increasing heights on a stack. When a shorter bar arrives, pop taller bars and compute their rectangles: each popped bar extends back to its stored start index."}]},
-{"id":28,"problem":"Binary Search","approaches":[
+{"id":28,"problem":"Binary Search","entry":["search"],"approaches":[
  {"name":"Iterative binary search","time":"O(log n)","space":"O(1)","idea":"Halve the search range each step with lo and hi pointers; a loop avoids the O(log n) stack of the recursive version."}]},
-{"id":29,"problem":"Search a 2D Matrix","approaches":[
+{"id":29,"problem":"Search a 2D Matrix","entry":["searchMatrix"],"approaches":[
  {"name":"One binary search over the flattened matrix","time":"O(log(m·n))","space":"O(1)","idea":"Treat the matrix as one sorted list of m·n numbers: index i is row i // n, column i % n."}]},
-{"id":30,"problem":"Koko Eating Bananas","approaches":[
+{"id":30,"problem":"Koko Eating Bananas","entry":["minEatingSpeed"],"approaches":[
  {"name":"Binary search on the eating speed","time":"O(n log m)","space":"O(1)","idea":"Speeds from 1 to max(piles) are monotonic: if speed s works, any faster speed works. Binary search for the slowest speed that finishes within h hours (m = the largest pile)."}]},
-{"id":31,"problem":"Find Minimum In Rotated Sorted Array","approaches":[
+{"id":31,"problem":"Find Minimum In Rotated Sorted Array","entry":["findMin"],"approaches":[
  {"name":"Binary search against the right end","time":"O(log n)","space":"O(1)","idea":"If nums[mid] > nums[hi], the minimum is right of mid; otherwise it is at mid or to its left."}]},
-{"id":32,"problem":"Search In Rotated Sorted Array","approaches":[
+{"id":32,"problem":"Search In Rotated Sorted Array","entry":["search"],"approaches":[
  {"name":"Binary search on the sorted half","time":"O(log n)","space":"O(1)","idea":"At each step one half is sorted. Check whether the target lies inside that half's range and discard the other half accordingly."}]},
-{"id":33,"problem":"Time Based Key Value Store","approaches":[
+{"id":33,"problem":"Time Based Key Value Store","entry":["TimeMap"],"approaches":[
  {"name":"Map of lists + binary search on timestamps","time":"O(log n)","space":"O(n)","idea":"set appends (timestamps arrive increasing, so each list stays sorted); get binary-searches the key's list for the last timestamp ≤ the query."}]},
-{"id":34,"problem":"Median of Two Sorted Arrays","approaches":[
+{"id":34,"problem":"Median of Two Sorted Arrays","entry":["findMedianSortedArrays"],"approaches":[
  {"name":"Binary search on the partition","time":"O(log(min(m, n)))","space":"O(1)","idea":"Binary search how many elements the smaller array contributes to the left half; the partition is right when both left maxima are ≤ both right minima."}]},
-{"id":35,"problem":"Reverse Linked List","approaches":[
+{"id":35,"problem":"Reverse Linked List","entry":["reverseList"],"approaches":[
  {"name":"Iterative pointer reversal","time":"O(n)","space":"O(1)","idea":"Walk the list keeping prev and curr, pointing curr.next back at prev. The recursive version uses O(n) stack."}]},
-{"id":36,"problem":"Merge Two Sorted Lists","approaches":[
+{"id":36,"problem":"Merge Two Sorted Lists","entry":["mergeTwoLists"],"approaches":[
  {"name":"Iterative merge with a dummy head","time":"O(n + m)","space":"O(1)","idea":"Keep a tail pointer from a dummy node and splice in the smaller head each step, then attach whatever is left."}]},
-{"id":37,"problem":"Reorder List","approaches":[
+{"id":37,"problem":"Reorder List","entry":["reorderList"],"approaches":[
  {"name":"Find middle, reverse second half, merge","time":"O(n)","space":"O(1)","idea":"Use slow/fast pointers to find the middle, reverse the second half in place, then interleave the two halves; no array of nodes needed."}]},
-{"id":38,"problem":"Remove Nth Node From End of List","approaches":[
+{"id":38,"problem":"Remove Nth Node From End of List","entry":["removeNthFromEnd"],"approaches":[
  {"name":"Two pointers n apart, one pass","time":"O(n)","space":"O(1)","idea":"Move a fast pointer n steps ahead of a slow one (starting at a dummy node); when fast reaches the end, slow is just before the node to remove."}]},
-{"id":39,"problem":"Copy List With Random Pointer","approaches":[
+{"id":39,"problem":"Copy List With Random Pointer","entry":["copyRandomList"],"approaches":[
  {"name":"Hash map from old node to copy","time":"O(n)","space":"O(n)","idea":"First pass creates every copy in a map; second pass sets each copy's next and random through the map."},
  {"name":"Interleave copies in the original list","time":"O(n)","space":"O(1)","idea":"Insert each copy right after its original (A → A' → B → B'), set copy.random = original.random.next, then unweave the two lists. No map needed."}]},
-{"id":40,"problem":"Add Two Numbers","approaches":[
+{"id":40,"problem":"Add Two Numbers","entry":["addTwoNumbers"],"approaches":[
  {"name":"Digit-by-digit with a carry","time":"O(max(m, n))","space":"O(max(m, n))","idea":"Walk both lists together adding digits and the carry into a new list; continue while either list or the carry remains. Only the result list takes memory."}]},
-{"id":41,"problem":"Linked List Cycle","approaches":[
+{"id":41,"problem":"Linked List Cycle","entry":["hasCycle"],"approaches":[
  {"name":"Floyd's slow and fast pointers","time":"O(n)","space":"O(1)","idea":"Move one pointer one step and another two steps; they meet if and only if there is a cycle. No visited set needed."}]},
-{"id":42,"problem":"Find The Duplicate Number","approaches":[
+{"id":42,"problem":"Find The Duplicate Number","entry":["findDuplicate"],"approaches":[
  {"name":"Floyd's cycle detection on indices","time":"O(n)","space":"O(1)","idea":"Treat i → nums[i] as a linked list; the duplicate is where the cycle begins. Find the meeting point, then restart one pointer from 0 and step both until they meet."}]},
-{"id":43,"problem":"LRU Cache","approaches":[
+{"id":43,"problem":"LRU Cache","entry":["LRUCache"],"approaches":[
  {"name":"Hash map + doubly linked list","time":"O(1)","space":"O(n)","idea":"The map finds a node in O(1); the list keeps usage order so moving a node to the front and evicting from the back are both O(1)."}]},
-{"id":44,"problem":"Merge K Sorted Lists","approaches":[
+{"id":44,"problem":"Merge K Sorted Lists","entry":["mergeKLists"],"approaches":[
  {"name":"Min-heap of the list heads","time":"O(n log k)","space":"O(k)","idea":"Keep one node from each list in a heap; pop the smallest, append it, push its next. Merging lists in pairs (divide and conquer) is also O(n log k)."}]},
-{"id":45,"problem":"Reverse Nodes In K Group","approaches":[
+{"id":45,"problem":"Reverse Nodes In K Group","entry":["reverseKGroup"],"approaches":[
  {"name":"Iterative group reversal","time":"O(n)","space":"O(1)","idea":"Check that k nodes remain, reverse them in place, reconnect to the previous group's tail, and move on; recursion would use O(n/k) stack."}]},
-{"id":46,"problem":"Invert Binary Tree","approaches":[
+{"id":46,"problem":"Invert Binary Tree","entry":["invertTree"],"approaches":[
  {"name":"DFS swapping children","time":"O(n)","space":"O(h)","idea":"Swap the left and right child of every node, recursively or with an explicit stack; h is the tree's height."}]},
-{"id":47,"problem":"Maximum Depth of Binary Tree","approaches":[
+{"id":47,"problem":"Maximum Depth of Binary Tree","entry":["maxDepth"],"approaches":[
  {"name":"DFS","time":"O(n)","space":"O(h)","idea":"depth(node) = 1 + max(depth(left), depth(right)); the stack only ever holds one root-to-leaf path."}]},
-{"id":48,"problem":"Diameter of Binary Tree","approaches":[
+{"id":48,"problem":"Diameter of Binary Tree","entry":["diameterOfBinaryTree"],"approaches":[
  {"name":"One DFS returning height","time":"O(n)","space":"O(h)","idea":"Each call returns its height and updates the best diameter with left height + right height, instead of recomputing heights for every node."}]},
-{"id":49,"problem":"Balanced Binary Tree","approaches":[
+{"id":49,"problem":"Balanced Binary Tree","entry":["isBalanced"],"approaches":[
  {"name":"One DFS returning height or 'unbalanced'","time":"O(n)","space":"O(h)","idea":"Return -1 as soon as any subtree is unbalanced, otherwise its height, so each node is visited once instead of recomputing heights top-down."}]},
-{"id":50,"problem":"Same Tree","approaches":[
+{"id":50,"problem":"Same Tree","entry":["isSameTree"],"approaches":[
  {"name":"Simultaneous DFS","time":"O(n)","space":"O(h)","idea":"Two trees are the same if the roots match and both pairs of subtrees are the same; stop at the first mismatch."}]},
-{"id":51,"problem":"Subtree of Another Tree","approaches":[
+{"id":51,"problem":"Subtree of Another Tree","entry":["isSubtree"],"approaches":[
  {"name":"DFS with a same-tree check at each node","time":"O(m·n)","space":"O(h)","idea":"At every node of the main tree, run the same-tree check against the subtree."},
  {"name":"Serialize both trees and search the string","time":"O(m + n)","space":"O(m + n)","advanced":true,"idea":"Serialize each tree in preorder with null markers and delimiters, then search for the smaller string in the larger with KMP or Z-algorithm."}]},
-{"id":52,"problem":"Lowest Common Ancestor of a Binary Search Tree","approaches":[
+{"id":52,"problem":"Lowest Common Ancestor of a Binary Search Tree","entry":["lowestCommonAncestor"],"approaches":[
  {"name":"Walk down using BST order","time":"O(h)","space":"O(1)","idea":"From the root: if both values are smaller go left, if both larger go right, otherwise this node is the split point. A loop needs no stack."}]},
-{"id":53,"problem":"Binary Tree Level Order Traversal","approaches":[
+{"id":53,"problem":"Binary Tree Level Order Traversal","entry":["levelOrder"],"approaches":[
  {"name":"BFS level by level","time":"O(n)","space":"O(n)","idea":"Process the queue in batches of its current length; each batch is one level."}]},
-{"id":54,"problem":"Binary Tree Right Side View","approaches":[
+{"id":54,"problem":"Binary Tree Right Side View","entry":["rightSideView"],"approaches":[
  {"name":"BFS keeping the last node per level","time":"O(n)","space":"O(n)","idea":"Do a level-order traversal and record the last node of each level (or DFS right-first, recording the first node at each new depth)."}]},
-{"id":55,"problem":"Count Good Nodes In Binary Tree","approaches":[
+{"id":55,"problem":"Count Good Nodes In Binary Tree","entry":["goodNodes"],"approaches":[
  {"name":"DFS carrying the path maximum","time":"O(n)","space":"O(h)","idea":"Pass the largest value seen on the path down; a node is good when its value ≥ that maximum."}]},
-{"id":56,"problem":"Validate Binary Search Tree","approaches":[
+{"id":56,"problem":"Validate Binary Search Tree","entry":["isValidBST"],"approaches":[
  {"name":"DFS with lower and upper bounds","time":"O(n)","space":"O(h)","idea":"Each node must lie strictly between bounds inherited from its ancestors; checking only parent-child pairs misses deeper violations."}]},
-{"id":57,"problem":"Kth Smallest Element In a Bst","approaches":[
+{"id":57,"problem":"Kth Smallest Element In a Bst","entry":["kthSmallest"],"approaches":[
  {"name":"Iterative inorder, stop at k","time":"O(h + k)","space":"O(h)","idea":"Inorder visits a BST in sorted order; use an explicit stack and stop after the kth pop instead of collecting every value."}]},
-{"id":58,"problem":"Construct Binary Tree From Preorder And Inorder Traversal","approaches":[
+{"id":58,"problem":"Construct Binary Tree From Preorder And Inorder Traversal","entry":["buildTree"],"approaches":[
  {"name":"Recursion with an inorder index map","time":"O(n)","space":"O(n)","idea":"Map each value to its inorder index so finding the root's position is O(1), and pass index ranges instead of slicing lists (slicing makes it O(n²))."}]},
-{"id":59,"problem":"Binary Tree Maximum Path Sum","approaches":[
+{"id":59,"problem":"Binary Tree Maximum Path Sum","entry":["maxPathSum"],"approaches":[
  {"name":"DFS returning the best downward gain","time":"O(n)","space":"O(h)","idea":"Each call returns node + max(0, best child gain) and updates the answer with node + both children's gains (negative gains clipped to 0)."}]},
-{"id":60,"problem":"Serialize And Deserialize Binary Tree","approaches":[
+{"id":60,"problem":"Serialize And Deserialize Binary Tree","entry":["Codec", "serialize"],"approaches":[
  {"name":"Preorder with null markers","time":"O(n)","space":"O(n)","idea":"Write values in preorder with a marker for missing children; rebuild by reading tokens in the same order with an index or iterator."}]},
-{"id":61,"problem":"Kth Largest Element In a Stream","approaches":[
+{"id":61,"problem":"Kth Largest Element In a Stream","entry":["KthLargest"],"approaches":[
  {"name":"Min-heap of size k","time":"O(log k)","space":"O(k)","idea":"Keep only the k largest values in a min-heap; its top is the kth largest. Each add is one push and at most one pop, never a full sort."}]},
-{"id":62,"problem":"Last Stone Weight","approaches":[
+{"id":62,"problem":"Last Stone Weight","entry":["lastStoneWeight"],"approaches":[
  {"name":"Max-heap","time":"O(n log n)","space":"O(n)","idea":"Pop the two heaviest, push back their difference if non-zero; a heap avoids re-sorting after every smash."}]},
-{"id":63,"problem":"K Closest Points to Origin","approaches":[
+{"id":63,"problem":"K Closest Points to Origin","entry":["kClosest"],"approaches":[
  {"name":"Quickselect on distance","time":"O(n)","space":"O(1)","idea":"Partition around a pivot distance as in quicksort, but only recurse into the side containing the kth position. O(n) on average (O(n²) worst case)."},
  {"name":"Max-heap of size k","time":"O(n log k)","space":"O(k)","idea":"Keep the k closest points seen so far in a max-heap keyed by distance; pop the farthest when it grows past k."}]},
-{"id":64,"problem":"Kth Largest Element In An Array","approaches":[
+{"id":64,"problem":"Kth Largest Element In An Array","entry":["findKthLargest"],"approaches":[
  {"name":"Quickselect","time":"O(n)","space":"O(1)","idea":"Partition around a pivot and only continue into the side that contains index n - k. O(n) on average; a random pivot keeps the worst case unlikely."},
  {"name":"Min-heap of size k","time":"O(n log k)","space":"O(k)","idea":"Keep the k largest values in a min-heap; the top at the end is the answer."}]},
-{"id":65,"problem":"Task Scheduler","approaches":[
+{"id":65,"problem":"Task Scheduler","entry":["leastInterval"],"approaches":[
  {"name":"Count the most frequent task","time":"O(n)","space":"O(1)","idea":"With maxCount the highest frequency and tied the number of tasks sharing it, the answer is max(len(tasks), (maxCount - 1) * (n + 1) + tied). No simulation needed."}]},
-{"id":66,"problem":"Design Twitter","approaches":[
+{"id":66,"problem":"Design Twitter","entry":["Twitter"],"approaches":[
  {"name":"Heap over each followee's latest tweet","time":"O(n log n)","space":"O(n)","idea":"Store each user's tweets newest last. For the feed, push each followee's latest tweet into a heap and pop 10 times, pushing that user's previous tweet each time, instead of sorting every tweet."}]},
-{"id":67,"problem":"Find Median From Data Stream","approaches":[
+{"id":67,"problem":"Find Median From Data Stream","entry":["MedianFinder"],"approaches":[
  {"name":"Two heaps","time":"O(log n)","space":"O(n)","idea":"A max-heap holds the smaller half and a min-heap the larger half, kept within one element of each other; the median is read from the tops."}]},
-{"id":68,"problem":"Subsets","approaches":[
+{"id":68,"problem":"Subsets","entry":["subsets"],"approaches":[
  {"name":"Backtracking (include / exclude)","time":"O(n · 2ⁿ)","space":"O(n)","idea":"For each element choose to include it or not; every leaf is a subset. There are 2ⁿ subsets, so this is optimal."}]},
-{"id":69,"problem":"Combination Sum","approaches":[
+{"id":69,"problem":"Combination Sum","entry":["combinationSum"],"approaches":[
  {"name":"Backtracking from the current index","time":"O(2^t)","space":"O(t)","idea":"Recurse on the same index (reuse allowed) or move to the next one; stop once the remaining target goes negative. Sorting lets you break early."}]},
-{"id":70,"problem":"Permutations","approaches":[
+{"id":70,"problem":"Permutations","entry":["permute"],"approaches":[
  {"name":"Backtracking with a used flag or swaps","time":"O(n · n!)","space":"O(n)","idea":"Pick each unused number for the next position; swapping in place avoids copying lists. There are n! permutations, so this is optimal."}]},
-{"id":71,"problem":"Subsets II","approaches":[
+{"id":71,"problem":"Subsets II","entry":["subsetsWithDup"],"approaches":[
  {"name":"Sort, then skip equal neighbours","time":"O(n · 2ⁿ)","space":"O(n)","idea":"After choosing to skip a value, skip all its copies too, so duplicates are never generated and no set of results is needed."}]},
-{"id":72,"problem":"Combination Sum II","approaches":[
+{"id":72,"problem":"Combination Sum II","entry":["combinationSum2"],"approaches":[
  {"name":"Sort, backtrack, skip duplicates","time":"O(n · 2ⁿ)","space":"O(n)","idea":"At each depth skip a value equal to the previous one at that depth, and stop when a number exceeds the remaining target."}]},
-{"id":73,"problem":"Word Search","approaches":[
+{"id":73,"problem":"Word Search","entry":["exist"],"approaches":[
  {"name":"DFS from each cell, marking the path in place","time":"O(m·n·3^L)","space":"O(L)","idea":"Mark a cell as visited by overwriting it during the DFS and restore it on the way back, instead of keeping a visited set. After the first step there are only 3 directions to try (L = word length)."}]},
-{"id":74,"problem":"Palindrome Partitioning","approaches":[
+{"id":74,"problem":"Palindrome Partitioning","entry":["partition"],"approaches":[
  {"name":"Backtracking with a palindrome table","time":"O(n · 2ⁿ)","space":"O(n²)","idea":"Precompute isPal[i][j] with DP so each palindrome check is O(1), then backtrack over cut positions."}]},
-{"id":75,"problem":"Letter Combinations of a Phone Number","approaches":[
+{"id":75,"problem":"Letter Combinations of a Phone Number","entry":["letterCombinations"],"approaches":[
  {"name":"Backtracking over digits","time":"O(n · 4ⁿ)","space":"O(n)","idea":"Each digit maps to 3 or 4 letters; build one letter per depth. The output itself has up to 4ⁿ strings, so this is optimal."}]},
-{"id":76,"problem":"N Queens","approaches":[
+{"id":76,"problem":"N Queens","entry":["solveNQueens"],"approaches":[
  {"name":"Backtracking with column and diagonal sets","time":"O(n!)","space":"O(n)","idea":"Place one queen per row; sets for columns, r + c and r - c make each safety check O(1) instead of scanning the board."}]},
-{"id":77,"problem":"Implement Trie Prefix Tree","approaches":[
+{"id":77,"problem":"Implement Trie Prefix Tree","entry":["Trie", "PrefixTree"],"approaches":[
  {"name":"Trie nodes with child maps","time":"O(n)","space":"O(n)","idea":"Each operation walks one node per character of the word (n = word length); storage grows with the total characters inserted."}]},
-{"id":78,"problem":"Design Add And Search Words Data Structure","approaches":[
+{"id":78,"problem":"Design Add And Search Words Data Structure","entry":["WordDictionary"],"approaches":[
  {"name":"Trie with DFS on '.'","time":"O(n)","space":"O(n)","idea":"Add is a normal trie insert. Search follows one child per letter and branches into every child only at '.', so plain words cost O(word length)."}]},
-{"id":79,"problem":"Word Search II","approaches":[
+{"id":79,"problem":"Word Search II","entry":["findWords"],"approaches":[
  {"name":"Trie of words + one DFS per cell","time":"O(m·n·3^L)","space":"O(n)","idea":"Build a trie of all words and search the board once, following trie edges; remove words from the trie once found so later searches prune early. Much faster than running Word Search for each word."}]},
-{"id":80,"problem":"Number of Islands","approaches":[
+{"id":80,"problem":"Number of Islands","entry":["numIslands"],"approaches":[
  {"name":"Flood fill (DFS or BFS)","time":"O(m·n)","space":"O(m·n)","idea":"Scan the grid; each time you meet unvisited land, count an island and sink all its connected land so it is never counted again."}]},
-{"id":81,"problem":"Clone Graph","approaches":[
+{"id":81,"problem":"Clone Graph","entry":["cloneGraph"],"approaches":[
  {"name":"DFS or BFS with an old → new map","time":"O(V + E)","space":"O(V)","idea":"Create each copy the first time you meet a node and look it up in the map afterwards, so cycles don't cause infinite loops."}]},
-{"id":82,"problem":"Max Area of Island","approaches":[
+{"id":82,"problem":"Max Area of Island","entry":["maxAreaOfIsland"],"approaches":[
  {"name":"Flood fill returning area","time":"O(m·n)","space":"O(m·n)","idea":"DFS from each unvisited land cell returns 1 + the areas of its neighbours; mark cells visited so each is counted once."}]},
-{"id":83,"problem":"Pacific Atlantic Water Flow","approaches":[
+{"id":83,"problem":"Pacific Atlantic Water Flow","entry":["pacificAtlantic"],"approaches":[
  {"name":"Search inward from both oceans","time":"O(m·n)","space":"O(m·n)","idea":"Run DFS/BFS from every border cell of each ocean, moving only to neighbours at least as high. Cells reached from both oceans are the answer. Searching from every cell separately is O((m·n)²)."}]},
-{"id":84,"problem":"Surrounded Regions","approaches":[
+{"id":84,"problem":"Surrounded Regions","entry":["solve"],"approaches":[
  {"name":"Mark border-connected O's first","time":"O(m·n)","space":"O(m·n)","idea":"DFS from every 'O' on the border and mark it safe; then flip every remaining 'O' to 'X' and restore the safe ones."}]},
-{"id":85,"problem":"Rotting Oranges","approaches":[
+{"id":85,"problem":"Rotting Oranges","entry":["orangesRotting"],"approaches":[
  {"name":"Multi-source BFS","time":"O(m·n)","space":"O(m·n)","idea":"Put every rotten orange in the queue at minute 0 and spread level by level; the number of levels is the answer, if no fresh orange is left."}]},
-{"id":86,"problem":"Walls And Gates","approaches":[
+{"id":86,"problem":"Walls And Gates","entry":["wallsAndGates", "islandsAndTreasure"],"approaches":[
  {"name":"Multi-source BFS from all gates","time":"O(m·n)","space":"O(m·n)","idea":"Start BFS from every gate at once; the first time a room is reached is its shortest distance, so each cell is visited once instead of once per gate."}]},
-{"id":87,"problem":"Course Schedule","approaches":[
+{"id":87,"problem":"Course Schedule","entry":["canFinish"],"approaches":[
  {"name":"Topological sort (Kahn's algorithm)","time":"O(V + E)","space":"O(V + E)","idea":"Repeatedly take courses with no remaining prerequisites; if every course gets taken there is no cycle. DFS with three colours works too."}]},
-{"id":88,"problem":"Course Schedule II","approaches":[
+{"id":88,"problem":"Course Schedule II","entry":["findOrder"],"approaches":[
  {"name":"Topological sort (Kahn's algorithm)","time":"O(V + E)","space":"O(V + E)","idea":"Same as Course Schedule, recording the order courses leave the queue; return empty if some course is never freed."}]},
-{"id":89,"problem":"Redundant Connection","approaches":[
+{"id":89,"problem":"Redundant Connection","entry":["findRedundantConnection"],"approaches":[
  {"name":"Union-find","time":"O(n)","space":"O(n)","idea":"Add edges one by one; the first edge whose endpoints already share a root closes a cycle. With path compression and union by rank each operation is effectively O(1) (inverse Ackermann)."}]},
-{"id":90,"problem":"Number of Connected Components In An Undirected Graph","approaches":[
+{"id":90,"problem":"Number of Connected Components In An Undirected Graph","entry":["countComponents"],"approaches":[
  {"name":"Union-find","time":"O(V + E)","space":"O(V)","idea":"Start with V components and subtract one for every edge that joins two different roots. DFS over an adjacency list is equally fast."}]},
-{"id":91,"problem":"Graph Valid Tree","approaches":[
+{"id":91,"problem":"Graph Valid Tree","entry":["validTree"],"approaches":[
  {"name":"Edge count + union-find","time":"O(V + E)","space":"O(V)","idea":"A tree has exactly n - 1 edges; with that checked, it's a tree if no edge joins two nodes that are already connected."}]},
-{"id":92,"problem":"Word Ladder","approaches":[
+{"id":92,"problem":"Word Ladder","entry":["ladderLength"],"approaches":[
  {"name":"BFS with wildcard patterns","time":"O(n·k²)","space":"O(n·k²)","idea":"Index words by patterns like 'h*t' so neighbours are found by pattern lookup instead of comparing every pair of words (k = word length). Bidirectional BFS is faster in practice."}]},
-{"id":93,"problem":"Reconstruct Itinerary","approaches":[
+{"id":93,"problem":"Reconstruct Itinerary","entry":["findItinerary"],"approaches":[
  {"name":"Hierholzer's algorithm","time":"O(E log E)","space":"O(E)","idea":"Sort each airport's destinations, DFS using each ticket once, and add an airport to the route after its tickets are used up; reverse at the end. No backtracking needed."}]},
-{"id":94,"problem":"Min Cost to Connect All Points","approaches":[
+{"id":94,"problem":"Min Cost to Connect All Points","entry":["minCostConnectPoints"],"approaches":[
  {"name":"Prim's algorithm with an array","time":"O(n²)","space":"O(n)","idea":"The graph is complete, so skip building all n² edges: keep each point's cheapest distance to the tree in an array and add the closest point each round."}]},
-{"id":95,"problem":"Network Delay Time","approaches":[
+{"id":95,"problem":"Network Delay Time","entry":["networkDelayTime"],"approaches":[
  {"name":"Dijkstra with a min-heap","time":"O(E log V)","space":"O(V + E)","idea":"Pop the closest unsettled node and relax its edges; the answer is the largest settled distance, or -1 if some node is never reached."}]},
-{"id":96,"problem":"Swim In Rising Water","approaches":[
+{"id":96,"problem":"Swim In Rising Water","entry":["swimInWater"],"approaches":[
  {"name":"Dijkstra on the maximum height","time":"O(n² log n)","space":"O(n²)","idea":"Always expand the reachable cell with the lowest elevation; the answer is the highest elevation popped before reaching the corner."}]},
-{"id":97,"problem":"Alien Dictionary","approaches":[
+{"id":97,"problem":"Alien Dictionary","entry":["alienOrder", "foreignDictionary"],"approaches":[
  {"name":"Topological sort over letters","time":"O(n)","space":"O(n)","idea":"Compare each adjacent pair of words to find the first differing letter, which gives one edge; then topologically sort the letters. Watch for a word followed by its own prefix (invalid). n = total characters."}]},
-{"id":98,"problem":"Cheapest Flights Within K Stops","approaches":[
+{"id":98,"problem":"Cheapest Flights Within K Stops","entry":["findCheapestPrice"],"approaches":[
  {"name":"Bellman-Ford for k + 1 rounds","time":"O(k·E)","space":"O(V)","idea":"Relax every edge k + 1 times, each round working from a copy of the previous round's prices so a route never uses more stops than allowed."}]},
-{"id":99,"problem":"Climbing Stairs","approaches":[
+{"id":99,"problem":"Climbing Stairs","entry":["climbStairs"],"approaches":[
  {"name":"Two running variables","time":"O(n)","space":"O(1)","idea":"ways(i) = ways(i-1) + ways(i-2), so keep only the last two values. Plain recursion without memoisation is O(2ⁿ)."}]},
-{"id":100,"problem":"Min Cost Climbing Stairs","approaches":[
+{"id":100,"problem":"Min Cost Climbing Stairs","entry":["minCostClimbingStairs"],"approaches":[
  {"name":"Bottom-up DP with two variables","time":"O(n)","space":"O(1)","idea":"The cost to reach step i is cost[i] + min of the two before it; keep only the last two values."}]},
-{"id":101,"problem":"House Robber","approaches":[
+{"id":101,"problem":"House Robber","entry":["rob"],"approaches":[
  {"name":"DP with two variables","time":"O(n)","space":"O(1)","idea":"best(i) = max(best(i-1), best(i-2) + nums[i]); keep only the last two values instead of a table or an unmemoised recursion."}]},
-{"id":102,"problem":"House Robber II","approaches":[
+{"id":102,"problem":"House Robber II","entry":["rob"],"approaches":[
  {"name":"House Robber twice","time":"O(n)","space":"O(1)","idea":"The first and last houses can't both be robbed, so take the better of robbing houses 0..n-2 and 1..n-1 with the O(1)-space House Robber."}]},
-{"id":103,"problem":"Longest Palindromic Substring","approaches":[
+{"id":103,"problem":"Longest Palindromic Substring","entry":["longestPalindrome"],"approaches":[
  {"name":"Expand around each centre","time":"O(n²)","space":"O(1)","idea":"Try all 2n - 1 centres (letters and gaps) and expand while the ends match. Same speed as the DP table without its O(n²) memory."},
  {"name":"Manacher's algorithm","time":"O(n)","space":"O(n)","advanced":true,"idea":"Reuses palindrome radii mirrored around the rightmost palindrome found so far, so each character is expanded past only once."}]},
-{"id":104,"problem":"Palindromic Substrings","approaches":[
+{"id":104,"problem":"Palindromic Substrings","entry":["countSubstrings"],"approaches":[
  {"name":"Expand around each centre","time":"O(n²)","space":"O(1)","idea":"From each of the 2n - 1 centres, expand while the ends match and count one palindrome per step."},
  {"name":"Manacher's algorithm","time":"O(n)","space":"O(n)","advanced":true,"idea":"Compute every centre's palindrome radius in linear time; the count is the sum of (radius + 1) / 2 over the transformed string."}]},
-{"id":105,"problem":"Decode Ways","approaches":[
+{"id":105,"problem":"Decode Ways","entry":["numDecodings"],"approaches":[
  {"name":"DP with two variables","time":"O(n)","space":"O(1)","idea":"ways(i) adds ways(i-1) if s[i] is 1–9 and ways(i-2) if s[i-1..i] is 10–26; keep only the last two values."}]},
-{"id":106,"problem":"Coin Change","approaches":[
+{"id":106,"problem":"Coin Change","entry":["coinChange"],"approaches":[
  {"name":"Bottom-up DP over amounts","time":"O(n·t)","space":"O(t)","idea":"dp[a] = 1 + min(dp[a - coin]) over the n coins, for every amount up to t. Greedy picking of the largest coin fails on inputs like [1, 3, 4] with amount 6."}]},
-{"id":107,"problem":"Maximum Product Subarray","approaches":[
+{"id":107,"problem":"Maximum Product Subarray","entry":["maxProduct"],"approaches":[
  {"name":"Track the running max and min","time":"O(n)","space":"O(1)","idea":"A negative number turns the smallest product into the largest, so keep both the max and min product ending at each index."}]},
-{"id":108,"problem":"Word Break","approaches":[
+{"id":108,"problem":"Word Break","entry":["wordBreak"],"approaches":[
  {"name":"DP over prefixes","time":"O(n·m·k)","space":"O(n)","idea":"dp[i] is true if some dictionary word ends at i and dp[i - len(word)] is true (n = string length, m words of length up to k). Plain recursion without memoisation is exponential."}]},
-{"id":109,"problem":"Longest Increasing Subsequence","approaches":[
+{"id":109,"problem":"Longest Increasing Subsequence","entry":["lengthOfLIS"],"approaches":[
  {"name":"Patience sorting with binary search","time":"O(n log n)","space":"O(n)","idea":"Keep tails[i] = the smallest tail of any increasing subsequence of length i + 1; binary-search where each number goes. The length of tails is the answer."},
  {"name":"DP over pairs","time":"O(n²)","space":"O(n)","idea":"lis[i] = 1 + max(lis[j]) for j < i with nums[j] < nums[i]."}]},
-{"id":110,"problem":"Partition Equal Subset Sum","approaches":[
+{"id":110,"problem":"Partition Equal Subset Sum","entry":["canPartition"],"approaches":[
  {"name":"1-D subset-sum DP","time":"O(n·t)","space":"O(t)","idea":"t = half the total. Keep a boolean array of reachable sums and update it right to left for each number so each number is used once (a set of sums works too)."}]},
-{"id":111,"problem":"Unique Paths","approaches":[
+{"id":111,"problem":"Unique Paths","entry":["uniquePaths"],"approaches":[
  {"name":"One-row DP","time":"O(m·n)","space":"O(n)","idea":"Each cell is the one above plus the one to its left, so a single row updated in place is enough. The binomial formula C(m+n-2, m-1) is faster still."}]},
-{"id":112,"problem":"Longest Common Subsequence","approaches":[
+{"id":112,"problem":"Longest Common Subsequence","entry":["longestCommonSubsequence"],"approaches":[
  {"name":"DP keeping one row","time":"O(m·n)","space":"O(min(m, n))","idea":"Row i only needs row i - 1, so keep one row over the shorter string plus a variable for the diagonal."}]},
-{"id":113,"problem":"Best Time to Buy And Sell Stock With Cooldown","approaches":[
+{"id":113,"problem":"Best Time to Buy And Sell Stock With Cooldown","entry":["maxProfit"],"approaches":[
  {"name":"Three-state machine","time":"O(n)","space":"O(1)","idea":"Track the best profit while holding, just sold, and resting; each day's three values come from the previous day's."}]},
-{"id":114,"problem":"Coin Change II","approaches":[
+{"id":114,"problem":"Coin Change II","entry":["change"],"approaches":[
  {"name":"1-D DP, coins in the outer loop","time":"O(n·t)","space":"O(t)","idea":"Loop over coins outside and amounts inside so each combination is counted once, not once per order."}]},
-{"id":115,"problem":"Target Sum","approaches":[
+{"id":115,"problem":"Target Sum","entry":["findTargetSumWays"],"approaches":[
  {"name":"Reduce to subset-sum DP","time":"O(n·t)","space":"O(t)","idea":"If P is the plus-set, sum(P) = (total + target) / 2, so count subsets with that sum using a 1-D DP. Trying every sign is O(2ⁿ)."}]},
-{"id":116,"problem":"Interleaving String","approaches":[
+{"id":116,"problem":"Interleaving String","entry":["isInterleave"],"approaches":[
  {"name":"DP keeping one row","time":"O(m·n)","space":"O(n)","idea":"dp[j] says whether s1[:i] and s2[:j] can form s3[:i+j]; each row only needs the previous one."}]},
-{"id":117,"problem":"Longest Increasing Path In a Matrix","approaches":[
+{"id":117,"problem":"Longest Increasing Path In a Matrix","entry":["longestIncreasingPath"],"approaches":[
  {"name":"DFS with memoisation","time":"O(m·n)","space":"O(m·n)","idea":"The longest path from a cell never changes, so cache it; each cell is computed once. No visited set is needed because paths strictly increase."}]},
-{"id":118,"problem":"Distinct Subsequences","approaches":[
+{"id":118,"problem":"Distinct Subsequences","entry":["numDistinct"],"approaches":[
  {"name":"1-D DP","time":"O(m·n)","space":"O(n)","idea":"dp[j] counts ways to form t[:j]; for each character of s, update j from right to left: dp[j] += dp[j-1] when s[i] == t[j-1]."}]},
-{"id":119,"problem":"Edit Distance","approaches":[
+{"id":119,"problem":"Edit Distance","entry":["minDistance"],"approaches":[
  {"name":"DP keeping one row","time":"O(m·n)","space":"O(min(m, n))","idea":"Each cell is 1 + min(insert, delete, replace), or the diagonal when characters match; keep one row and the diagonal value."}]},
-{"id":120,"problem":"Burst Balloons","approaches":[
+{"id":120,"problem":"Burst Balloons","entry":["maxCoins"],"approaches":[
  {"name":"Interval DP on the last balloon burst","time":"O(n³)","space":"O(n²)","idea":"Pad with 1s and let dp[l][r] be the best for the open interval; choosing which balloon bursts last splits it into independent halves."}]},
-{"id":121,"problem":"Regular Expression Matching","approaches":[
+{"id":121,"problem":"Regular Expression Matching","entry":["isMatch"],"approaches":[
  {"name":"DP over string and pattern positions","time":"O(m·n)","space":"O(m·n)","idea":"dp[i][j] says whether s[i:] matches p[j:]; '*' either skips the pair x* or consumes one matching character. Plain recursion without a cache is exponential."}]},
-{"id":122,"problem":"Maximum Subarray","approaches":[
+{"id":122,"problem":"Maximum Subarray","entry":["maxSubArray"],"approaches":[
  {"name":"Kadane's algorithm","time":"O(n)","space":"O(1)","idea":"Keep the best sum ending here: extend it with the current number, or restart at the current number if the running sum went negative."}]},
-{"id":123,"problem":"Jump Game","approaches":[
+{"id":123,"problem":"Jump Game","entry":["canJump"],"approaches":[
  {"name":"Greedy goal pointer","time":"O(n)","space":"O(1)","idea":"Walk from the end, moving the goal to i whenever i + nums[i] reaches it; you can win if the goal reaches index 0."}]},
-{"id":124,"problem":"Jump Game II","approaches":[
+{"id":124,"problem":"Jump Game II","entry":["jump"],"approaches":[
  {"name":"Greedy BFS by ranges","time":"O(n)","space":"O(1)","idea":"Treat each jump as a level: track the farthest index reachable from the current range and jump when you pass the range's end."}]},
-{"id":125,"problem":"Gas Station","approaches":[
+{"id":125,"problem":"Gas Station","entry":["canCompleteCircuit"],"approaches":[
  {"name":"One pass with a running tank","time":"O(n)","space":"O(1)","idea":"If total gas < total cost there is no answer. Otherwise, whenever the tank goes negative, the next station becomes the new start."}]},
-{"id":126,"problem":"Hand of Straights","approaches":[
+{"id":126,"problem":"Hand of Straights","entry":["isNStraightHand"],"approaches":[
  {"name":"Counts + smallest card first","time":"O(n log n)","space":"O(n)","idea":"Count cards, then from the smallest remaining value build a group of groupSize consecutive values, decrementing counts; any missing card means false."}]},
-{"id":127,"problem":"Merge Triplets to Form Target Triplet","approaches":[
+{"id":127,"problem":"Merge Triplets to Form Target Triplet","entry":["mergeTriplets"],"approaches":[
  {"name":"One pass, ignore triplets that overshoot","time":"O(n)","space":"O(1)","idea":"Skip any triplet with a value above the target; among the rest, check that each target position is matched by some triplet."}]},
-{"id":128,"problem":"Partition Labels","approaches":[
+{"id":128,"problem":"Partition Labels","entry":["partitionLabels"],"approaches":[
  {"name":"Last index + one pass","time":"O(n)","space":"O(1)","idea":"Record each letter's last index (26 slots), extend the current part's end to the furthest last index seen, and cut when i reaches it."}]},
-{"id":129,"problem":"Valid Parenthesis String","approaches":[
+{"id":129,"problem":"Valid Parenthesis String","entry":["checkValidString"],"approaches":[
  {"name":"Greedy range of open counts","time":"O(n)","space":"O(1)","idea":"Track the lowest and highest possible open count; '*' widens the range. Fail if high drops below 0, clamp low at 0, and succeed if low ends at 0."}]},
-{"id":130,"problem":"Insert Interval","approaches":[
+{"id":130,"problem":"Insert Interval","entry":["insert"],"approaches":[
  {"name":"One pass: before, merge, after","time":"O(n)","space":"O(n)","idea":"Copy intervals ending before the new one, merge every overlapping interval into it, then copy the rest. No sorting needed because the input is sorted."}]},
-{"id":131,"problem":"Merge Intervals","approaches":[
+{"id":131,"problem":"Merge Intervals","entry":["merge"],"approaches":[
  {"name":"Sort by start, then merge","time":"O(n log n)","space":"O(n)","idea":"After sorting, each interval either overlaps the last merged one (extend its end) or starts a new one."}]},
-{"id":132,"problem":"Non Overlapping Intervals","approaches":[
+{"id":132,"problem":"Non Overlapping Intervals","entry":["eraseOverlapIntervals"],"approaches":[
  {"name":"Sort by end, keep greedily","time":"O(n log n)","space":"O(1)","idea":"Keep the interval that ends earliest and remove anything overlapping it; this leaves the most room for later intervals."}]},
-{"id":133,"problem":"Meeting Rooms","approaches":[
+{"id":133,"problem":"Meeting Rooms","entry":["canAttendMeetings"],"approaches":[
  {"name":"Sort by start, compare neighbours","time":"O(n log n)","space":"O(1)","idea":"After sorting, an overlap can only happen between consecutive meetings."}]},
-{"id":134,"problem":"Meeting Rooms II","approaches":[
+{"id":134,"problem":"Meeting Rooms II","entry":["minMeetingRooms"],"approaches":[
  {"name":"Sorted starts and ends, two pointers","time":"O(n log n)","space":"O(n)","idea":"Sort start and end times separately; a start before the earliest unfinished end needs a new room. A min-heap of end times is equally fast."}]},
-{"id":135,"problem":"Minimum Interval to Include Each Query","approaches":[
+{"id":135,"problem":"Minimum Interval to Include Each Query","entry":["minInterval"],"approaches":[
  {"name":"Sort both, sweep with a min-heap","time":"O(n log n + q log q)","space":"O(n + q)","idea":"Process queries in increasing order, pushing intervals that have started (keyed by size) and popping ones that have ended; the heap top answers the query."}]},
-{"id":136,"problem":"Rotate Image","approaches":[
+{"id":136,"problem":"Rotate Image","entry":["rotate"],"approaches":[
  {"name":"Transpose, then reverse each row","time":"O(n²)","space":"O(1)","idea":"Swapping across the diagonal and then mirroring each row rotates the matrix 90° clockwise in place, with no copy."}]},
-{"id":137,"problem":"Spiral Matrix","approaches":[
+{"id":137,"problem":"Spiral Matrix","entry":["spiralOrder"],"approaches":[
  {"name":"Shrinking boundaries","time":"O(m·n)","space":"O(m·n)","idea":"Keep top, bottom, left and right bounds; walk one side at a time and move that bound inward. Only O(1) extra besides the output, with no visited grid."}]},
-{"id":138,"problem":"Set Matrix Zeroes","approaches":[
+{"id":138,"problem":"Set Matrix Zeroes","entry":["setZeroes"],"approaches":[
  {"name":"First row and column as markers","time":"O(m·n)","space":"O(1)","idea":"Use row 0 and column 0 to record which rows and columns to zero, with one extra flag for column 0 itself, instead of separate sets."}]},
-{"id":139,"problem":"Happy Number","fixedSize":"the input is one number, and its digit-square sums quickly drop below a few hundred","approaches":[
+{"id":139,"problem":"Happy Number","fixedSize":"the input is one number, and its digit-square sums quickly drop below a few hundred","entry":["isHappy"],"approaches":[
  {"name":"Floyd's cycle detection","time":"O(log n)","space":"O(1)","idea":"Apply the digit-square sum with a slow and a fast pointer; they meet at 1 if the number is happy, or elsewhere in a cycle. No seen set needed."}]},
-{"id":140,"problem":"Plus One","approaches":[
+{"id":140,"problem":"Plus One","entry":["plusOne"],"approaches":[
  {"name":"Carry from the last digit","time":"O(n)","space":"O(1)","idea":"Turn trailing 9s into 0s and add one to the first non-9 digit; only an all-9s number needs a new leading 1."}]},
-{"id":141,"problem":"Pow(x, n)","approaches":[
+{"id":141,"problem":"Pow(x, n)","entry":["myPow"],"approaches":[
  {"name":"Fast exponentiation (iterative)","time":"O(log n)","space":"O(1)","idea":"Square x and halve n each step, multiplying the result in when the current bit of n is 1; handle negative n by inverting x."}]},
-{"id":142,"problem":"Multiply Strings","approaches":[
+{"id":142,"problem":"Multiply Strings","entry":["multiply"],"approaches":[
  {"name":"Grade-school multiplication into one array","time":"O(m·n)","space":"O(m + n)","idea":"The product of digits i and j lands at positions i + j and i + j + 1 of an array of length m + n; add into it and carry as you go."}]},
-{"id":143,"problem":"Detect Squares","approaches":[
+{"id":143,"problem":"Detect Squares","entry":["DetectSquares", "CountSquares"],"approaches":[
  {"name":"Point counts + diagonal lookup","time":"O(n)","space":"O(n)","idea":"Count each point. For a query, treat every stored point that makes a diagonal with it as the opposite corner and multiply the counts of the other two corners."}]},
-{"id":144,"problem":"Single Number","approaches":[
+{"id":144,"problem":"Single Number","entry":["singleNumber"],"approaches":[
  {"name":"XOR everything","time":"O(n)","space":"O(1)","idea":"a ^ a = 0 and a ^ 0 = a, so XOR-ing every number leaves only the one that appears once. No hash set needed."}]},
-{"id":145,"problem":"Number of 1 Bits","fixedSize":"the input is one 32-bit number","approaches":[
+{"id":145,"problem":"Number of 1 Bits","fixedSize":"the input is one 32-bit number","entry":["hammingWeight"],"approaches":[
  {"name":"Clear the lowest set bit","time":"O(log n)","space":"O(1)","idea":"n & (n - 1) removes the lowest 1 bit, so the loop runs once per set bit (at most 32 times)."}]},
-{"id":146,"problem":"Counting Bits","approaches":[
+{"id":146,"problem":"Counting Bits","entry":["countBits"],"approaches":[
  {"name":"DP from the number shifted right","time":"O(n)","space":"O(n)","idea":"bits[i] = bits[i >> 1] + (i & 1): i has the same bits as i // 2 plus its last bit. Counting each number separately is O(n log n)."}]},
-{"id":147,"problem":"Reverse Bits","fixedSize":"the input is one 32-bit number","approaches":[
+{"id":147,"problem":"Reverse Bits","fixedSize":"the input is one 32-bit number","entry":["reverseBits"],"approaches":[
  {"name":"32 shifts","time":"O(1)","space":"O(1)","idea":"Take the last bit of n, shift it into the result from the other side, and repeat 32 times."}]},
-{"id":148,"problem":"Missing Number","approaches":[
+{"id":148,"problem":"Missing Number","entry":["missingNumber"],"approaches":[
  {"name":"XOR or the sum formula","time":"O(n)","space":"O(1)","idea":"n(n + 1)/2 minus the array's sum is the missing number (or XOR all indices and values). No sorting or set needed."}]},
-{"id":149,"problem":"Sum of Two Integers","fixedSize":"the inputs are 32-bit numbers","approaches":[
+{"id":149,"problem":"Sum of Two Integers","fixedSize":"the inputs are 32-bit numbers","entry":["getSum"],"approaches":[
  {"name":"XOR for the sum, AND-shift for the carry","time":"O(1)","space":"O(1)","idea":"a ^ b adds without carrying and (a & b) << 1 is the carry; repeat until the carry is 0 (at most 32 rounds; mask to 32 bits in Python)."}]},
-{"id":150,"problem":"Reverse Integer","fixedSize":"the input is one 32-bit number with at most 10 digits","approaches":[
+{"id":150,"problem":"Reverse Integer","fixedSize":"the input is one 32-bit number with at most 10 digits","entry":["reverse"],"approaches":[
  {"name":"Pop and push digits with an overflow check","time":"O(log n)","space":"O(1)","idea":"Take digits with % 10 and build the result with * 10, checking against the 32-bit limits before each push instead of converting to a string."}]}
 ]

@@ -124,4 +124,15 @@ class ApproachRecommenderTest {
         assertSame(BITS, r.approach());
         assertTrue(r.message().contains("32-bit"), r.message());
     }
+
+    @Test
+    void codeMustBeASolutionToTheProblem() {
+        ApproachRecommender r = new ApproachRecommender(Map.of(3,
+                new KnownProblem(List.of(HASH_SET), null, List.of(), "Two Sum", List.of("twoSum"))));
+        assertTrue(r.wrongProblem(3, "def twoSum(nums, target):\n    pass\n", CodeLanguage.PYTHON).isEmpty());
+        String msg = r.wrongProblem(3, "def containsDuplicate(nums):\n    pass\n", CodeLanguage.PYTHON).orElseThrow();
+        assertTrue(msg.contains("Two Sum") && msg.contains("a function named twoSum"), msg);
+        assertTrue(r.wrongProblem(99, "anything", CodeLanguage.PYTHON).isEmpty());     // unknown problem: no check
+        assertTrue(r.wrongProblem(null, "anything", CodeLanguage.PYTHON).isEmpty());
+    }
 }

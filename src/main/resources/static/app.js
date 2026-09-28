@@ -46,6 +46,7 @@ function render(d) {
   $('who').textContent = d.username;
   renderBanner(d);
   renderTiles(d);
+  renderPlan(d);
   renderHeatmap(d);
   renderDue(d);
   renderTests(d);
@@ -61,14 +62,18 @@ function renderBanner(d) {
   // "Never miss twice": a nudge after one missed day, a warm welcome after longer. Nothing resets.
   el.className = 'banner info';
   el.innerHTML = daysAway === 1
-    ? '<span class="icon" aria-hidden="true">·</span><span>Missed yesterday? That\'s fine. Try not to miss twice: one review today keeps the habit going.</span>'
-    : `<span class="icon" aria-hidden="true">·</span><span>Welcome back. Nothing was reset while you were away. Your reviews waited for you, so start with just one.</span>`;
+    ? '<span class="icon" aria-hidden="true">·</span><span>Missed yesterday? That\'s fine. Try not to miss twice: one revision today keeps the habit going.</span>'
+    : `<span class="icon" aria-hidden="true">·</span><span>Welcome back. Nothing was reset while you were away. Your revisions waited for you, so start with just one.</span>`;
   el.hidden = false;
 }
 
 function renderTiles(d) {
   const h = d.consistency, c = d.counts;
-  $('longterm-count').textContent = d.memory.longTerm;
+  $('revised-count').textContent = c.fullyRevised;
+  $('revised-target').textContent = `/ ${c.target}`;
+  $('revised-sub').textContent = c.improved
+    ? `all 3 revisions done · ${c.improved} improved`
+    : 'all 3 revisions done';
 
   $('due-count').textContent = c.dueToday;
   $('due-sub').innerHTML = c.overdue > 0
@@ -78,6 +83,9 @@ function renderTiles(d) {
   $('solved-count').textContent = c.done;
   $('solved-target').textContent = `/ ${c.target}`;
   $('solved-bar').style.width = `${Math.min(100, (c.done / c.target) * 100)}%`;
+  $('solved-sub').textContent = d.plan.newProblemsOpen
+    ? `new problems until day ${d.plan.lastNewDayNumber}`
+    : `closed on day ${d.plan.lastNewDayNumber}`;
 
   $('study-days').textContent = h.totalStudyDays;
   $('week-sub').textContent = h.weekNumber > 0
@@ -85,6 +93,51 @@ function renderTiles(d) {
     : `Your plan starts ${fmt(d.planStart)}`;
 
   $('calendar-note').textContent = plural(h.totalStudyDays, 'study day');
+}
+
+/** Pace for new problems, and the revisions due over the next two weeks. */
+function renderPlan(d) {
+  const p = d.pace, plan = d.plan;
+  $('plan-note').textContent = `ends ${fmt(plan.end, { day: 'numeric', month: 'short' })}`;
+  const pace = $('pace');
+  pace.replaceChildren();
+  if (!plan.newProblemsOpen) {
+    pace.append(`New problems closed on day ${plan.lastNewDayNumber}. The rest of the plan is for revisions, all done by ${fmt(plan.end)}.`);
+  } else if (p.left === 0) {
+    pace.append('All 150 solved. Now it\'s revisions only.');
+  } else {
+    pace.append(el('b', '', `${p.neededPerDay} a day`),
+      ` needed to solve the last ${p.left} by day ${plan.lastNewDayNumber} (${fmt(plan.lastNewDay, { day: 'numeric', month: 'short' })}).`);
+    if (p.projectedDay) {
+      const late = p.projectedDay > plan.lastNewDayNumber;
+      pace.append(el('br'), `Your pace: ${p.yourPerDay} a day, `,
+        el('span', late ? 'pace-late' : 'pace-ok', !late
+          ? `on track to finish around day ${p.projectedDay}`
+          : p.projectedDay > d.planDays
+            ? 'too slow to finish within the plan'
+            : `finishing around day ${p.projectedDay}, after day ${plan.lastNewDayNumber}`), '.');
+    }
+  }
+
+  $('workload-cap').textContent = `daily cap ${plan.maxReviewsPerDay}`;
+  const box = $('workload');
+  box.replaceChildren();
+  const top = Math.max(plan.maxReviewsPerDay, ...d.workload.map((w) => w.reviews));
+  for (const w of d.workload) {
+    const col = el('div', 'wl-day');
+    col.title = `${fmt(w.date)}: ${plural(w.reviews, 'revision')}`;
+    const bar = el('div', `wl-bar${w.reviews > plan.maxReviewsPerDay ? ' over' : ''}`);
+    bar.style.height = `${(w.reviews / top) * 100}%`;
+    const stack = el('div', 'wl-stack');
+    stack.append(bar);
+    col.append(el('span', 'wl-n', w.reviews ? String(w.reviews) : ''), stack,
+      el('span', 'wl-label', w.date === d.today ? 'T' : fmt(w.date, { weekday: 'narrow' })));
+    box.append(col);
+  }
+  const cap = el('div', 'wl-cap');
+  cap.style.bottom = `calc(18px + ${(plan.maxReviewsPerDay / top) * 60}px)`;
+  box.append(cap);
+  box.setAttribute('aria-label', d.workload.map((w) => `${fmt(w.date)}: ${w.reviews}`).join(', '));
 }
 
 /** Memory panel: a stacked bar of problems by stage, and the recent recall rate. */
@@ -202,18 +255,26 @@ const REVIEW_RATINGS = [
   ['GOOD', 'Good', 'Solved it with normal effort'],
   ['EASY', 'Easy', 'Quick and confident'],
 ];
+const SOLVE_LABEL = { AGAIN: 'Forgot', HARD: 'Hard', GOOD: 'Medium', EASY: 'Easy' };
+const REVIEW_LABEL = { AGAIN: 'Again', HARD: 'Hard', GOOD: 'Good', EASY: 'Easy' };
+const short = (iso) => fmt(iso, { day: 'numeric', month: 'short' });
+
+const slotAttempts = (p, k) => p.attempts.filter((a) => a.revision === k);
+/** The attempt that completed revision k (the solve day for k = 0). */
+const slotDone = (p, k) => (k === 0 ? slotAttempts(p, 0)[0]
+  : [...slotAttempts(p, k)].reverse().find((a) => a.rating && a.rating !== 'AGAIN'));
+const isDue = (p) => Boolean(p.nextDueOn) && p.nextDueOn <= state.today;
+const nextRevision = (p) => p.revisionsDone + 1;
 
 function renderDue(d) {
   const list = $('due-list');
   list.replaceChildren();
   $('today-note').textContent = d.consistency.activeToday
     ? '✓ Studied today'
-    : 'Minimum for today: one review or one new problem';
+    : 'Minimum for today: one revision or one new problem';
 
   if (d.due.length === 0) {
-    const next = allProgress(d)
-      .map((p) => p.nextDueOn)
-      .sort()[0];
+    const next = allProgress(d).map((p) => p.nextDueOn).filter(Boolean).sort()[0];
     list.append(el('li', 'empty', next
       ? `No revisions today. Next one is on ${fmt(next)}.`
       : 'No revisions yet. Mark a problem done to start.'));
@@ -222,42 +283,22 @@ function renderDue(d) {
 
   for (const p of d.due) {
     const li = el('li', 'due-item');
-
     const main = el('div');
     const title = p.link ? el('a', 'due-title', p.name) : el('span', 'due-title', p.name);
     if (p.link) { title.href = p.link; title.target = '_blank'; title.rel = 'noopener'; }
+    const tries = slotAttempts(p, nextRevision(p)).length;
     main.append(title, metaLine([
+      `Revision ${nextRevision(p)} of ${state.plan.revisions}${tries ? ` · try ${tries + 1}` : ''}`,
       LEVEL[p.difficulty],
-      p.reps === 0 && p.lapses === 0 ? 'First review' : `Last gap ${plural(p.intervalDays, 'day')}`,
       p.overdueDays > 0 ? ['overdue', `! Overdue ${plural(p.overdueDays, 'day')}`] : null,
-      p.lapses ? `Forgot ${p.lapses}×` : null,
     ]));
-
-    // Try the problem first; your notes are one click away if you need them.
-    const { toggle, panel } = notes(p);
-
-    // Rate it as in Anki; each button shows when you'd see the problem next.
-    const answer = el('div', 'answer');
-    answer.setAttribute('role', 'group');
-    answer.setAttribute('aria-label', `How did "${p.name}" go?`);
-    const buttons = REVIEW_RATINGS.map(([rating, label, hint]) => {
-      const b = el('button', `btn rate rate-${rating.toLowerCase()}`);
-      b.type = 'button';
-      const gap = p.reviewGaps && p.reviewGaps[rating];
-      b.append(el('span', 'rate-name', label));
-      if (gap) b.append(el('span', 'rate-gap', gapLabel(gap)));
-      b.title = gap ? `${hint}. Next review ${inDays(gap)}.` : hint;
-      return b;
-    });
-    buttons.forEach((b, i) => b.addEventListener('click', () => revise(p, REVIEW_RATINGS[i][0], buttons)));
-    answer.append(...buttons);
-
-    li.append(main, toggle, answer, panel);
+    const { button, panel } = panelToggle(p, 'today', 'revise', 'Revise');
+    button.classList.replace('ghost', 'primary');
+    li.append(main, button, panel);
     list.append(li);
   }
 }
 
-/** "Easy · Revision 1 of 2 · ! Overdue 3 days" — parts may be text or [className, text]. */
 function metaLine(parts) {
   const line = el('div', 'meta');
   parts.filter(Boolean).forEach((part, i) => {
@@ -327,7 +368,9 @@ function renderCatalog(d) {
   root.replaceChildren();
 
   const done = d.catalog.filter((c) => c.progress).length;
-  $('catalog-summary').textContent = `${done} done · ${d.catalog.length - done} to do`;
+  $('catalog-summary').textContent = `${done} solved · ${d.counts.fullyRevised} fully revised · ${d.catalog.length - done} to do`;
+  $('table-legend').textContent = `Each problem gets ${d.plan.revisions} revisions, all done by day ${d.planDays}. `
+    + 'Open a ✓ to see that attempt: your notes, saved versions and their analyses.';
 
   const show = document.querySelector('input[name=show]:checked').value;
   const query = $('catalog-search').value.trim().toLowerCase();
@@ -365,7 +408,7 @@ function renderCatalog(d) {
     shown += earlier.length;
     root.append(categoryBlock('Earlier entries', earlier.length, earlier.length,
       earlier.map((p) => catalogRow({ id: null, name: p.name, url: p.link,
-        difficulty: p.initialDifficulty, progress: p })),
+        difficulty: p.difficulty, progress: p })),
       query !== '' || openCats.has('Earlier entries')));
   }
 
@@ -385,7 +428,11 @@ function categoryBlock(name, doneCount, total, rows, open) {
   summary.append(bar);
   box.append(summary);
   const list = el('ul', 'cat-list');
-  list.append(...rows);
+  const head = el('li', 'row row-head');
+  head.setAttribute('aria-hidden', 'true');
+  head.append(el('span', '', 'Problem'), el('span', '', 'NeetCode'), el('span', '', 'Solved'),
+    el('span', '', 'Revision 1'), el('span', '', 'Revision 2'), el('span', '', 'Revision 3'), el('span'));
+  list.append(head, ...rows);
   box.append(list);
   box.addEventListener('toggle', () => {
     if (box.open) openCats.add(name); else openCats.delete(name);
@@ -393,57 +440,110 @@ function categoryBlock(name, doneCount, total, rows, open) {
   return box;
 }
 
+/**
+ * One problem as a table row: Problem · NeetCode difficulty · Solved · Revision 1–3. A done cell
+ * opens that problem's history; the next revision's cell says when it's due, or "Revise".
+ */
 function catalogRow(c) {
   const p = c.progress;
   const li = el('li', p ? 'row done' : 'row');
 
-  const mark = el('span', 'check', p ? '✓' : '');
-  mark.setAttribute('aria-hidden', 'true');
-
   const title = el('a', 'row-title', c.name);
   title.href = c.url; title.target = '_blank'; title.rel = 'noopener';
   title.title = c.name;
+  const level = el('span', 'level', LEVEL[c.difficulty]);
 
-  // Level and status: their own columns on wide screens, one line under the title on phones.
-  const sub = el('div', 'sub');
-  sub.append(el('span', 'level', LEVEL[c.difficulty]));
-  let status;
-  if (!p) status = el('span', 'status', '');
-  else if (p.overdueDays > 0) status = el('span', 'status overdue', `! Overdue ${plural(p.overdueDays, 'day')}`);
-  else if (p.nextDueOn === state.today) status = el('span', 'status', 'Review today');
-  else if (p.mature) status = el('span', 'status mastered', `✓ Next ${fmt(p.nextDueOn)}`);
-  else status = el('span', 'status', `Next ${fmt(p.nextDueOn)}`);
-  if (p) status.title = `Remembered ${plural(p.reps, 'time')}, forgot ${plural(p.lapses, 'time')}. Current gap ${plural(p.intervalDays, 'day')}.`;
-  sub.append(status);
-
-  const actions = el('div', 'actions');
-  let panel = null;
   if (!p) {
-    const btn = el('button', 'btn link', 'Mark done');
-    btn.type = 'button';
-    btn.addEventListener('click', () => openDone(c));
-    actions.append(btn);
-  } else {
-    const n = notes(p);
-    panel = n.panel;
-    const undo = el('button', 'btn icon', '✕');
-    undo.type = 'button';
-    undo.title = `Undo "${c.name}"`;
-    undo.setAttribute('aria-label', `Undo ${c.name}`);
-    undo.addEventListener('click', () => remove(p));
-    actions.append(n.toggle, undo);
+    const mark = el('button', 'btn link', 'Mark done');
+    mark.type = 'button';
+    if (!state.plan.newProblemsOpen) {
+      mark.disabled = true;
+      mark.title = `New problems stopped on day ${state.plan.lastNewDayNumber}, so every revision fits before the plan ends.`;
+    }
+    mark.addEventListener('click', () => openDone(c));
+    const solved = el('div', 'tcell solved');
+    solved.append(mark);
+    li.append(title, level, solved, el('div', 'tcell rev muted', '—'), el('div', 'tcell rev muted', '—'),
+      el('div', 'tcell rev muted', '—'), el('div', 'actions'));
+    return li;
   }
 
-  li.append(mark, title, sub, actions);
-  if (panel) li.append(panel);
+  const { button: toggle, panel, open } = panelToggle(p, 'list', 'history', 'History');
+  const cells = [0, 1, 2, 3].map((k) => stageCell(p, k, open));
+
+  const compact = el('div', 'tcell compact');
+  const dots = el('span', 'dots');
+  dots.setAttribute('aria-label', `${p.revisionsDone} of ${state.plan.revisions} revisions done`);
+  for (let k = 1; k <= state.plan.revisions; k++) dots.append(el('i', k <= p.revisionsDone ? 'dot on' : 'dot'));
+  if (isDue(p)) {
+    const go = el('button', `btn link next${p.overdueDays > 0 ? ' overdue' : ''}`, nextLabel(p));
+    go.type = 'button';
+    go.addEventListener('click', () => open('revise'));
+    compact.append(dots, go);
+  } else {
+    compact.append(dots, el('span', 'next', nextLabel(p)));
+  }
+
+  const undo = el('button', 'btn icon', '✕');
+  undo.type = 'button';
+  undo.title = `Undo "${c.name}"`;
+  undo.setAttribute('aria-label', `Undo ${c.name}`);
+  undo.addEventListener('click', () => remove(p));
+  const actions = el('div', 'actions');
+  actions.append(toggle, undo);
+
+  li.append(title, level, ...cells, compact, actions, panel);
   return li;
 }
 
-let notesSeq = 0;
-const openNotes = new Set();   // problem ids whose notes panel is open, kept across reloads
+function nextLabel(p) {
+  if (p.fullyRevised) return '✓ Fully revised';
+  if (p.overdueDays > 0) return `Revise · ${plural(p.overdueDays, 'day')} late`;
+  if (isDue(p)) return 'Revise today';
+  return `next ${short(p.nextDueOn)}`;
+}
 
+/** A Solved / Revision k cell. */
+function stageCell(p, k, open) {
+  const cell = el('div', k === 0 ? 'tcell solved' : 'tcell rev');
+  const done = k === 0 || k <= p.revisionsDone ? slotDone(p, k) : null;
+  if (done) {
+    const tries = k === 0 ? 1 : slotAttempts(p, k).length;
+    const b = el('button', 'stage done-stage');
+    b.type = 'button';
+    const rating = done.rating ? (k === 0 ? SOLVE_LABEL : REVIEW_LABEL)[done.rating] : '';
+    b.append(el('span', 'stage-date', `✓ ${short(done.attemptedOn)}`),
+      el('span', `stage-rating r-${(done.rating || '').toLowerCase()}`, rating + (tries > 1 ? ` · ${tries} tries` : '')));
+    b.title = `${k === 0 ? 'Solved' : `Revision ${k}`} on ${fmt(done.attemptedOn)}. Open the history.`;
+    b.addEventListener('click', () => open('history', done.id));
+    cell.append(b);
+  } else if (k === nextRevision(p) && !p.fullyRevised) {
+    const tries = slotAttempts(p, k).length;
+    if (isDue(p)) {
+      const b = el('button', `btn stage-due${p.overdueDays > 0 ? ' overdue' : ''}`, 'Revise');
+      b.type = 'button';
+      b.title = p.overdueDays > 0 ? `Due ${fmt(p.nextDueOn)}, ${plural(p.overdueDays, 'day')} ago` : 'Due today';
+      b.addEventListener('click', () => open('revise'));
+      cell.append(b);
+      if (p.overdueDays > 0) cell.append(el('span', 'stage-late', `${p.overdueDays}d late`));
+    } else {
+      cell.append(el('span', 'stage-next', `due ${short(p.nextDueOn)}`));
+    }
+    if (tries) cell.append(el('span', 'stage-tries', `↻ ${tries}`));
+  } else {
+    cell.classList.add('muted');
+    cell.textContent = '—';
+  }
+  return cell;
+}
+
+// ---------- the panel under a problem: revise form and/or its attempt history
+const openPanels = new Map();   // "where:id" → 'history' | 'revise', kept across reloads
+const drafts = new Map();       // unsaved text in the forms, kept across reloads
 const LANGUAGES = { JAVA: 'Java', PYTHON: 'Python', JAVASCRIPT: 'JavaScript', CPP: 'C++' };
 const CONFIDENCE = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
+let panelSeq = 0;
+let focusAttempt = null;
 
 function lastLanguage() {
   try { return localStorage.getItem('dsa.codeLanguage') || 'JAVA'; } catch { return 'JAVA'; }
@@ -452,190 +552,375 @@ function rememberLanguage(lang) {
   try { localStorage.setItem('dsa.codeLanguage', lang); } catch { /* private mode: fine */ }
 }
 
-/**
- * A "Notes" button and the panel it opens. On the day the problem was solved the panel is a form
- * (notes, drawing link, code, Analyse); after that it's a read-only record, frozen.
- */
-function notes(p) {
-  const panel = el('div', 'notes');
-  panel.id = `notes-${++notesSeq}`;   // the same problem can appear in Today and in the list
-  panel.hidden = !openNotes.has(p.id);
+function panelToggle(p, where, mode, label) {
+  const key = `${where}:${p.id}`;
+  const panel = el('div', 'panel');
+  panel.id = `panel-${++panelSeq}`;
+  const button = el('button', 'btn ghost', label);
+  button.type = 'button';
+  button.setAttribute('aria-controls', panel.id);
 
-  const reviewed = `reviewed ${plural(p.reps + p.lapses, 'time')} · current gap ${plural(p.intervalDays, 'day')}`;
-  const when = el('p', 'notes-when');
-  if (p.editable) {
-    when.append(`Done today · ${reviewed} · `, el('span', 'editable-tag', 'Editable until midnight, then frozen'));
-  } else {
-    const lock = el('span', 'frozen-tag', 'Frozen');
-    lock.title = `Notes can only be edited on the day you solve a problem (${fmt(p.solvedOn)}).`;
-    when.append(`Done ${fmt(p.solvedOn)} · ${reviewed} · `, lock);
-  }
-  panel.append(when);
-  panel.append(p.editable ? notesForm(p) : notesRecord(p));
-
-  const toggle = el('button', 'btn ghost', 'Notes');
-  toggle.type = 'button';
-  toggle.setAttribute('aria-expanded', String(!panel.hidden));
-  toggle.setAttribute('aria-controls', panel.id);
-  toggle.addEventListener('click', () => {
-    panel.hidden = !panel.hidden;
-    if (panel.hidden) openNotes.delete(p.id); else openNotes.add(p.id);
-    toggle.setAttribute('aria-expanded', String(!panel.hidden));
+  const draw = () => {
+    const current = openPanels.get(key);
+    panel.hidden = !current;
+    button.setAttribute('aria-expanded', String(Boolean(current)));
+    button.textContent = current ? 'Close' : label;
+    panel.replaceChildren();
+    if (!current) return;
+    if (current === 'revise' && isDue(p)) panel.append(reviseForm(p, key));
+    else if (isDue(p)) {
+      const go = el('button', 'btn primary revise-now', `Start revision ${nextRevision(p)}`);
+      go.type = 'button';
+      go.addEventListener('click', () => { openPanels.set(key, 'revise'); draw(); });
+      panel.append(go);
+    }
+    panel.append(history(p, current === 'revise'));
+    if (focusAttempt) {
+      const target = panel.querySelector(`[data-attempt="${focusAttempt}"]`);
+      focusAttempt = null;
+      if (target) requestAnimationFrame(() => target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    }
+  };
+  const open = (m, attemptId) => {
+    focusAttempt = attemptId || null;
+    openPanels.set(key, m);
+    draw();
+  };
+  button.addEventListener('click', () => {
+    if (openPanels.has(key)) openPanels.delete(key); else openPanels.set(key, mode);
+    draw();
   });
-  return { toggle, panel };
+  draw();
+  return { button, panel, open };
 }
 
-/** Frozen notes: what you wrote on the day, your code and its analysis. */
-function notesRecord(p) {
-  const box = el('div', 'notes-record');
-  if (p.learnings) box.append(el('p', 'notes-text', p.learnings));
-  if (p.excalidrawUrl) {
-    const a = el('a', '', 'Open drawing in Excalidraw ↗');
-    a.href = p.excalidrawUrl; a.target = '_blank'; a.rel = 'noopener';
-    box.append(a);
-  }
-  if (p.code) {
-    box.append(el('p', 'code-label', `Your code · ${LANGUAGES[p.codeLanguage] || ''}`));
-    const pre = el('pre', 'code-view');
-    pre.append(el('code', '', p.code));
-    box.append(pre);
-  }
-  if (p.analysis) box.append(analysisBox(p.analysis));
-  return box;
-}
-
-/** Today's notes: editable, with a code box and Analyse. */
-function notesForm(p) {
-  const form = el('form', 'notes-form');
-  form.noValidate = true;
-  const uid = `nf-${notesSeq}`;
-
-  const learnings = el('textarea');
-  learnings.name = 'learnings'; learnings.rows = 4; learnings.maxLength = 2000; learnings.value = p.learnings || '';
-  const drawing = el('input');
-  drawing.name = 'excalidrawUrl'; drawing.type = 'url'; drawing.maxLength = 500;
-  drawing.placeholder = 'https://excalidraw.com/#json=…'; drawing.value = p.excalidrawUrl || '';
-
+/** A language picker and code box; Tab indents. */
+function codeEditor(draftKey, initial, initialLang) {
+  const d = drafts.get(draftKey) || {};
+  const uid = `ce-${++panelSeq}`;
   const lang = el('select', 'lang-select');
-  lang.name = 'codeLanguage';
   lang.id = `${uid}-lang`;
   for (const [value, label] of Object.entries(LANGUAGES)) {
     const o = el('option', '', label);
     o.value = value;
     lang.append(o);
   }
-  lang.value = p.codeLanguage || lastLanguage();
-
+  lang.value = d.lang || initialLang || lastLanguage();
   const code = el('textarea', 'code-input');
-  code.name = 'code'; code.rows = 10; code.maxLength = 10000; code.spellcheck = false;
+  code.rows = 9; code.maxLength = 10000; code.spellcheck = false;
   code.id = `${uid}-code`;
-  code.value = p.code || '';
+  code.value = d.code ?? initial ?? '';
   code.placeholder = 'Paste or type your solution';
   code.setAttribute('autocapitalize', 'off');
   code.setAttribute('autocomplete', 'off');
-  code.setAttribute('aria-describedby', `${uid}-hint`);
   code.addEventListener('keydown', indentWithTab);
+  const remember = () => drafts.set(draftKey, { ...(drafts.get(draftKey) || {}), code: code.value, lang: lang.value });
+  code.addEventListener('input', remember);
+  lang.addEventListener('change', remember);
+  return { lang, code, uid };
+}
 
-  const codeHead = el('div', 'code-head');
-  const codeLabel = el('label', 'code-label', 'Your code');
-  codeLabel.htmlFor = code.id;
-  const langLabel = el('label', 'sr-only', 'Language');
-  langLabel.htmlFor = lang.id;
-  codeHead.append(codeLabel, langLabel, lang);
-  const hint = el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.');
-  hint.id = `${uid}-hint`;
-
-  const error = el('p', 'form-error');
-  error.setAttribute('role', 'alert');
-  error.hidden = true;
-  const status = el('span', 'save-status');
-  status.setAttribute('aria-live', 'polite');
-
-  const save = el('button', 'btn', 'Save');
-  save.type = 'submit';
-  const analyse = el('button', 'btn primary', 'Analyse');
-  analyse.type = 'button';
-  analyse.title = 'Estimate the time and space complexity of your code';
-  const actions = el('div', 'notes-actions');
-  actions.append(save, analyse, status);
-
-  const result = el('div', 'analysis-slot');
-  if (p.analysis) result.append(analysisBox(p.analysis));
-
-  form.append(
-    field('What you learned', learnings),
-    field('Excalidraw link', drawing, 'optional'),
-    codeHead, code, hint, error, actions, result);
-
-  const saved = () => ({
-    learnings: learnings.value.trim(),
-    excalidrawUrl: drawing.value.trim(),
-    code: code.value.trim() ? code.value : '',
-    codeLanguage: code.value.trim() ? lang.value : null,
-  });
-  let last = JSON.stringify(saved());
-  const dirty = () => JSON.stringify(saved()) !== last;
-
-  // Changing the code makes the old analysis wrong, so hide it until the next Analyse.
-  const markStale = () => { if (dirty()) result.replaceChildren(); status.textContent = dirty() ? 'Unsaved changes' : ''; };
-  [learnings, drawing, code, lang].forEach((x) => x.addEventListener('input', markStale));
-
-  async function persist() {
-    const body = saved();
-    if (!body.learnings) throw new Error('Write down what you learned.');
-    if (body.excalidrawUrl && !/^https:\/\/\S+$/.test(body.excalidrawUrl)) throw new Error('The Excalidraw link must start with https://');
-    const updated = await api(`/api/problems/${p.id}/notes`, { method: 'PATCH', body: JSON.stringify(body) });
-    last = JSON.stringify(saved());
-    if (body.codeLanguage) rememberLanguage(body.codeLanguage);
-    Object.assign(p, updated);
-    return updated;
-  }
-
-  async function run(button, work) {
+/**
+ * Analyse (a preview: nothing saved) for a code box. Returns the button and a function telling
+ * whether the current code is exactly what was analysed.
+ */
+function previewButton(code, lang, catalogId, slot, error) {
+  let analysed = null;
+  const btn = el('button', 'btn', 'Analyse');
+  btn.type = 'button';
+  btn.title = 'Estimate the time and space complexity of this code (nothing is saved)';
+  const clear = () => { if (analysed !== null && code.value + lang.value !== analysed) { analysed = null; slot.replaceChildren(); } };
+  code.addEventListener('input', clear);
+  lang.addEventListener('change', clear);
+  btn.addEventListener('click', async () => {
     error.hidden = true;
-    save.disabled = analyse.disabled = true;
-    const label = button.textContent;
-    button.textContent = button === analyse ? 'Analysing…' : 'Saving…';
+    if (!code.value.trim()) { error.textContent = 'Add your code first, then analyse it.'; error.hidden = false; return; }
+    btn.disabled = true;
+    btn.textContent = 'Analysing…';
     try {
-      await work();
+      const result = await api('/api/analysis/preview', {
+        method: 'POST',
+        body: JSON.stringify({ code: code.value, codeLanguage: lang.value, catalogId }),
+      });
+      analysed = code.value + lang.value;
+      slot.replaceChildren(analysisBox(result));
     } catch (e) {
-      error.textContent = e.message;
-      error.hidden = false;
-      if (/frozen/i.test(e.message)) await load();   // midnight passed: show the frozen record
+      error.textContent = e.message; error.hidden = false;
     } finally {
-      button.textContent = label;
-      save.disabled = analyse.disabled = false;
+      btn.disabled = false;
+      btn.textContent = 'Analyse';
+    }
+  });
+  return { btn, isAnalysed: () => analysed !== null && analysed === code.value + lang.value };
+}
+
+function errorLine() {
+  const e = el('p', 'form-error');
+  e.setAttribute('role', 'alert');
+  e.hidden = true;
+  return e;
+}
+
+/** A revision: optional notes and code (with Analyse), then your rating saves it. */
+function reviseForm(p, key) {
+  const k = nextRevision(p);
+  const tries = slotAttempts(p, k).length;
+  const box = el('section', 'revise');
+  box.append(el('h3', '', `Revision ${k} of ${state.plan.revisions}${tries ? ` · try ${tries + 1}` : ''}`),
+    el('p', 'hint', 'Solve it again first. Your earlier attempts are below if you get stuck.'));
+
+  const draftKey = `rev:${p.id}`;
+  const d = drafts.get(draftKey) || {};
+  const notes = el('textarea');
+  notes.rows = 3; notes.maxLength = 2000; notes.value = d.notes || '';
+  notes.placeholder = 'e.g. Forgot the length check; remembered the hash map straight away';
+  notes.addEventListener('input', () => drafts.set(draftKey, { ...(drafts.get(draftKey) || {}), notes: notes.value }));
+  box.append(field('What did you notice this time?', notes, 'optional'));
+
+  const { lang, code } = codeEditor(draftKey, '', null);
+  const head = el('div', 'code-head');
+  head.append(el('span', 'code-label', 'Your code (optional)'), lang);
+  const error = errorLine();
+  const slot = el('div', 'analysis-slot');
+  const { btn: analyse } = previewButton(code, lang, p.catalogId, slot, error);
+  const codeActions = el('div', 'notes-actions');
+  codeActions.append(analyse, el('span', 'save-status', 'Saved with this revision when you rate it.'));
+  box.append(head, code, codeActions, slot);
+
+  box.append(el('p', 'rate-prompt', 'How did it go?'));
+  const answer = el('div', 'answer');
+  answer.setAttribute('role', 'group');
+  answer.setAttribute('aria-label', `Rate revision ${k} of ${p.name}`);
+  const buttons = REVIEW_RATINGS.map(([rating, label, hint]) => {
+    const b = el('button', `btn rate rate-${rating.toLowerCase()}`);
+    b.type = 'button';
+    const gap = p.reviewGaps ? p.reviewGaps[rating] : undefined;
+    b.append(el('span', 'rate-name', label));
+    if (gap === 0) b.append(el('span', 'rate-gap', '✓ done'));
+    else if (gap) b.append(el('span', 'rate-gap', gapLabel(gap)));
+    b.title = gap === 0 ? `${hint}. Completes all ${state.plan.revisions} revisions.`
+      : gap ? `${hint}. Next ${rating === 'AGAIN' ? 'try' : 'revision'} ${inDays(gap)}.` : hint;
+    return b;
+  });
+  buttons.forEach((b, i) => b.addEventListener('click', async () => {
+    error.hidden = true;
+    buttons.forEach((x) => (x.disabled = true));
+    const rating = REVIEW_RATINGS[i][0];
+    try {
+      const hasCode = code.value.trim() !== '';
+      const updated = await api(`/api/problems/${p.id}/reviews`, {
+        method: 'POST',
+        body: JSON.stringify({ rating, learnings: notes.value.trim(), code: hasCode ? code.value : '', codeLanguage: hasCode ? lang.value : null }),
+      });
+      if (hasCode) rememberLanguage(lang.value);
+      drafts.delete(draftKey);
+      openPanels.delete(key);
+      toast(updated.fullyRevised
+        ? `All ${state.plan.revisions} revisions done: "${p.name}" is fully revised.`
+        : rating === 'AGAIN'
+          ? `No problem. Try revision ${k} again ${inDays(updated.intervalDays)} (${fmt(updated.nextDueOn)}).`
+          : `Revision ${k} done. Revision ${k + 1} ${inDays(updated.intervalDays)} (${fmt(updated.nextDueOn)}).`);
+      await load();
+    } catch (e) {
+      error.textContent = e.message; error.hidden = false;
+      buttons.forEach((x) => (x.disabled = false));
+    }
+  }));
+  answer.append(...buttons);
+  box.append(answer, error);
+  return box;
+}
+
+/** Every attempt, oldest first: notes, saved versions with their analyses, and today's editors. */
+function history(p, collapsed) {
+  const wrap = el('div', 'history');
+  if (collapsed) {
+    const d = el('details', 'history-toggle');
+    d.append(el('summary', '', `Earlier attempts (${p.attempts.length})`));
+    d.append(historyBody(p));
+    wrap.append(d);
+  } else {
+    wrap.append(historyBody(p));
+  }
+  return wrap;
+}
+
+function historyBody(p) {
+  const body = el('div', 'history-body');
+  const trail = el('p', 'trail');
+  p.attempts.forEach((a, i) => {
+    const best = a.versions.filter((v) => v.analysis).map((v) => v.analysis.time);
+    if (i) trail.append(el('span', 'trail-sep', '→'));
+    trail.append(el('span', 'trail-step', `${attemptTitle(a, true)}${best.length ? ` ${best[best.length - 1]}` : ''}`));
+  });
+  body.append(trail);
+  for (const a of p.attempts) body.append(attemptBlock(p, a));
+  return body;
+}
+
+function attemptTitle(a, compact) {
+  if (a.revision === 0) return 'Solved';
+  return compact ? `Rev ${a.revision}${a.tryNo > 1 ? `.${a.tryNo}` : ''}` : `Revision ${a.revision}${a.tryNo > 1 ? ` · try ${a.tryNo}` : ''}`;
+}
+
+function attemptBlock(p, a) {
+  const box = el('section', a.editable ? 'attempt editable' : 'attempt');
+  box.dataset.attempt = a.id;
+  const head = el('div', 'attempt-head');
+  head.append(el('strong', '', attemptTitle(a, false)),
+    el('span', 'meta', `${fmt(a.attemptedOn)}${a.rating ? ` · ${(a.revision === 0 ? SOLVE_LABEL : REVIEW_LABEL)[a.rating]}` : ''}`));
+  if (a.editable) head.append(el('span', 'editable-tag', 'Editable until midnight'));
+  else {
+    const lock = el('span', 'frozen-tag', 'Frozen');
+    lock.title = `Attempts can only be changed on their own day (${fmt(a.attemptedOn)}).`;
+    head.append(lock);
+  }
+  if (a.versions.some((v) => v.improved)) head.append(el('span', 'improved-tag', 'Improved'));
+  box.append(head);
+
+  if (a.editable) box.append(notesEditor(a));
+  else {
+    if (a.learnings) box.append(el('p', 'notes-text', a.learnings));
+    else if (a.revision > 0) box.append(el('p', 'muted small', 'No notes for this revision.'));
+    if (a.excalidrawUrl) {
+      const link = el('a', 'drawing-link', 'Open drawing in Excalidraw ↗');
+      link.href = a.excalidrawUrl; link.target = '_blank'; link.rel = 'noopener';
+      box.append(link);
     }
   }
 
-  form.addEventListener('submit', (e) => {
+  a.versions.forEach((v, i) => box.append(versionBlock(p, a, v, i === a.versions.length - 1)));
+  if (a.editable) box.append(newVersionEditor(p, a));
+  return box;
+}
+
+function notesEditor(a) {
+  const form = el('form', 'notes-form');
+  form.noValidate = true;
+  const draftKey = `notes:${a.id}`;
+  const d = drafts.get(draftKey) || {};
+  const notes = el('textarea');
+  notes.rows = 3; notes.maxLength = 2000; notes.value = d.notes ?? a.learnings ?? '';
+  const drawing = el('input');
+  drawing.type = 'url'; drawing.maxLength = 500; drawing.placeholder = 'https://excalidraw.com/#json=…';
+  drawing.value = d.drawing ?? a.excalidrawUrl ?? '';
+  const remember = () => drafts.set(draftKey, { notes: notes.value, drawing: drawing.value });
+  notes.addEventListener('input', remember);
+  drawing.addEventListener('input', remember);
+  const error = errorLine();
+  const save = el('button', 'btn', 'Save notes');
+  save.type = 'submit';
+  const status = el('span', 'save-status');
+  const actions = el('div', 'notes-actions');
+  actions.append(save, status);
+  form.append(field(a.revision === 0 ? 'What you learned' : 'What you noticed', notes, a.revision === 0 ? null : 'optional'),
+    field('Excalidraw link', drawing, 'optional'), actions, error);
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    run(save, async () => {
-      await persist();
+    error.hidden = true;
+    if (a.revision === 0 && !notes.value.trim()) { error.textContent = 'Write down what you learned.'; error.hidden = false; return; }
+    if (drawing.value.trim() && !/^https:\/\/\S+$/.test(drawing.value.trim())) {
+      error.textContent = 'The Excalidraw link must start with https://'; error.hidden = false; return;
+    }
+    save.disabled = true;
+    try {
+      await api(`/api/attempts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ learnings: notes.value.trim(), excalidrawUrl: drawing.value.trim() }) });
+      drafts.delete(draftKey);
       status.textContent = 'Saved';
-      syncCopies(p);
-    });
+      await load();
+    } catch (err) {
+      error.textContent = err.message; error.hidden = false;
+      if (/frozen/i.test(err.message)) await load();
+    } finally {
+      save.disabled = false;
+    }
   });
-
-  analyse.addEventListener('click', () => run(analyse, async () => {
-    if (!code.value.trim()) throw new Error('Add your code first, then analyse it.');
-    if (dirty()) await persist();
-    const updated = await api(`/api/problems/${p.id}/analysis`, { method: 'POST' });
-    Object.assign(p, updated);
-    status.textContent = '';
-    result.replaceChildren(analysisBox(updated.analysis));
-    syncCopies(p);
-  }));
-
   return form;
 }
 
-/** The same problem can be shown twice (Today and the list): refresh the data behind both. */
-function syncCopies(p) {
-  if (!state) return;
-  for (const list of [state.due, state.catalog.map((c) => c.progress).filter(Boolean)]) {
-    for (const q of list) if (q.id === p.id && q !== p) Object.assign(q, p);
+/** One saved version: its code and analysis behind a toggle, and today's actions. */
+function versionBlock(p, a, v, latest) {
+  const box = el('details', 'version');
+  box.open = latest && a.editable;
+  const summary = el('summary');
+  summary.append(el('span', 'v-name', `Version ${v.versionNo}`), el('span', 'v-lang', LANGUAGES[v.codeLanguage] || ''));
+  summary.append(v.analysis
+    ? el('span', 'v-cx', `${v.analysis.time} time · ${v.analysis.space} space`)
+    : el('span', 'v-cx muted', 'not analysed'));
+  if (v.improved) summary.append(el('span', 'improved-tag', 'Improved'));
+  box.append(summary);
+  const pre = el('pre', 'code-view');
+  pre.append(el('code', '', v.code));
+  box.append(pre);
+  if (v.analysis) box.append(analysisBox(v.analysis));
+  if (a.editable) {
+    const error = errorLine();
+    const actions = el('div', 'notes-actions');
+    const analyse = el('button', 'btn', v.analysis ? 'Analyse again' : 'Analyse');
+    analyse.type = 'button';
+    const del = el('button', 'btn ghost', 'Delete version');
+    del.type = 'button';
+    const busy = async (btn, label, work) => {
+      error.hidden = true;
+      btn.disabled = true;
+      const old = btn.textContent;
+      btn.textContent = label;
+      try { await work(); await load(); } catch (e) { error.textContent = e.message; error.hidden = false; btn.disabled = false; btn.textContent = old; }
+    };
+    analyse.addEventListener('click', () => busy(analyse, 'Analysing…', () => api(`/api/versions/${v.id}/analysis`, { method: 'POST' })));
+    del.addEventListener('click', () => {
+      if (!confirm(`Delete version ${v.versionNo}?`)) return;
+      busy(del, 'Deleting…', () => api(`/api/versions/${v.id}`, { method: 'DELETE' }));
+    });
+    actions.append(analyse, del);
+    box.append(actions, error);
   }
+  return box;
+}
+
+/** "Save as new version": starts from your latest code, so you can improve it and keep both. */
+function newVersionEditor(p, a) {
+  const box = el('div', 'new-version');
+  const last = a.versions[a.versions.length - 1];
+  const full = a.versions.length >= 5;
+  const { lang, code } = codeEditor(`ver:${a.id}`, last ? last.code : '', last ? last.codeLanguage : null);
+  const head = el('div', 'code-head');
+  head.append(el('span', 'code-label', a.versions.length ? 'New version' : 'Your code'), lang);
+  const error = errorLine();
+  const slot = el('div', 'analysis-slot');
+  const { btn: analyse, isAnalysed } = previewButton(code, lang, p.catalogId, slot, error);
+  const save = el('button', 'btn primary', 'Save as new version');
+  save.type = 'button';
+  const status = el('span', 'save-status', full ? 'You have 5 versions (the most). Delete one to save another.'
+    : last ? 'Your earlier versions stay as they are.' : '');
+  save.disabled = full;
+  save.addEventListener('click', async () => {
+    error.hidden = true;
+    if (!code.value.trim()) { error.textContent = 'Add your code first.'; error.hidden = false; return; }
+    if (last && code.value.trim() === last.code.trim() && lang.value === last.codeLanguage) {
+      error.textContent = 'This is the same as your latest version. Change it first.'; error.hidden = false; return;
+    }
+    save.disabled = true;
+    save.textContent = 'Saving…';
+    try {
+      await api(`/api/attempts/${a.id}/versions`, {
+        method: 'POST',
+        body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: isAnalysed() }),
+      });
+      rememberLanguage(lang.value);
+      drafts.delete(`ver:${a.id}`);
+      toast(isAnalysed() ? 'Saved as a new version, with its analysis.' : 'Saved as a new version.');
+      await load();
+    } catch (e) {
+      error.textContent = e.message; error.hidden = false;
+      save.disabled = false;
+      save.textContent = 'Save as new version';
+    }
+  });
+  const actions = el('div', 'notes-actions');
+  actions.append(analyse, save, status);
+  box.append(head, code, el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.'), actions, error, slot);
+  return box;
 }
 
 function field(label, control, optional) {
@@ -784,24 +1069,6 @@ document.querySelectorAll('input[name=show]').forEach((r) =>
 $('catalog-search').addEventListener('input', () => state && renderCatalog(state));
 
 // ---------- actions
-async function revise(p, rating, buttons) {
-  buttons.forEach((b) => (b.disabled = true));
-  try {
-    const updated = await api(`/api/problems/${p.id}/reviews`, {
-      method: 'POST',
-      body: JSON.stringify({ rating }),
-    });
-    const when = `${inDays(updated.intervalDays)} (${fmt(updated.nextDueOn)})`;
-    toast(rating === 'AGAIN'
-      ? `No problem. You'll see it again ${when} to relearn it.`
-      : `${rating === 'EASY' ? 'Great' : 'Nice'}. Next review ${when}.`);
-    await load();
-  } catch (e) {
-    toast(e.message);
-    buttons.forEach((b) => (b.disabled = false));
-  }
-}
-
 async function remove(p) {
   if (!confirm(`Undo "${p.name}"? Your notes and revision history for it will be deleted.`)) return;
   try {
@@ -914,7 +1181,9 @@ doneForm.addEventListener('submit', async (ev) => {
     });
     if (codeLanguage) rememberLanguage(codeLanguage);
     dialog.close();
-    const complexity = saved.analysis ? ` Time ${saved.analysis.time}, space ${saved.analysis.space}.` : '';
+    const firstVersion = saved.attempts[0] && saved.attempts[0].versions[0];
+    const a = firstVersion && firstVersion.analysis;
+    const complexity = a ? ` Time ${a.time}, space ${a.space}.` : '';
     toast(`Done. First review ${inDays(saved.intervalDays)}, ${fmt(saved.nextDueOn)}.${complexity}`);
     await load();
   } catch (e) {

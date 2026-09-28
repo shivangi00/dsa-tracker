@@ -308,116 +308,235 @@ class ApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    // ---------- notes, code and analysis
+    // ---------- attempts: notes, saved versions and analysis
 
-    private static final String TWO_SUM = """
-            {"learnings":"Hash map of value to index.","excalidrawUrl":"",
-             "code":"def twoSum(nums, target):\\n    seen = {}\\n    for i, n in enumerate(nums):\\n        if target - n in seen:\\n            return [seen[target - n], i]\\n        seen[n] = i\\n",
-             "codeLanguage":"PYTHON"}""";
+    private static final String TWO_SUM_CODE =
+            "def twoSum(nums, target):\\n    seen = {}\\n    for i, n in enumerate(nums):\\n        if target - n in seen:\\n"
+            + "            return [seen[target - n], i]\\n        seen[n] = i\\n";
+    private static final String TWO_SUM_BRUTE =
+            "def twoSum(nums, target):\\n    for i in range(len(nums)):\\n        for j in range(i + 1, len(nums)):\\n"
+            + "            if nums[i] + nums[j] == target:\\n                return [i, j]\\n";
 
-    @Test
-    void notesAndCodeCanBeEditedAndAnalysedOnTheDaySolved() throws Exception {
-        Cookie hana = signUp("hana");
-        long id = markDone(hana, 1);
+    private static long idAt(String json, String path) {
+        return ((Number) JsonPath.read(json, path)).longValue();
+    }
 
-        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(hana)
-                        .contentType(APPLICATION_JSON).content(TWO_SUM))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.editable").value(true))
-                .andExpect(jsonPath("$.codeLanguage").value("PYTHON"))
-                .andExpect(jsonPath("$.analysis").doesNotExist());
-
-        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(hana))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.analysis.time").value("O(n)"))
-                .andExpect(jsonPath("$.analysis.space").value("O(n)"))
-                .andExpect(jsonPath("$.analysis.source").value("estimate"));
-
-        // Changing the code clears the analysis of the old code
-        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(hana)
-                        .contentType(APPLICATION_JSON).content(TWO_SUM.replace("seen[n] = i", "seen[n] = i  # done")))
-                .andExpect(jsonPath("$.analysis").doesNotExist());
+    private String body(org.springframework.test.web.servlet.ResultActions r) throws Exception {
+        return r.andReturn().getResponse().getContentAsString();
     }
 
     @Test
-    void codeCanBeAnalysedAndSavedInTheMarkDoneWindow() throws Exception {
-        Cookie pia = signUp("pia");
-        String code = "def f(nums):\\n    for x in nums:\\n        for y in nums:\\n            pass\\n";
+    void theSolveDayKeepsEveryVersionYouSave() throws Exception {
+        Cookie hana = signUp("hana");
+        // Mark done with brute-force code: saved as version 1 and analysed
+        String done = body(mvc.perform(post("/api/catalog/3/done").with(csrf()).cookie(hana).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"Brute force first.\",\"code\":\"" + TWO_SUM_BRUTE + "\",\"codeLanguage\":\"PYTHON\",\"rating\":\"HARD\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.attempts.length()").value(1))
+                .andExpect(jsonPath("$.attempts[0].revision").value(0))
+                .andExpect(jsonPath("$.attempts[0].editable").value(true))
+                .andExpect(jsonPath("$.attempts[0].versions[0].versionNo").value(1))
+                .andExpect(jsonPath("$.attempts[0].versions[0].analysis.time").value("O(n²)"))
+                .andExpect(jsonPath("$.attempts[0].versions[0].analysis.recommendation.verdict").value("faster")));
+        long attempt = idAt(done, "$.attempts[0].id");
 
-        // Preview: analysed, nothing saved
+        // Optimised: "Save as new version" keeps version 1 as it was
+        mvc.perform(post("/api/attempts/" + attempt + "/versions").with(csrf()).cookie(hana).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\",\"analyse\":false}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.attempts[0].versions.length()").value(2))
+                .andExpect(jsonPath("$.attempts[0].versions[0].analysis.time").value("O(n²)"))
+                .andExpect(jsonPath("$.attempts[0].versions[1].versionNo").value(2))
+                .andExpect(jsonPath("$.attempts[0].versions[1].analysis").doesNotExist());
+
+        // Analysis is separate: analyse version 2 when you like (on the day)
+        String after = body(mvc.perform(get("/api/dashboard").cookie(hana)));
+        long v2 = idAt(after, "$.catalog[2].progress.attempts[0].versions[1].id");
+        mvc.perform(post("/api/versions/" + v2 + "/analysis").with(csrf()).cookie(hana))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attempts[0].versions[1].analysis.time").value("O(n)"))
+                .andExpect(jsonPath("$.attempts[0].versions[1].analysis.recommendation.verdict").value("optimal"))
+                .andExpect(jsonPath("$.attempts[0].versions[0].improved").value(false))
+                .andExpect(jsonPath("$.attempts[0].versions[1].improved").value(true));   // O(n) beats O(n²)
+        mvc.perform(get("/api/dashboard").cookie(hana)).andExpect(jsonPath("$.counts.improved").value(1));
+
+        // Notes can be edited on the day
+        mvc.perform(patch("/api/attempts/" + attempt).with(csrf()).cookie(hana).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"Brute force, then a hash map.\",\"excalidrawUrl\":\"\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attempts[0].learnings").value("Brute force, then a hash map."));
+        // …but the solve day needs notes
+        mvc.perform(patch("/api/attempts/" + attempt).with(csrf()).cookie(hana).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\" \"}"))
+                .andExpect(status().isBadRequest());
+
+        // A version can be deleted on the day
+        mvc.perform(delete("/api/versions/" + v2).with(csrf()).cookie(hana))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attempts[0].versions.length()").value(1));
+    }
+
+    @Test
+    void atMostFiveVersionsPerAttempt() throws Exception {
+        Cookie lia = signUp("lia");
+        String done = body(mvc.perform(post("/api/catalog/3/done").with(csrf()).cookie(lia).contentType(APPLICATION_JSON)
+                .content("{\"learnings\":\"x\",\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\"}")));
+        long attempt = idAt(done, "$.attempts[0].id");
+        for (int i = 2; i <= 5; i++) {
+            mvc.perform(post("/api/attempts/" + attempt + "/versions").with(csrf()).cookie(lia).contentType(APPLICATION_JSON)
+                            .content("{\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\"}"))
+                    .andExpect(status().isCreated());
+        }
+        mvc.perform(post("/api/attempts/" + attempt + "/versions").with(csrf()).cookie(lia).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void codeCanBeAnalysedBeforeMarkingDone() throws Exception {
+        Cookie pia = signUp("pia");
+        String code = "def containsDuplicate(nums):\\n    for x in nums:\\n        for y in nums:\\n            pass\\n";
+        mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(pia).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + code + "\",\"codeLanguage\":\"PYTHON\",\"catalogId\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.time").value("O(n²)"))
+                .andExpect(jsonPath("$.recommendation.approach.name").value("Hash set"));
         mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(pia).contentType(APPLICATION_JSON)
                         .content("{\"code\":\"" + code + "\",\"codeLanguage\":\"PYTHON\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.time").value("O(n²)"));
+                .andExpect(jsonPath("$.recommendation").doesNotExist());   // no problem given: nothing to compare
         mvc.perform(get("/api/dashboard").cookie(pia)).andExpect(jsonPath("$.counts.done").value(0));
-
-        // Mark done with the code: saved together with its analysis
-        mvc.perform(post("/api/catalog/1/done").with(csrf()).cookie(pia).contentType(APPLICATION_JSON)
-                        .content("{\"learnings\":\"Nested loops.\",\"code\":\"" + code + "\",\"codeLanguage\":\"PYTHON\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").exists())
-                .andExpect(jsonPath("$.analysis.time").value("O(n²)"));
     }
 
     @Test
-    void analysisRecommendsABetterApproach() throws Exception {
+    void aRevisionIsAnAttemptWithOptionalNotesAndCode() throws Exception {
         Cookie ria = signUp("ria");
-        String brute = "def f(nums):\\n    for i in range(len(nums)):\\n        for j in range(i + 1, len(nums)):\\n"
-                + "            if nums[i] == nums[j]:\\n                return True\\n    return False\\n";
+        long id = markDone(ria, 3);
+        jdbc.update("UPDATE problems SET next_due_on = CURRENT_DATE - 1 WHERE id = ?", id);   // due (a day late)
 
-        // Preview for Contains Duplicate (catalog id 1): O(n²) → the hash set approach
-        mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
-                        .content("{\"code\":\"" + brute + "\",\"codeLanguage\":\"PYTHON\",\"catalogId\":1}"))
+        // Revision 1 with notes and code
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"rating\":\"GOOD\",\"learnings\":\"Remembered the hash map.\",\"code\":\"" + TWO_SUM_CODE
+                                + "\",\"codeLanguage\":\"PYTHON\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.recommendation.verdict").value("faster"))
-                .andExpect(jsonPath("$.recommendation.approach.name").value("Hash set"))
-                .andExpect(jsonPath("$.recommendation.approach.time").value("O(n)"));
+                .andExpect(jsonPath("$.revisionsDone").value(1))
+                .andExpect(jsonPath("$.attempts.length()").value(2))
+                .andExpect(jsonPath("$.attempts[1].revision").value(1))
+                .andExpect(jsonPath("$.attempts[1].tryNo").value(1))
+                .andExpect(jsonPath("$.attempts[1].rating").value("GOOD"))
+                .andExpect(jsonPath("$.attempts[1].learnings").value("Remembered the hash map."))
+                .andExpect(jsonPath("$.attempts[1].versions[0].analysis.time").value("O(n)"));
 
-        // Without a catalog id there's nothing to compare with
-        mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
-                        .content("{\"code\":\"" + brute + "\",\"codeLanguage\":\"PYTHON\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.recommendation").doesNotExist());
+        // Revision 2 with nothing but a rating: Again repeats it as try 2 of revision 2
+        jdbc.update("UPDATE problems SET next_due_on = CURRENT_DATE WHERE id = ?", id);
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"rating\":\"AGAIN\"}"))
+                .andExpect(jsonPath("$.revisionsDone").value(1))
+                .andExpect(jsonPath("$.attempts[2].revision").value(2))
+                .andExpect(jsonPath("$.attempts[2].learnings").doesNotExist());
+        jdbc.update("UPDATE problems SET next_due_on = CURRENT_DATE WHERE id = ?", id);
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"rating\":\"HARD\"}"))
+                .andExpect(jsonPath("$.revisionsDone").value(2))
+                .andExpect(jsonPath("$.attempts[3].revision").value(2))
+                .andExpect(jsonPath("$.attempts[3].tryNo").value(2));
 
-        // Saved: the problem's analysis carries the recommendation, on the dashboard too
-        mvc.perform(post("/api/catalog/1/done").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
-                        .content("{\"learnings\":\"Brute force first.\",\"code\":\"" + brute + "\",\"codeLanguage\":\"PYTHON\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.analysis.recommendation.verdict").value("faster"));
+        // Revision 3 completes it: fully revised, nothing more due
+        jdbc.update("UPDATE problems SET next_due_on = CURRENT_DATE WHERE id = ?", id);
         mvc.perform(get("/api/dashboard").cookie(ria))
-                .andExpect(jsonPath("$.catalog[0].progress.analysis.recommendation.approach.name").value("Hash set"));
+                .andExpect(jsonPath("$.due[0].reviewGaps.GOOD").value(0));   // 0 = completes
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"rating\":\"EASY\"}"))
+                .andExpect(jsonPath("$.revisionsDone").value(3))
+                .andExpect(jsonPath("$.fullyRevised").value(true))
+                .andExpect(jsonPath("$.nextDueOn").doesNotExist());
+        mvc.perform(get("/api/dashboard").cookie(ria))
+                .andExpect(jsonPath("$.counts.fullyRevised").value(1))
+                .andExpect(jsonPath("$.due.length()").value(0));
+        mvc.perform(post("/api/problems/" + id + "/reviews").with(csrf()).cookie(ria).contentType(APPLICATION_JSON)
+                        .content("{\"rating\":\"GOOD\"}"))
+                .andExpect(status().isConflict());
     }
 
     @Test
-    void notesAreFrozenOnceTheDayIsOver() throws Exception {
+    void attemptsAreFrozenOnceTheirDayIsOver() throws Exception {
         Cookie ivan = signUp("ivan");
-        long id = markDone(ivan, 1);
-        // Pretend it was solved yesterday
-        jdbc.update("UPDATE problems SET solved_on = solved_on - 1, last_reviewed_on = last_reviewed_on - 1, "
-                + "next_due_on = next_due_on - 1 WHERE id = ?", id);
+        String done = body(mvc.perform(post("/api/catalog/3/done").with(csrf()).cookie(ivan).contentType(APPLICATION_JSON)
+                .content("{\"learnings\":\"x\",\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\"}")));
+        long attempt = idAt(done, "$.attempts[0].id");
+        long version = idAt(done, "$.attempts[0].versions[0].id");
+        jdbc.update("UPDATE attempts SET attempted_on = attempted_on - 1 WHERE id = ?", attempt);   // yesterday
 
-        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(ivan)
-                        .contentType(APPLICATION_JSON).content(TWO_SUM))
+        mvc.perform(patch("/api/attempts/" + attempt).with(csrf()).cookie(ivan).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"changed\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("frozen")));
-        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(ivan))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Frozen")));
+        mvc.perform(post("/api/attempts/" + attempt + "/versions").with(csrf()).cookie(ivan).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\"}"))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/versions/" + version + "/analysis").with(csrf()).cookie(ivan))
+                .andExpect(status().isConflict());
+        mvc.perform(delete("/api/versions/" + version).with(csrf()).cookie(ivan))
                 .andExpect(status().isConflict());
         mvc.perform(get("/api/dashboard").cookie(ivan))
-                .andExpect(jsonPath("$.catalog[0].progress.editable").value(false));
+                .andExpect(jsonPath("$.catalog[2].progress.attempts[0].editable").value(false));
     }
 
     @Test
-    void analysingNeedsCodeAndOnlyYourOwnProblem() throws Exception {
+    void nobodyCanTouchSomeoneElsesAttemptsOrVersions() throws Exception {
         Cookie joan = signUp("joan");   // usernames are 3–30 characters
         Cookie kim = signUp("kim");
-        long id = markDone(joan, 1);
-        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(joan))
+        String done = body(mvc.perform(post("/api/catalog/3/done").with(csrf()).cookie(joan).contentType(APPLICATION_JSON)
+                .content("{\"learnings\":\"x\",\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\"}")));
+        long attempt = idAt(done, "$.attempts[0].id");
+        long version = idAt(done, "$.attempts[0].versions[0].id");
+
+        mvc.perform(patch("/api/attempts/" + attempt).with(csrf()).cookie(kim).contentType(APPLICATION_JSON)
+                .content("{\"learnings\":\"mine now\"}")).andExpect(status().isNotFound());
+        mvc.perform(post("/api/attempts/" + attempt + "/versions").with(csrf()).cookie(kim).contentType(APPLICATION_JSON)
+                .content("{\"code\":\"" + TWO_SUM_CODE + "\",\"codeLanguage\":\"PYTHON\"}")).andExpect(status().isNotFound());
+        mvc.perform(post("/api/versions/" + version + "/analysis").with(csrf()).cookie(kim)).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/versions/" + version).with(csrf()).cookie(kim)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void newProblemsStopOnDay85AndThePlanShowsThePace() throws Exception {
+        Cookie nell = signUp("nell");
+        markDone(nell, 1);
+        mvc.perform(get("/api/dashboard").cookie(nell))
+                .andExpect(jsonPath("$.plan.lastNewDayNumber").value(85))
+                .andExpect(jsonPath("$.plan.revisions").value(3))
+                .andExpect(jsonPath("$.plan.newProblemsOpen").value(true))
+                .andExpect(jsonPath("$.pace.left").value(149))
+                .andExpect(jsonPath("$.workload.length()").value(14))
+                .andExpect(jsonPath("$.workload[3].reviews").value(1));   // Medium: first revision in 3 days
+
+        jdbc.update("UPDATE users SET start_date = CURRENT_DATE - 90 WHERE username = 'nell'");   // now day 91
+        mvc.perform(post("/api/catalog/2/done").with(csrf()).cookie(nell).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"too late\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("day 85")));
+        mvc.perform(get("/api/dashboard").cookie(nell))
+                .andExpect(jsonPath("$.plan.newProblemsOpen").value(false));
+    }
+
+    @Test
+    void codeForAnotherProblemIsRefused() throws Exception {
+        Cookie uma = signUp("uma");
+        String containsDuplicate = "def containsDuplicate(nums):\\n    return len(set(nums)) < len(nums)\\n";
+
+        // Contains Duplicate code under Two Sum (catalog 3): refused, and no analysis used up
+        mvc.perform(post("/api/analysis/preview").with(csrf()).cookie(uma).contentType(APPLICATION_JSON)
+                        .content("{\"code\":\"" + containsDuplicate + "\",\"codeLanguage\":\"PYTHON\",\"catalogId\":3}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("twoSum")));
+        mvc.perform(post("/api/catalog/3/done").with(csrf()).cookie(uma).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"Oops.\",\"code\":\"" + containsDuplicate + "\",\"codeLanguage\":\"PYTHON\"}"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(post("/api/problems/" + id + "/analysis").with(csrf()).cookie(kim))
-                .andExpect(status().isNotFound());
-        mvc.perform(patch("/api/problems/" + id + "/notes").with(csrf()).cookie(kim)
-                        .contentType(APPLICATION_JSON).content(TWO_SUM))
-                .andExpect(status().isNotFound());
+
+        // Under its own problem it's fine
+        mvc.perform(post("/api/catalog/1/done").with(csrf()).cookie(uma).contentType(APPLICATION_JSON)
+                        .content("{\"learnings\":\"A set.\",\"code\":\"" + containsDuplicate + "\",\"codeLanguage\":\"PYTHON\"}"))
+                .andExpect(status().isCreated());
     }
 
     @Test

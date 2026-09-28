@@ -13,6 +13,7 @@ import static dev.shivangi.dsatracker.repetition.Rating.GOOD;
 import static dev.shivangi.dsatracker.repetition.Rating.HARD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,7 +30,7 @@ class SpacedRepetitionPolicyTest {
     private List<Integer> gaps(Rating first, Rating review, int reviews) {
         ScheduleState s = policy.onFirstSolve(day1, first);
         List<Integer> gaps = new ArrayList<>(List.of(s.intervalDays()));
-        for (int i = 0; i < reviews; i++) {
+        for (int i = 0; i < reviews && s.nextDueOn() != null; i++) {
             s = policy.onReview(s, s.nextDueOn(), review);
             gaps.add(s.intervalDays());
         }
@@ -43,27 +44,19 @@ class SpacedRepetitionPolicyTest {
         assertEquals(3, policy.onFirstSolve(day1, GOOD).intervalDays());
         assertEquals(5, policy.onFirstSolve(day1, EASY).intervalDays());
         assertEquals(day(4), policy.onFirstSolve(day1, GOOD).nextDueOn());
-        assertEquals(Map.of(AGAIN, 1, HARD, 2, GOOD, 3, EASY, 5), policy.firstGaps());
+        assertEquals(Map.of(AGAIN, 1, HARD, 2, GOOD, 3, EASY, 5), policy.firstGaps(day1, null));
     }
 
     @Test
     void goodEveryTimeGrowsByTheEase() {
-        assertEquals(List.of(3, 8, 20, 50, 125), gaps(GOOD, GOOD, 4));
+        assertEquals(List.of(3, 8, 20, 50), gaps(GOOD, GOOD, 4));   // the third revision completes it
         assertEquals(List.of(5, 13, 34, 90), gaps(EASY, GOOD, 3));
     }
 
     @Test
-    void aHarderStartGrowsMoreSlowlyButCatchesUp() {
-        List<Integer> hard = gaps(HARD, GOOD, 4);
-        List<Integer> forgot = gaps(AGAIN, GOOD, 4);
-        assertEquals(List.of(2, 5, 12, 29, 73), hard);
-        assertEquals(List.of(1, 3, 7, 17, 42), forgot);
-        // the ease has recovered to the normal 2.5 by then
-        ScheduleState s = policy.onFirstSolve(day1, AGAIN);
-        for (int i = 0; i < 4; i++) {
-            s = policy.onReview(s, s.nextDueOn(), GOOD);
-        }
-        assertEquals(2.5, s.ease(), 1e-9);
+    void aHarderStartGrowsMoreSlowly() {
+        assertEquals(List.of(2, 5, 12, 29), gaps(HARD, GOOD, 3));
+        assertEquals(List.of(1, 3, 7, 17), gaps(AGAIN, GOOD, 3));
     }
 
     @Test
@@ -123,7 +116,7 @@ class SpacedRepetitionPolicyTest {
 
     @Test
     void gapsAreCappedAtAYear() {
-        ScheduleState s = new ScheduleState(300, 2.5, 6, 0, day1, day(301));
+        ScheduleState s = new ScheduleState(300, 2.5, 1, 0, day1, day(301));
         assertEquals(365, policy.onReview(s, s.nextDueOn(), EASY).intervalDays());
         assertEquals(365, policy.onReview(s, s.nextDueOn(), GOOD).intervalDays());
     }
@@ -144,6 +137,90 @@ class SpacedRepetitionPolicyTest {
         assertFalse(s.isMature());
         assertFalse(policy.onReview(s, day(12), GOOD).isMature());  // gap 20, just under three weeks
         assertTrue(policy.onReview(s, day(12), EASY).isMature());   // gap 26
+    }
+
+    // ---------- three revisions, finished by the end of the plan
+
+    @Test
+    void theThirdSuccessfulRevisionCompletesIt() {
+        ScheduleState s = policy.onFirstSolve(day1, GOOD);
+        s = policy.onReview(s, s.nextDueOn(), GOOD);
+        s = policy.onReview(s, s.nextDueOn(), AGAIN);                // doesn't count
+        assertEquals(1, s.reps());
+        s = policy.onReview(s, s.nextDueOn(), HARD);
+        assertEquals(2, s.reps());
+        ScheduleState done = policy.onReview(s, s.nextDueOn(), GOOD);
+        assertEquals(3, done.reps());
+        assertNull(done.nextDueOn());
+        assertFalse(done.isDueOn(day(400)));
+        assertEquals(0, policy.overdueDays(done, day(400)));
+        assertThrows(IllegalStateException.class, () -> policy.onReview(done, day(400), GOOD));
+        assertEquals(done, policy.pullForward(done, day(400)));
+    }
+
+    @Test
+    void theLastRevisionsButtonsSayTheyComplete() {
+        ScheduleState s = new ScheduleState(8, 2.5, 2, 0, day1, day(9));
+        Map<Rating, Integer> g = policy.previewGaps(s, day(9));
+        assertEquals(1, (int) g.get(AGAIN));
+        assertEquals(SpacedRepetitionPolicy.COMPLETES, (int) g.get(HARD));
+        assertEquals(SpacedRepetitionPolicy.COMPLETES, (int) g.get(EASY));
+    }
+
+    @Test
+    void lateProblemsAreSqueezedToFinishByTheEndOfThePlan() {
+        LocalDate planEnd = day(100);
+        ScheduleState s = policy.onFirstSolve(day(85), GOOD, planEnd);  // 15 days left, 3 revisions: gaps ≤ 5
+        assertEquals(day(88), s.nextDueOn());
+        s = policy.onReview(s, day(88), GOOD, planEnd);                 // natural 8, but 12 days / 2 left = 6
+        assertEquals(day(94), s.nextDueOn());
+        s = policy.onReview(s, day(94), GOOD, planEnd);                 // natural 15, but 6 days / 1 left = 6
+        assertEquals(day(100), s.nextDueOn());
+        assertNull(policy.onReview(s, day(100), GOOD, planEnd).nextDueOn());
+    }
+
+    @Test
+    void earlyProblemsKeepTheirNaturalGaps() {
+        LocalDate planEnd = day(100);
+        ScheduleState s = policy.onFirstSolve(day1, GOOD, planEnd);
+        s = policy.onReview(s, s.nextDueOn(), GOOD, planEnd);
+        assertEquals(8, s.intervalDays());
+        s = policy.onReview(s, s.nextDueOn(), GOOD, planEnd);
+        assertEquals(20, s.intervalDays());
+    }
+
+    @Test
+    void theDeadlineCapNeverGoesBelowOneDay() {
+        ScheduleState s = policy.onFirstSolve(day(99), EASY, day(100));
+        assertEquals(1, s.intervalDays());
+        ScheduleState late = policy.onFirstSolve(day(120), EASY, day(100));   // past the end: still tomorrow
+        assertEquals(1, late.intervalDays());
+    }
+
+    @Test
+    void firstGapsFollowTheDeadlineToo() {
+        assertEquals(Map.of(AGAIN, 1, HARD, 2, GOOD, 3, EASY, 5), policy.firstGaps(day1, day(100)));
+        assertEquals(Map.of(AGAIN, 1, HARD, 2, GOOD, 3, EASY, 3), policy.firstGaps(day(90), day(100)));  // 10 / 3
+    }
+
+    // ---------- spreading the workload
+
+    @Test
+    void aFullDayPushesTheReviewEarlier() {
+        ScheduleState s = new ScheduleState(20, 2.5, 1, 0, day1, day(21));
+        ScheduleState spread = policy.spread(s, day1, Map.of(day(21), 6));
+        assertEquals(day(20), spread.nextDueOn());
+        assertEquals(19, spread.intervalDays());
+    }
+
+    @Test
+    void spreadingNeverMovesAReviewLaterOrTooFar() {
+        ScheduleState s = new ScheduleState(20, 2.5, 1, 0, day1, day(21));
+        Map<LocalDate, Integer> full = Map.of(day(21), 6, day(20), 6, day(19), 6, day(18), 6);
+        assertEquals(s, policy.spread(s, day1, full));                  // at most 3 days earlier: keep the date
+        ScheduleState shortGap = new ScheduleState(3, 2.5, 0, 0, day1, day(4));
+        assertEquals(shortGap, policy.spread(shortGap, day1, Map.of(day(4), 9)));   // gap 3: no room to move
+        assertEquals(s, policy.spread(s, day1, Map.of(day(21), 5)));    // under the cap: unchanged
     }
 
     @Test

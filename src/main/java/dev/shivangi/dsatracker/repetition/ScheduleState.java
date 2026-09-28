@@ -13,7 +13,7 @@ import java.time.LocalDate;
  * @param reps           successful reviews so far (the first solve doesn't count)
  * @param lapses         times you pressed Again on a review
  * @param lastReviewedOn the day of the last review, or of the first solve
- * @param nextDueOn      the day the next review is due
+ * @param nextDueOn      the day the next review is due; null once fully revised
  */
 public record ScheduleState(
         int intervalDays,
@@ -25,7 +25,7 @@ public record ScheduleState(
 
     /** True if the problem can be reviewed today (due today or overdue). */
     public boolean isDueOn(LocalDate today) {
-        return !nextDueOn.isAfter(today);
+        return nextDueOn != null && !nextDueOn.isAfter(today);
     }
 
     /** "Mature" = the memory is expected to last three weeks or more (Anki's threshold). */

@@ -25,13 +25,12 @@
     <button type="button" class="btn link banner-action" id="rc-banner-open">Create one</button>
   </div>
 
-  <!-- Four headline numbers in one quiet row -->
   <!-- Four headline numbers. None of them can drop to zero because of a missed day. -->
   <section class="stats" aria-label="Summary">
     <div class="stat">
-      <div class="stat-label">Long-term memory</div>
-      <div class="stat-value" id="longterm-count">–</div>
-      <div class="stat-sub">problems you'd remember for 3+ weeks</div>
+      <div class="stat-label">Fully revised</div>
+      <div class="stat-value"><span id="revised-count">–</span><span class="unit" id="revised-target"></span></div>
+      <div class="stat-sub" id="revised-sub">all 3 revisions done</div>
     </div>
     <div class="stat">
       <div class="stat-label">Due today</div>
@@ -39,9 +38,10 @@
       <div class="stat-sub" id="due-sub"></div>
     </div>
     <div class="stat">
-      <div class="stat-label">Done</div>
+      <div class="stat-label">Solved</div>
       <div class="stat-value"><span id="solved-count">–</span><span class="unit" id="solved-target"></span></div>
       <div class="bar" aria-hidden="true"><div class="bar-fill" id="solved-bar"></div></div>
+      <div class="stat-sub" id="solved-sub"></div>
     </div>
     <div class="stat">
       <div class="stat-label">Study days</div>
@@ -68,24 +68,22 @@
         <ul class="test-list" id="test-list"></ul>
       </section>
 
-      <section class="section" aria-labelledby="nc-h">
-        <div class="section-head">
-          <h2 id="nc-h">NeetCode 150</h2>
-          <span class="section-note" id="catalog-summary"></span>
-        </div>
-        <div class="toolbar">
-          <div class="seg" role="radiogroup" aria-label="Show">
-            <label><input type="radio" name="show" value="all" checked><span>All</span></label>
-            <label><input type="radio" name="show" value="todo"><span>To do</span></label>
-            <label><input type="radio" name="show" value="done"><span>Done</span></label>
-          </div>
-          <input type="search" id="catalog-search" placeholder="Search" aria-label="Search problems">
-        </div>
-        <div id="catalog"></div>
-      </section>
     </main>
 
     <aside class="aside">
+      <section class="section" aria-labelledby="plan-h">
+        <div class="section-head">
+          <h2 id="plan-h">Plan</h2>
+          <span class="section-note" id="plan-note"></span>
+        </div>
+        <p class="pace" id="pace"></p>
+        <div class="workload-head">
+          <span>Revisions due, next 14 days</span>
+          <span class="workload-cap" id="workload-cap"></span>
+        </div>
+        <div class="workload" id="workload" role="img"></div>
+      </section>
+
       <section class="section heat" aria-labelledby="heat-h">
         <div class="section-head">
           <h2 id="heat-h">Study calendar</h2>
@@ -113,6 +111,23 @@
       </section>
     </aside>
   </div>
+
+  <section class="section wide" aria-labelledby="nc-h">
+    <div class="section-head">
+      <h2 id="nc-h">NeetCode 150</h2>
+      <span class="section-note" id="catalog-summary"></span>
+    </div>
+    <div class="toolbar">
+      <div class="seg" role="radiogroup" aria-label="Show">
+        <label><input type="radio" name="show" value="all" checked><span>All</span></label>
+        <label><input type="radio" name="show" value="todo"><span>To do</span></label>
+        <label><input type="radio" name="show" value="done"><span>Done</span></label>
+      </div>
+      <input type="search" id="catalog-search" placeholder="Search" aria-label="Search problems">
+    </div>
+    <p class="table-legend" id="table-legend"></p>
+    <div id="catalog"></div>
+  </section>
 </div>
 
 <dialog id="done-dialog" aria-labelledby="done-title">

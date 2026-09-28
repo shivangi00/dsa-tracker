@@ -1,6 +1,6 @@
 # DSA Tracker
 
-A minimalist tracker for working through the **NeetCode 150**, for any number of people. Each person signs up, picks a start date, and each day marks problems done with what they learned (plus an optional Excalidraw link). Reviews are scheduled by an Anki-style spaced-repetition algorithm driven by your own Forgot / Hard / Medium / Easy ratings, a weekly test checks you can spot the same patterns in new problems, and motivation comes from long-term memory rather than streaks.
+A minimalist tracker for working through the **NeetCode 150**, for any number of people. Each person signs up, picks a start date, and each day marks problems done with what they learned (plus an optional Excalidraw link). Every problem gets three revisions, scheduled by an Anki-style algorithm driven by your own ratings and fitted to a 100-day plan; every attempt keeps your notes and saved code versions; a short weekly test checks you can spot the same patterns in new problems, and motivation comes from long-term memory rather than streaks.
 
 **Stack:** Java 21 · Spring Boot 3.5 · Spring Security · PostgreSQL 16 · Flyway · plain HTML/CSS/JS (no build step) · Spring Session (sessions in Postgres) · Docker · GitHub Actions CI
 
@@ -57,34 +57,49 @@ The **first account** you create takes over any problems logged before accounts 
 - **Graceful shutdown.** In-flight requests finish before a deploy stops the old copy.
 - **One database address.** On Render the single app instance connects directly to Neon. (If you ever run many instances, point `DB_URL` at Neon's `-pooler` address and set `SPRING_FLYWAY_URL`, `SPRING_FLYWAY_USER` and `SPRING_FLYWAY_PASSWORD` to the direct address and the same login, because schema changes need a direct connection.)
 
-## The review algorithm
+## The plan and the review algorithm
 
-Anki-style (SM-2) spaced repetition driven by **your own ratings**. The same problem can be easy for one person and hard for another, so the schedule follows how it went for you, not NeetCode's difficulty label.
+A 100-day plan: solve all 150 problems by **day 85**, and give every problem **3 revisions**, all finished by **day 100**. Days 86–100 are for revisions only (marking new problems done is refused after day 85; `app.last-new-problem-day`).
 
-**When you mark a problem done**, you rate how it went. The rating sets the first review and the *ease* (how fast gaps grow):
+The problems table reads like a spreadsheet: **Problem · NeetCode difficulty · Solved · Revision 1 · Revision 2 · Revision 3**. Each ✓ opens that attempt; the next revision's cell shows its due date, or **Revise** when it's due. On a phone each row collapses to "●●○ · next 5 Oct".
 
-| Your rating | Meaning | First review | Ease | Then, pressing Good each time |
-|---|---|---|---|---|
-| Forgot | needed a hint or the solution | tomorrow | 2.30 | 1 → 3 → 7 → 17 → 42 days |
-| Hard | solved it, with real effort | in 2 days | 2.35 | 2 → 5 → 12 → 29 → 73 |
-| Medium | solved it with normal effort | in 3 days | 2.50 | 3 → 8 → 20 → 50 → 125 |
-| Easy | quick and confident | in 5 days | 2.65 | 5 → 13 → 34 → 90 |
+Anki-style (SM-2) gaps driven by **your own ratings**: the same problem can be easy for one person and hard for another, so the schedule follows how it went for you, not NeetCode's label.
 
-**At each review** you press Again, Hard, Good or Easy. Each button shows the gap it would give, as in Anki (d = days late):
+**When you mark a problem done**, you rate how it went:
+
+| Your rating | Meaning | First revision | Ease |
+|---|---|---|---|
+| Forgot | needed a hint or the solution | tomorrow | 2.30 |
+| Hard | solved it, with real effort | in 2 days | 2.35 |
+| Medium | solved it with normal effort | in 3 days | 2.50 |
+| Easy | quick and confident | in 5 days | 2.65 |
+
+**At each revision** you press Again, Hard, Good or Easy; each button shows the gap it would give (d = days late):
 
 | Button | Next gap | Ease |
 |---|---|---|
-| Again | tomorrow | − 0.20 |
+| Again | the same revision again tomorrow (another try; doesn't count as one of the 3) | − 0.20 |
 | Hard | (gap + d/4) × 1.2 | − 0.15 |
-| Good | (gap + d/2) × ease | + 0.05 while below 2.5 |
+| Good | (gap + d/2) × ease | + 0.05 while below 2.5 (no "ease hell") |
 | Easy | (gap + d) × ease × 1.3 | + 0.15 |
 
-- **No "ease hell".** In plain SM-2, a few bad days can push the ease down for good. Here each Good nudges it back towards 2.5.
-- **Late but remembered earns a bonus**, since the memory outlasted the schedule.
-- Every successful answer grows the gap by at least a day, and Hard < Good < Easy always. Ease never drops below 1.3.
-- **Missing days resets nothing.** A review stays due until you do it; your rating then decides the next gap.
-- A problem is **mature** once its gap reaches 21 days. Gaps are capped at 365 days.
-- Problems logged before ratings existed keep their schedule; your next rating takes over from there.
+Hard, Good or Easy on the third revision **completes** the problem: fully revised, nothing more due. Medium then Good every time: 3 → 8 → 20 days.
+
+- **The deadline.** Every gap is capped at *days left ÷ revisions left*, so the remaining revisions always fit before day 100. A Medium problem solved on day 85: revisions on days 88, 94 and 100. Problems solved early keep their natural, longer gaps.
+- **Workload smoothing.** If 6 revisions are already due on a day, a new one is brought forward by up to a quarter of its gap (at most 3 days). Never later, so the deadline holds. The Plan panel shows the next 14 days as bars against the daily cap.
+- **Pace.** The Plan panel shows how many new problems a day you need to finish by day 85, your pace so far, and where that lands.
+- **Missing days resets nothing.** A revision stays due until you do it; later gaps then shrink to still fit the deadline.
+- A problem is **mature** once its gap reaches 21 days (memory stages). Gaps are capped at 365 days.
+
+## Attempts, notes and saved versions
+
+Every sitting is an **attempt**: the solve day, then each revision (and each retry after Again). Each attempt keeps:
+
+- the date and your rating;
+- **notes**: required on the solve day ("What you learned"), optional at revisions ("What did you notice this time?"), plus an optional Excalidraw link;
+- **saved versions** of your code, each with **its own analysis**. The code box has **Analyse** (a preview: nothing is saved) and **Save as new version**, which keeps the code as the next version and never touches earlier ones. Up to 5 versions per attempt. A saved version can be analysed later that day, or deleted.
+
+An attempt is **editable on its own day and frozen after** (the server refuses changes with 409), so nothing is ever overwritten across days. A version whose time complexity beats everything you saved before it is marked **Improved**, and the dashboard counts the problems you've improved. Each problem's history starts with a trail like *Solved O(n²) → Rev 1 O(n) → Rev 2 O(n)*.
 
 ## Motivation without streaks
 
@@ -107,23 +122,22 @@ The calendar still shows the days you studied, but empty days are just rest days
 Week *n* of your plan runs for 7 days from your start date. On the week's last day its test unlocks (no deadline).
 
 - Every NeetCode 150 problem belongs to one of **73 patterns** (e.g. "Monotonic stack", "Binary search on the answer").
-- For each pattern you practised that week, the test picks one **practice problem**: a *different* LeetCode problem that uses the same technique, never one you've had before (235 in total). Up to 5 questions; patterns you forgot most come first.
+- For each pattern you practised that week, the test picks one **practice problem**: a *different* LeetCode problem that uses the same technique, never one you've had before (235 in total). At most 3 questions, so a test takes minutes, not an evening; patterns you forgot most come first.
 - For each question: **1)** pick which pattern you'd use from four options (look-alikes from the same topic), graded instantly with a one-line explanation; **2)** solve it on LeetCode and report *Solved*, *Solved with a hint* or *Couldn't solve yet*.
-- *Couldn't solve yet* brings the NeetCode problem with that pattern back for review **tomorrow**.
+- *Couldn't solve yet* brings the NeetCode problem with that pattern back for revision **tomorrow** (unless it's already fully revised).
 
 Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, entries outside the 150), so every LeetCode number and link is real.
 
-## Notes, code and complexity analysis
+## Complexity analysis
 
-- **Code while you write your notes.** The Mark as done window has the code box and **Analyse** too, so you can check the complexity before saving; the code and its analysis are saved with your notes.
-- **Editable on the day, frozen after.** On the day you solve a problem, its notes panel is a form: what you learned, the Excalidraw link and your code. At midnight (London time) it freezes into a read-only record of what you understood that day. The server enforces this (409 after the day), not just the page.
+- **Code while you write your notes.** The Mark as done window and the revision form have the code box and **Analyse** too, so you can check the complexity before saving; the code is saved as version 1 of that attempt, with its analysis.
 - **Your code** in Java, Python, JavaScript or C++ (up to 10,000 characters). Tab indents; Esc then Tab moves on.
 - **Analyse** estimates time and space complexity and shows how it got there, with a confidence level:
   - **Built-in estimate** (always available, free, nothing leaves the server): reads the code's structure. Nested loops multiply; fixed loops (26 letters, 4 directions) are O(1); halving loops are O(log n); sliding windows and monotonic stacks are amortised; sort is O(n log n), heap operations O(log n). Recursion is classified as tree traversal, visit-once DFS/BFS, divide and conquer, memoised, backtracking or exponential. Space counts arrays, maps, 2-D tables and recursion depth, not the returned answer. It uses k for the size of each item (Group Anagrams is O(n·k)) and m·n for grids. Tested on 33 NeetCode solutions.
   - **Claude** (optional): set `ANTHROPIC_API_KEY` and Analyse asks Claude instead; if Claude can't be reached, the built-in estimate answers. Limited to 50 analyses per user per day.
 - **The working is shown step by step** for *your* code: time steps then space steps, in line order (outer loop before inner), each ending with the total, so you can check the reasoning and spot mistakes.
 - **Talking points for an interview**, under the analysis (collapsed): 2–3 points for each of the 150 problems (edge cases, clarifying questions, trade-offs), from `interview-tips.json`. With Claude analysis on, Claude adds points about your own code, such as an edge case it handles or misses.
-- Changing the code clears its old analysis, since that analysis described different code.
+- **Code must match the problem.** Code saved or analysed under a NeetCode problem must define LeetCode's function for it (`twoSum` for Two Sum) or, for design problems, its class (`LRUCache`), in any of the four languages. Otherwise it's refused with a message saying what's expected. The names are the `entry` field in `best-approaches.json`.
 - **Better approach suggestions**, shown separately below your analysis as a nudge (the approach itself stays behind *Show a hint*, so you can try first). After every analysis, the result is compared with the best known approaches for that NeetCode problem (a hand-written list of 1–2 approaches for each of the 150, in `best-approaches.json`: name, time, space and the idea in a sentence or two). You see one of:
   - **Faster approach available**: its complexity, and the idea behind a *Show the idea* toggle (plus the memory it costs, if it uses more than yours).
   - **Less memory, same speed**: e.g. a one-row DP table instead of the full grid.
@@ -143,12 +157,14 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 | POST | `/api/auth/recover` | `{ username, recoveryCode, password, confirmPassword }` | `{ me, recoveryCode }` (the new code); signs out other sessions and signs you in; 400 if they don't match |
 | GET / PATCH | `/api/me` | `{ startDate }` | your account: `{ username, startDate, hasRecoveryCode }` |
 | POST | `/api/me/recovery-code` | `{ password }` | `{ recoveryCode }`: a new code; the old one stops working |
-| GET | `/api/dashboard` | | due reviews, memory stages, recall, study days, weekly tests, all 150 problems with your progress |
-| POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl, code?, codeLanguage?, rating }` | `rating` is AGAIN / HARD / GOOD / EASY (shown as Forgot / Hard / Medium / Easy; missing = GOOD) and sets the first review; code (if any) is saved and analysed |
+| GET | `/api/dashboard` | | due revisions, plan (key dates, pace, 14-day workload), memory stages, recall, study days, weekly tests, all 150 problems with their attempt history |
+| POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl, code?, codeLanguage?, rating }` | `rating` is AGAIN / HARD / GOOD / EASY (shown as Forgot / Hard / Medium / Easy; missing = GOOD) and sets the first revision; code is saved as version 1 and analysed; 409 after day 85 |
 | POST | `/api/analysis/preview` | `{ code, codeLanguage, catalogId? }` | analyses code without saving it (the Mark as done window); with `catalogId`, includes a recommendation |
-| POST | `/api/problems/{id}/reviews` | `{ rating: AGAIN \| HARD \| GOOD \| EASY }` | returns the new gap and due date (the older `{ remembered }` still works) |
-| PATCH | `/api/problems/{id}/notes` | `{ learnings, excalidrawUrl, code, codeLanguage }` | only on the day it was solved, else 409 |
-| POST | `/api/problems/{id}/analysis` | | analyses the saved code; only on the day it was solved |
+| POST | `/api/problems/{id}/reviews` | `{ rating, learnings?, code?, codeLanguage? }` | a revision attempt; code is saved as its version 1 and analysed; 409 if not due or fully revised (the older `{ remembered }` still works) |
+| PATCH | `/api/attempts/{id}` | `{ learnings, excalidrawUrl }` | an attempt's notes; only on its day, else 409 |
+| POST | `/api/attempts/{id}/versions` | `{ code, codeLanguage, analyse }` | Save as new version (max 5); `analyse: true` also analyses it |
+| POST | `/api/versions/{id}/analysis` | | analyses a saved version; only on its attempt's day |
+| DELETE | `/api/versions/{id}` | | deletes a saved version; only on its attempt's day |
 | DELETE | `/api/problems/{id}` | | undo "done" |
 | POST | `/api/tests/week/{n}` | | opens week n's test (creates it the first time); 409 before it unlocks |
 | GET | `/api/tests/{id}` | | the test; right answers only for questions you've answered |
@@ -173,7 +189,7 @@ src/main/java/dev/shivangi/dsatracker/
   service/       AuthService, ProblemService, AnalysisService, DashboardService, WeeklyTestService
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
 src/main/resources/
-  db/migration/V1…V10      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings
+  db/migration/V1…V11      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   interview-tips.json     interview talking points for each of the 150 problems
   static/        http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css

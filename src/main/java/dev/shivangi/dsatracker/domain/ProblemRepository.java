@@ -31,6 +31,14 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
             """)
     List<Problem> findDue(@Param("userId") Long userId, @Param("today") LocalDate today);
 
+    /** How many reviews are due on each day in a range (for spreading the workload). */
+    @Query("""
+            select p.nextDueOn, count(p) from Problem p
+            where p.userId = :userId and p.nextDueOn between :from and :to
+            group by p.nextDueOn
+            """)
+    List<Object[]> dueCountsBetween(@Param("userId") Long userId, @Param("from") LocalDate from, @Param("to") LocalDate to);
+
     /** Gives rows from before accounts existed to the first account. */
     @Modifying
     @Query("update Problem p set p.userId = :userId where p.userId is null")

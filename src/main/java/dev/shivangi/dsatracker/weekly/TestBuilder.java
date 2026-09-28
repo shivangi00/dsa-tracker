@@ -22,7 +22,7 @@ import java.util.Set;
  */
 public final class TestBuilder {
 
-    public static final int MAX_ITEMS = 5;
+    public static final int MAX_ITEMS = 3;   // a weekly test is short: 2–3 problems
     public static final int OPTIONS = 4;
 
     /** A problem you marked done that week. */
