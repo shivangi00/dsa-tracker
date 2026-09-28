@@ -616,7 +616,57 @@ function panelToggle(p, where, mode, label) {
   return { button, panel, open };
 }
 
-/** A language picker and code box; Tab indents. */
+/**
+ * Guesses the language of pasted code from tell-tale syntax, or null if unsure. Used to switch the
+ * language picker automatically, so Python isn't analysed as Java.
+ */
+function detectLanguage(src) {
+  const code = src.replace(/(["'`])(?:\\.|(?!\1).)*\1/g, '""');   // strings can say anything
+  const score = { PYTHON: 0, JAVA: 0, JAVASCRIPT: 0, CPP: 0 };
+  const add = (lang, re, n = 1) => { if (re.test(code)) score[lang] += n; };
+  add('PYTHON', /^\s*def\s+\w+\s*\(.*\)\s*(->\s*[^:]+)?:\s*$/m, 3);
+  add('PYTHON', /^\s*class\s+\w+(\s*\([^)]*\))?\s*:\s*$/m, 2);
+  add('PYTHON', /\bself\b/, 2);
+  add('PYTHON', /^\s*(elif|for .+ in .+:|while .+:|if .+:)\s*$/m, 2);
+  add('PYTHON', /\b(None|True|False|len\(|range\(|enumerate\(|List\[|Optional\[)/, 1);
+  add('JAVA', /\b(public|private|protected)\s+(static\s+)?[\w<>\[\],\s]+\s+\w+\s*\(/, 3);
+  add('JAVA', /\b(HashMap|ArrayList|HashSet|Deque|PriorityQueue|Integer|String)\b/, 1);
+  add('JAVA', /\bnew\s+\w+(<[^>]*>)?\s*[\[(]/, 1);
+  add('JAVA', /\bSystem\.out\b|\.length\b(?!\()/, 1);
+  add('CPP', /#include\b|\bstd::|\busing namespace\b/, 4);
+  add('CPP', /\bvector\s*<|\bunordered_(map|set)\b|\bpublic\s*:/, 3);
+  add('CPP', /\bauto\b|->\w|\bnullptr\b/, 1);
+  add('JAVASCRIPT', /\b(var|let|const)\s+\w+\s*=\s*(function\b|\([^)]*\)\s*=>|\w+\s*=>)/, 4);
+  add('JAVASCRIPT', /\bfunction\s+\w+\s*\(|=>|===|!==|\bconsole\.log\b/, 2);
+  add('JAVASCRIPT', /\bnew\s+(Map|Set)\s*\(|\.push\(|\blet\b/, 1);
+  const ranked = Object.entries(score).sort((x, y) => y[1] - x[1]);
+  return ranked[0][1] >= 2 && ranked[0][1] > ranked[1][1] ? ranked[0][0] : null;
+}
+
+/**
+ * Keeps a language picker in step with its code box: when the code clearly looks like another
+ * language, the picker switches and a short note says so. Choosing a language by hand wins
+ * until the box is cleared.
+ */
+function autoLanguage(code, lang, note) {
+  let timer;
+  lang.addEventListener('change', (e) => { if (e.isTrusted) lang.dataset.manual = '1'; if (note) note.textContent = ''; });
+  const check = () => {
+    if (!code.value.trim()) { delete lang.dataset.manual; if (note) note.textContent = ''; return; }
+    if (lang.dataset.manual) return;
+    const guess = detectLanguage(code.value);
+    if (guess && guess !== lang.value) {
+      lang.value = guess;
+      lang.dispatchEvent(new Event('change'));
+      if (note) note.textContent = `Looks like ${LANGUAGES[guess]}: language switched.`;
+    }
+  };
+  code.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(check, 250); });
+  code.addEventListener('paste', () => setTimeout(check, 0));
+  return check;
+}
+
+/** A language picker and code box; Tab indents; the language follows the code. */
 function codeEditor(draftKey, initial, initialLang) {
   const d = drafts.get(draftKey) || {};
   const uid = `ce-${++panelSeq}`;
@@ -639,7 +689,10 @@ function codeEditor(draftKey, initial, initialLang) {
   const remember = () => drafts.set(draftKey, { ...(drafts.get(draftKey) || {}), code: code.value, lang: lang.value });
   code.addEventListener('input', remember);
   lang.addEventListener('change', remember);
-  return { lang, code, uid };
+  const note = el('span', 'lang-note');
+  note.setAttribute('aria-live', 'polite');
+  autoLanguage(code, lang, note);
+  return { lang, code, uid, note };
 }
 
 /**
@@ -699,9 +752,9 @@ function reviseForm(p, key) {
   notes.addEventListener('input', () => drafts.set(draftKey, { ...(drafts.get(draftKey) || {}), notes: notes.value }));
   box.append(field('What did you notice this time?', notes, 'optional'));
 
-  const { lang, code } = codeEditor(draftKey, '', null);
+  const { lang, code, note } = codeEditor(draftKey, '', null);
   const head = el('div', 'code-head');
-  head.append(el('span', 'code-label', 'Your code (optional)'), lang);
+  head.append(el('span', 'code-label', 'Your code (optional)'), note, lang);
   const error = errorLine();
   const slot = el('div', 'analysis-slot');
   const { btn: analyse } = previewButton(code, lang, p.catalogId, slot, error);
@@ -811,8 +864,8 @@ function attemptBlock(p, a) {
     }
   }
 
-  a.versions.forEach((v, i) => box.append(versionBlock(p, a, v, i === a.versions.length - 1)));
-  if (a.editable && a.versions.length === 0) box.append(addCode(p, a));
+  a.versions.forEach((v) => box.append(versionBlock(p, a, v)));
+  if (a.editable) box.append(versionEditor(p, a));
   return box;
 }
 
@@ -860,17 +913,12 @@ function notesEditor(a) {
   return form;
 }
 
-const editing = new Map();   // attempt id → the version being copied into a new one ('new' = first code), kept across reloads
-
 /**
- * One saved version: its code and analysis behind a toggle. On the attempt's day it has three
- * actions: Analyse again, Save as new version (the code becomes an editable copy right here, so
- * there's never a second box repeating it) and Delete version.
+ * One saved version: collapsed, with its code and analysis inside. Saved versions never change,
+ * so the only action (on the attempt's day) is Delete.
  */
-function versionBlock(p, a, v, latest) {
+function versionBlock(p, a, v) {
   const box = el('details', 'version');
-  const isEditing = editing.get(a.id) === v.id;
-  box.open = isEditing || (latest && a.editable);
   const summary = el('summary');
   summary.append(el('span', 'v-name', `Version ${v.versionNo}`), el('span', 'v-lang', LANGUAGES[v.codeLanguage] || ''));
   summary.append(v.analysis
@@ -878,111 +926,90 @@ function versionBlock(p, a, v, latest) {
     : el('span', 'v-cx muted', 'not analysed'));
   if (v.improved) summary.append(el('span', 'improved-tag', 'Improved'));
   box.append(summary);
-
-  if (isEditing) {
-    box.append(versionEditor(p, a, v));
-    return box;
-  }
-
   const pre = el('pre', 'code-view');
   pre.append(el('code', '', v.code));
   box.append(pre);
   if (v.analysis) box.append(analysisBox(v.analysis));
   if (a.editable) {
     const error = errorLine();
-    const actions = el('div', 'notes-actions');
-    const analyse = el('button', 'btn', v.analysis ? 'Analyse again' : 'Analyse');
-    analyse.type = 'button';
-    const copy = el('button', 'btn primary', 'Save as new version');
-    copy.type = 'button';
-    const full = a.versions.length >= 5;
-    if (full) {
-      copy.disabled = true;
-      copy.title = 'You have 5 versions (the most). Delete one to save another.';
-    } else {
-      copy.title = 'Edit a copy of this code and save it as the next version. This one stays as it is.';
-    }
-    const del = el('button', 'btn ghost danger', 'Delete version');
+    const del = el('button', 'btn ghost danger', 'Delete');
     del.type = 'button';
-    const busy = async (btn, label, work) => {
-      error.hidden = true;
-      btn.disabled = true;
-      const old = btn.textContent;
-      btn.textContent = label;
-      try { await work(); await load(); } catch (e) { error.textContent = e.message; error.hidden = false; btn.disabled = false; btn.textContent = old; }
-    };
-    analyse.addEventListener('click', () => busy(analyse, 'Analysing…', () => api(`/api/versions/${v.id}/analysis`, { method: 'POST' })));
-    copy.addEventListener('click', () => { editing.set(a.id, v.id); load(); });
-    del.addEventListener('click', () => {
+    del.title = `Delete version ${v.versionNo}`;
+    del.addEventListener('click', async () => {
       if (!confirm(`Delete version ${v.versionNo}?`)) return;
-      busy(del, 'Deleting…', () => api(`/api/versions/${v.id}`, { method: 'DELETE' }));
+      error.hidden = true;
+      del.disabled = true;
+      try { await api(`/api/versions/${v.id}`, { method: 'DELETE' }); await load(); }
+      catch (e) { error.textContent = e.message; error.hidden = false; del.disabled = false; }
     });
-    actions.append(analyse, copy, del);
-    if (full) actions.append(el('span', 'save-status', '5 versions saved (the most)'));
+    const actions = el('div', 'notes-actions');
+    actions.append(del);
     box.append(actions, error);
   }
   return box;
 }
 
 /**
- * The editable copy: starts from version {@code from} (or empty for an attempt's first code).
- * Analyse previews it; Save keeps it as the next version, with that analysis if you ran one.
+ * The code box under the saved versions (on the attempt's day): Analyse previews it, Save keeps it
+ * as the next version with its analysis, Delete clears the box. After a save the box is empty again.
  */
-function versionEditor(p, a, from) {
+function versionEditor(p, a) {
   const box = el('div', 'new-version');
   const draftKey = `ver:${a.id}`;
-  const { lang, code } = codeEditor(draftKey, from ? from.code : '', from ? from.codeLanguage : null);
+  const last = a.versions[a.versions.length - 1];
+  const full = a.versions.length >= 5;
+  const { lang, code, note } = codeEditor(draftKey, '', last ? last.codeLanguage : null);
+  code.placeholder = a.versions.length ? 'Paste or type your next version' : 'Paste or type your solution';
   const head = el('div', 'code-head');
-  head.append(el('span', 'code-label', from ? `New version, starting from version ${from.versionNo}` : 'Your code'), lang);
+  head.append(el('span', 'code-label', a.versions.length ? `Version ${Math.max(...a.versions.map((v) => v.versionNo)) + 1}` : 'Your code'), note, lang);
   const error = errorLine();
   const slot = el('div', 'analysis-slot');
-  const { btn: analyse, isAnalysed } = previewButton(code, lang, p.catalogId, slot, error);
-  const save = el('button', 'btn primary', from ? 'Save as new version' : 'Save');
+  const { btn: analyse } = previewButton(code, lang, p.catalogId, slot, error);
+  const save = el('button', 'btn primary', 'Save');
   save.type = 'button';
-  const cancel = el('button', 'btn ghost', 'Cancel');
-  cancel.type = 'button';
-  cancel.addEventListener('click', () => { editing.delete(a.id); drafts.delete(draftKey); load(); });
+  const clear = el('button', 'btn ghost danger', 'Delete');
+  clear.type = 'button';
+  clear.title = 'Clear this box (nothing saved is affected)';
+  clear.addEventListener('click', () => {
+    if (code.value.trim() && !confirm('Clear the code in this box?')) return;
+    code.value = '';
+    drafts.delete(draftKey);
+    slot.replaceChildren();
+    error.hidden = true;
+    code.dispatchEvent(new Event('input'));
+  });
+  if (full) {
+    save.disabled = true;
+    save.title = 'You have 5 versions (the most). Delete one to save another.';
+  }
   save.addEventListener('click', async () => {
     error.hidden = true;
     if (!code.value.trim()) { error.textContent = 'Add your code first.'; error.hidden = false; return; }
-    if (from && code.value.trim() === from.code.trim() && lang.value === from.codeLanguage) {
-      error.textContent = `This is the same as version ${from.versionNo}. Change it first.`; error.hidden = false; return;
+    if (a.versions.some((v) => v.code.trim() === code.value.trim() && v.codeLanguage === lang.value)) {
+      error.textContent = 'You already saved this exact code. Change it first.'; error.hidden = false; return;
     }
     save.disabled = true;
     save.textContent = 'Saving…';
     try {
-      const analysed = isAnalysed();
       await api(`/api/attempts/${a.id}/versions`, {
         method: 'POST',
-        body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: analysed }),
+        body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: true }),
       });
       rememberLanguage(lang.value);
-      editing.delete(a.id);
       drafts.delete(draftKey);
-      toast(analysed ? 'Saved as a new version, with its analysis.' : 'Saved as a new version.');
+      toast('Saved as a new version, with its analysis.');
       await load();
     } catch (e) {
       error.textContent = e.message; error.hidden = false;
       save.disabled = false;
-      save.textContent = from ? 'Save as new version' : 'Save';
+      save.textContent = 'Save';
     }
   });
   const actions = el('div', 'notes-actions');
-  actions.append(analyse, save, cancel);
+  actions.append(analyse, save, clear);
+  if (full) actions.append(el('span', 'save-status', '5 versions saved (the most). Delete one to save another.'));
   box.append(head, code, el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.'), actions, error, slot);
-  requestAnimationFrame(() => code.focus());
   return box;
-}
-
-/** An attempt with no code yet (e.g. marked done without it): a button, not an empty box. */
-function addCode(p, a) {
-  if (editing.get(a.id) === 'new') return versionEditor(p, a, null);
-  const btn = el('button', 'btn', 'Add your code');
-  btn.type = 'button';
-  btn.addEventListener('click', () => { editing.set(a.id, 'new'); load(); });
-  const row = el('div', 'notes-actions');
-  row.append(btn);
-  return row;
 }
 
 function field(label, control, optional) {
@@ -1150,6 +1177,8 @@ function openDone(c) {
   doneForm.reset();
   $('done-error').hidden = true;
   $('done-lang').value = lastLanguage();
+  delete $('done-lang').dataset.manual;
+  doneLangNote.textContent = '';
   $('done-analysis').replaceChildren();
   $('done-analyse-status').textContent = '';
   $('done-title').textContent = c.name;
@@ -1175,6 +1204,11 @@ doneCode.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !doneCode.dataset.tabExit) e.preventDefault();
 });
 doneCode.addEventListener('keydown', indentWithTab);
+const doneLangNote = document.createElement('span');
+doneLangNote.className = 'lang-note';
+doneLangNote.setAttribute('aria-live', 'polite');
+$('done-lang').before(doneLangNote);
+autoLanguage(doneCode, $('done-lang'), doneLangNote);
 const clearDoneAnalysis = () => { $('done-analysis').replaceChildren(); $('done-analyse-status').textContent = ''; };
 doneCode.addEventListener('input', clearDoneAnalysis);
 $('done-lang').addEventListener('change', clearDoneAnalysis);

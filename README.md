@@ -97,7 +97,7 @@ Every sitting is an **attempt**: the solve day, then each revision (and each ret
 
 - the date and your rating;
 - **notes**: required on the solve day ("What you learned"), optional at revisions ("What did you notice this time?"), plus an optional Excalidraw link;
-- **saved versions** of your code, each with **its own analysis**. On the attempt's day each version has three actions: **Analyse again**, **Save as new version** and **Delete version**. *Save as new version* turns that version's code into an editable copy in place (no second box repeating it), with **Analyse** to preview it; saving keeps it as the next version and never touches earlier ones. Up to 5 versions per attempt. An attempt without code yet shows an **Add your code** button.
+- **saved versions** of your code, each with **its own analysis**. Saved versions are collapsed (open one to see its code and analysis) and never change: their only action is **Delete**. Below them, on the attempt's day, is one code box with **Analyse** (a preview), **Save** (keeps it as the next version, analysed) and **Delete** (clears the box). After a save the box is empty, ready for the next version. Up to 5 versions per attempt.
 
 An attempt is **editable on its own day and frozen after** (the server refuses changes with 409), so nothing is ever overwritten across days. A version whose time complexity beats everything you saved before it is marked **Improved**, and the dashboard counts the problems you've improved. Each problem's history starts with a trail like *Solved O(n²) → Rev 1 O(n) → Rev 2 O(n)*.
 
@@ -135,7 +135,7 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 ## Complexity analysis
 
 - **Code while you write your notes.** The Mark as done window and the revision form have the code box and **Analyse** too, so you can check the complexity before saving; the code is saved as version 1 of that attempt, with its analysis.
-- **Your code** in Java, Python, JavaScript or C++ (up to 10,000 characters). Tab indents; Esc then Tab moves on.
+- **Your code** in Java, Python, JavaScript or C++ (up to 10,000 characters). The language picker **switches automatically** when the code clearly looks like another language (choosing one by hand wins). Tab indents; Esc then Tab moves on.
 - **Analyse** estimates time and space complexity and shows how it got there, with a confidence level:
   - **Built-in estimate** (always available, free, nothing leaves the server): reads the code's structure. Nested loops multiply; fixed loops (26 letters, 4 directions) are O(1); halving loops are O(log n); sliding windows and monotonic stacks are amortised; sort is O(n log n), heap operations O(log n). Recursion is classified as tree traversal, visit-once DFS/BFS, divide and conquer, memoised, backtracking or exponential. Space counts arrays, maps, 2-D tables and recursion depth, not the returned answer. It uses k for the size of each item (Group Anagrams is O(n·k)) and m·n for grids. Tested on 33 NeetCode solutions.
   - **Claude** (optional): set `ANTHROPIC_API_KEY` and Analyse asks Claude instead; if Claude can't be reached, the built-in estimate answers. Limited to 50 analyses per user per day.

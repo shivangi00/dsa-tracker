@@ -285,7 +285,9 @@ textarea { resize: vertical; }
 .v-cx { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
 .version .code-view { margin-top: 8px; }
 .version .notes-actions { margin-top: 8px; }
-.new-version { padding-top: 8px; display: grid; gap: 6px; }
+.new-version { border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 6px; }
+.lang-note { margin-left: auto; font-size: 11.5px; color: var(--good); }
+.code-head .lang-note:empty { display: none; }
 .btn.ghost.danger { color: var(--critical); }
 .btn.ghost.danger:hover { background: color-mix(in srgb, var(--critical) 10%, transparent); }
 .new-version .analysis-slot:empty { display: none; }
