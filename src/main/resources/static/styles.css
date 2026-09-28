@@ -31,8 +31,9 @@
   color-scheme: light dark;
 }
 
+/* Night mode: the device setting by default ... */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #141413;
     --raised: #1c1c1b;
     --tint: #1f1f1e;
@@ -53,6 +54,30 @@
     --good: #4cc74c;
   }
 }
+
+/* ... or chosen with the sun/moon button (theme.js sets data-theme on <html>). */
+:root[data-theme="dark"] {
+  --bg: #141413;
+  --raised: #1c1c1b;
+  --tint: #1f1f1e;
+  --line: #2c2c2a;
+  --ink: #f5f5f2;
+  --ink-2: #b4b3ab;
+  --ink-3: #85847d;
+  --accent: #4a92ea;
+
+  --empty: #262624;
+  --l1: #184f95;
+  --l2: #2a78d6;
+  --l3: #6da7ec;
+  --l4: #b7d3f6;
+
+  --critical: #ec6f6f;
+  --warning: #f2b233;
+  --good: #4cc74c;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
@@ -260,7 +285,9 @@ textarea { resize: vertical; }
 .v-cx { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
 .version .code-view { margin-top: 8px; }
 .version .notes-actions { margin-top: 8px; }
-.new-version { border-top: 1px dashed var(--line); padding-top: 8px; display: grid; gap: 6px; }
+.new-version { padding-top: 8px; display: grid; gap: 6px; }
+.btn.ghost.danger { color: var(--critical); }
+.btn.ghost.danger:hover { background: color-mix(in srgb, var(--critical) 10%, transparent); }
 .new-version .analysis-slot:empty { display: none; }
 
 /* Notes panel under a row */
@@ -524,6 +551,11 @@ a.btn { text-decoration: none; display: inline-block; }
 .top-right { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .top-right p { margin-right: 12px; }
 .who { font-size: 13px; font-weight: 600; margin-right: 4px; }
+.theme-toggle { display: inline-grid; place-items: center; padding: 6px 8px; color: var(--ink-2); }
+.theme-toggle:hover { color: var(--ink); }
+.theme-toggle.corner { position: absolute; top: 16px; right: 16px; }
+.theme-select { font: inherit; font-size: 14px; color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+body { transition: background-color .2s, color .2s; }
 
 /* ------------------------------------------------------------------
    Narrow screens

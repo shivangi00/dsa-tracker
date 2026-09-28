@@ -97,9 +97,13 @@ Every sitting is an **attempt**: the solve day, then each revision (and each ret
 
 - the date and your rating;
 - **notes**: required on the solve day ("What you learned"), optional at revisions ("What did you notice this time?"), plus an optional Excalidraw link;
-- **saved versions** of your code, each with **its own analysis**. The code box has **Analyse** (a preview: nothing is saved) and **Save as new version**, which keeps the code as the next version and never touches earlier ones. Up to 5 versions per attempt. A saved version can be analysed later that day, or deleted.
+- **saved versions** of your code, each with **its own analysis**. On the attempt's day each version has three actions: **Analyse again**, **Save as new version** and **Delete version**. *Save as new version* turns that version's code into an editable copy in place (no second box repeating it), with **Analyse** to preview it; saving keeps it as the next version and never touches earlier ones. Up to 5 versions per attempt. An attempt without code yet shows an **Add your code** button.
 
 An attempt is **editable on its own day and frozen after** (the server refuses changes with 409), so nothing is ever overwritten across days. A version whose time complexity beats everything you saved before it is marked **Improved**, and the dashboard counts the problems you've improved. Each problem's history starts with a trail like *Solved O(n²) → Rev 1 O(n) → Rev 2 O(n)*.
+
+## Day and night mode
+
+Follows your device's light/dark setting by default. The sun/moon button in the header (on every page, including sign-in) switches between day and night mode, and **Settings → Appearance** offers *Match my device*, *Day mode* or *Night mode*. The choice is saved per browser. Colours are CSS variables with a second set for night mode, so every part of the page switches together.
 
 ## Motivation without streaks
 
@@ -192,7 +196,7 @@ src/main/resources/
   db/migration/V1…V11      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   interview-tips.json     interview talking points for each of the 150 problems
-  static/        http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css
+  static/        theme.js (day/night mode, loaded first so there's no flash), http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css
 src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)
 Dockerfile (Render), Dockerfile.vercel + vercel.json (Vercel, kept in case its limits change), docker-compose.yml, .github/workflows/ci.yml, .env.example, DEPLOY.md
 ```

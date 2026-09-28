@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DSA Tracker</title>
+  <script src="theme.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,6 +14,7 @@
     <div class="top-right">
       <p id="plan-line">Loading…</p>
       <span class="who" id="who"></span>
+      <button type="button" class="btn ghost theme-toggle" data-theme-toggle></button>
       <button type="button" class="btn ghost" id="open-settings">Settings</button>
       <button type="button" class="btn ghost" id="sign-out">Sign out</button>
     </div>
@@ -206,6 +208,15 @@
       <span>Start date</span>
       <input name="startDate" type="date" required>
       <small class="hint">Day 1 of your 100-day plan. Days before it never count as absent.</small>
+    </label>
+    <label class="field">
+      <span>Appearance</span>
+      <select class="theme-select" data-theme-select>
+        <option value="system">Match my device</option>
+        <option value="light">Day mode</option>
+        <option value="dark">Night mode</option>
+      </select>
+      <small class="hint">Saved on this device. The sun/moon button at the top switches it too.</small>
     </label>
     <section class="settings-section" aria-labelledby="rc-title">
       <h3 id="rc-title">Recovery code</h3>

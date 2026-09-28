@@ -812,7 +812,7 @@ function attemptBlock(p, a) {
   }
 
   a.versions.forEach((v, i) => box.append(versionBlock(p, a, v, i === a.versions.length - 1)));
-  if (a.editable) box.append(newVersionEditor(p, a));
+  if (a.editable && a.versions.length === 0) box.append(addCode(p, a));
   return box;
 }
 
@@ -860,10 +860,17 @@ function notesEditor(a) {
   return form;
 }
 
-/** One saved version: its code and analysis behind a toggle, and today's actions. */
+const editing = new Map();   // attempt id → the version being copied into a new one ('new' = first code), kept across reloads
+
+/**
+ * One saved version: its code and analysis behind a toggle. On the attempt's day it has three
+ * actions: Analyse again, Save as new version (the code becomes an editable copy right here, so
+ * there's never a second box repeating it) and Delete version.
+ */
 function versionBlock(p, a, v, latest) {
   const box = el('details', 'version');
-  box.open = latest && a.editable;
+  const isEditing = editing.get(a.id) === v.id;
+  box.open = isEditing || (latest && a.editable);
   const summary = el('summary');
   summary.append(el('span', 'v-name', `Version ${v.versionNo}`), el('span', 'v-lang', LANGUAGES[v.codeLanguage] || ''));
   summary.append(v.analysis
@@ -871,6 +878,12 @@ function versionBlock(p, a, v, latest) {
     : el('span', 'v-cx muted', 'not analysed'));
   if (v.improved) summary.append(el('span', 'improved-tag', 'Improved'));
   box.append(summary);
+
+  if (isEditing) {
+    box.append(versionEditor(p, a, v));
+    return box;
+  }
+
   const pre = el('pre', 'code-view');
   pre.append(el('code', '', v.code));
   box.append(pre);
@@ -880,7 +893,16 @@ function versionBlock(p, a, v, latest) {
     const actions = el('div', 'notes-actions');
     const analyse = el('button', 'btn', v.analysis ? 'Analyse again' : 'Analyse');
     analyse.type = 'button';
-    const del = el('button', 'btn ghost', 'Delete version');
+    const copy = el('button', 'btn primary', 'Save as new version');
+    copy.type = 'button';
+    const full = a.versions.length >= 5;
+    if (full) {
+      copy.disabled = true;
+      copy.title = 'You have 5 versions (the most). Delete one to save another.';
+    } else {
+      copy.title = 'Edit a copy of this code and save it as the next version. This one stays as it is.';
+    }
+    const del = el('button', 'btn ghost danger', 'Delete version');
     del.type = 'button';
     const busy = async (btn, label, work) => {
       error.hidden = true;
@@ -890,59 +912,77 @@ function versionBlock(p, a, v, latest) {
       try { await work(); await load(); } catch (e) { error.textContent = e.message; error.hidden = false; btn.disabled = false; btn.textContent = old; }
     };
     analyse.addEventListener('click', () => busy(analyse, 'Analysing…', () => api(`/api/versions/${v.id}/analysis`, { method: 'POST' })));
+    copy.addEventListener('click', () => { editing.set(a.id, v.id); load(); });
     del.addEventListener('click', () => {
       if (!confirm(`Delete version ${v.versionNo}?`)) return;
       busy(del, 'Deleting…', () => api(`/api/versions/${v.id}`, { method: 'DELETE' }));
     });
-    actions.append(analyse, del);
+    actions.append(analyse, copy, del);
+    if (full) actions.append(el('span', 'save-status', '5 versions saved (the most)'));
     box.append(actions, error);
   }
   return box;
 }
 
-/** "Save as new version": starts from your latest code, so you can improve it and keep both. */
-function newVersionEditor(p, a) {
+/**
+ * The editable copy: starts from version {@code from} (or empty for an attempt's first code).
+ * Analyse previews it; Save keeps it as the next version, with that analysis if you ran one.
+ */
+function versionEditor(p, a, from) {
   const box = el('div', 'new-version');
-  const last = a.versions[a.versions.length - 1];
-  const full = a.versions.length >= 5;
-  const { lang, code } = codeEditor(`ver:${a.id}`, last ? last.code : '', last ? last.codeLanguage : null);
+  const draftKey = `ver:${a.id}`;
+  const { lang, code } = codeEditor(draftKey, from ? from.code : '', from ? from.codeLanguage : null);
   const head = el('div', 'code-head');
-  head.append(el('span', 'code-label', a.versions.length ? 'New version' : 'Your code'), lang);
+  head.append(el('span', 'code-label', from ? `New version, starting from version ${from.versionNo}` : 'Your code'), lang);
   const error = errorLine();
   const slot = el('div', 'analysis-slot');
   const { btn: analyse, isAnalysed } = previewButton(code, lang, p.catalogId, slot, error);
-  const save = el('button', 'btn primary', 'Save as new version');
+  const save = el('button', 'btn primary', from ? 'Save as new version' : 'Save');
   save.type = 'button';
-  const status = el('span', 'save-status', full ? 'You have 5 versions (the most). Delete one to save another.'
-    : last ? 'Your earlier versions stay as they are.' : '');
-  save.disabled = full;
+  const cancel = el('button', 'btn ghost', 'Cancel');
+  cancel.type = 'button';
+  cancel.addEventListener('click', () => { editing.delete(a.id); drafts.delete(draftKey); load(); });
   save.addEventListener('click', async () => {
     error.hidden = true;
     if (!code.value.trim()) { error.textContent = 'Add your code first.'; error.hidden = false; return; }
-    if (last && code.value.trim() === last.code.trim() && lang.value === last.codeLanguage) {
-      error.textContent = 'This is the same as your latest version. Change it first.'; error.hidden = false; return;
+    if (from && code.value.trim() === from.code.trim() && lang.value === from.codeLanguage) {
+      error.textContent = `This is the same as version ${from.versionNo}. Change it first.`; error.hidden = false; return;
     }
     save.disabled = true;
     save.textContent = 'Saving…';
     try {
+      const analysed = isAnalysed();
       await api(`/api/attempts/${a.id}/versions`, {
         method: 'POST',
-        body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: isAnalysed() }),
+        body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: analysed }),
       });
       rememberLanguage(lang.value);
-      drafts.delete(`ver:${a.id}`);
-      toast(isAnalysed() ? 'Saved as a new version, with its analysis.' : 'Saved as a new version.');
+      editing.delete(a.id);
+      drafts.delete(draftKey);
+      toast(analysed ? 'Saved as a new version, with its analysis.' : 'Saved as a new version.');
       await load();
     } catch (e) {
       error.textContent = e.message; error.hidden = false;
       save.disabled = false;
-      save.textContent = 'Save as new version';
+      save.textContent = from ? 'Save as new version' : 'Save';
     }
   });
   const actions = el('div', 'notes-actions');
-  actions.append(analyse, save, status);
+  actions.append(analyse, save, cancel);
   box.append(head, code, el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.'), actions, error, slot);
+  requestAnimationFrame(() => code.focus());
   return box;
+}
+
+/** An attempt with no code yet (e.g. marked done without it): a button, not an empty box. */
+function addCode(p, a) {
+  if (editing.get(a.id) === 'new') return versionEditor(p, a, null);
+  const btn = el('button', 'btn', 'Add your code');
+  btn.type = 'button';
+  btn.addEventListener('click', () => { editing.set(a.id, 'new'); load(); });
+  const row = el('div', 'notes-actions');
+  row.append(btn);
+  return row;
 }
 
 function field(label, control, optional) {
