@@ -25,30 +25,61 @@
     <button type="button" class="btn link banner-action" id="rc-banner-open">Create one</button>
   </div>
 
+
+  <!-- Overview: the numbers, the plan and the calendar side by side, so the work starts high up the page -->
+  <div class="overview">
   <!-- Four headline numbers. None of them can drop to zero because of a missed day. -->
-  <section class="stats" aria-label="Summary">
-    <div class="stat">
-      <div class="stat-label">Fully revised</div>
-      <div class="stat-value"><span id="revised-count">–</span><span class="unit" id="revised-target"></span></div>
-      <div class="stat-sub" id="revised-sub">all 3 revisions done</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Due today</div>
-      <div class="stat-value" id="due-count">–</div>
-      <div class="stat-sub" id="due-sub"></div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Solved</div>
-      <div class="stat-value"><span id="solved-count">–</span><span class="unit" id="solved-target"></span></div>
-      <div class="bar" aria-hidden="true"><div class="bar-fill" id="solved-bar"></div></div>
-      <div class="stat-sub" id="solved-sub"></div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Study days</div>
-      <div class="stat-value" id="study-days">–</div>
-      <div class="stat-sub" id="week-sub"></div>
-    </div>
-  </section>
+    <section class="stats compact" aria-label="Summary">
+      <div class="stat">
+        <div class="stat-label">Fully revised</div>
+        <div class="stat-value"><span id="revised-count">–</span><span class="unit" id="revised-target"></span></div>
+        <div class="stat-sub" id="revised-sub">all 3 revisions done</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Due today</div>
+        <div class="stat-value" id="due-count">–</div>
+        <div class="stat-sub" id="due-sub"></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Solved</div>
+        <div class="stat-value"><span id="solved-count">–</span><span class="unit" id="solved-target"></span></div>
+        <div class="bar" aria-hidden="true"><div class="bar-fill" id="solved-bar"></div></div>
+        <div class="stat-sub" id="solved-sub"></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Study days</div>
+        <div class="stat-value" id="study-days">–</div>
+        <div class="stat-sub" id="week-sub"></div>
+      </div>
+    </section>
+      <section class="panel-box" aria-labelledby="plan-h">
+        <div class="section-head">
+          <h2 id="plan-h">Plan</h2>
+          <span class="section-note" id="plan-note"></span>
+        </div>
+        <p class="pace" id="pace"></p>
+        <div class="workload-head">
+          <span>Revisions due, next 14 days</span>
+          <span class="workload-cap" id="workload-cap"></span>
+        </div>
+        <div class="workload" id="workload" role="img"></div>
+      </section>
+      <section class="panel-box heat" aria-labelledby="heat-h">
+        <div class="section-head">
+          <h2 id="heat-h">Study calendar</h2>
+          <span class="section-note" id="calendar-note"></span>
+        </div>
+        <div class="heatmap-scroll">
+          <div class="heatmap" id="heatmap" role="grid" aria-label="Activity per day"></div>
+        </div>
+        <div class="legend" aria-hidden="true">
+          <span>Less</span>
+          <i class="cell l1"></i><i class="cell l2"></i><i class="cell l3"></i><i class="cell l4"></i>
+          <span>More</span>
+        </div>
+        <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+      </section>
+  </div>
 
   <div class="layout">
     <main class="main">
@@ -71,34 +102,7 @@
     </main>
 
     <aside class="aside">
-      <section class="section" aria-labelledby="plan-h">
-        <div class="section-head">
-          <h2 id="plan-h">Plan</h2>
-          <span class="section-note" id="plan-note"></span>
-        </div>
-        <p class="pace" id="pace"></p>
-        <div class="workload-head">
-          <span>Revisions due, next 14 days</span>
-          <span class="workload-cap" id="workload-cap"></span>
-        </div>
-        <div class="workload" id="workload" role="img"></div>
-      </section>
 
-      <section class="section heat" aria-labelledby="heat-h">
-        <div class="section-head">
-          <h2 id="heat-h">Study calendar</h2>
-          <span class="section-note" id="calendar-note"></span>
-        </div>
-        <div class="heatmap-scroll">
-          <div class="heatmap" id="heatmap" role="grid" aria-label="Activity per day"></div>
-        </div>
-        <div class="legend" aria-hidden="true">
-          <span>Less</span>
-          <i class="cell l1"></i><i class="cell l2"></i><i class="cell l3"></i><i class="cell l4"></i>
-          <span>More</span>
-        </div>
-        <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
-      </section>
 
       <section class="section" aria-labelledby="mem-h">
         <div class="section-head">

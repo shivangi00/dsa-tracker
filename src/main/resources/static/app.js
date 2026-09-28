@@ -370,7 +370,7 @@ function renderCatalog(d) {
   const done = d.catalog.filter((c) => c.progress).length;
   $('catalog-summary').textContent = `${done} solved · ${d.counts.fullyRevised} fully revised · ${d.catalog.length - done} to do`;
   $('table-legend').textContent = `Each problem gets ${d.plan.revisions} revisions, all done by day ${d.planDays}. `
-    + 'Open a ✓ to see that attempt: your notes, saved versions and their analyses.';
+    + 'Click a date to open that attempt: your notes, saved versions and their analyses.';
 
   const show = document.querySelector('input[name=show]:checked').value;
   const query = $('catalog-search').value.trim().toLowerCase();
@@ -484,16 +484,38 @@ function catalogRow(c) {
     compact.append(dots, el('span', 'next', nextLabel(p)));
   }
 
-  const undo = el('button', 'btn icon', '✕');
+  const undo = el('button', 'btn icon delete');
   undo.type = 'button';
-  undo.title = `Undo "${c.name}"`;
-  undo.setAttribute('aria-label', `Undo ${c.name}`);
+  undo.title = `Delete "${c.name}" and its history`;
+  undo.setAttribute('aria-label', `Delete ${c.name}`);
+  undo.append(binIcon());
   undo.addEventListener('click', () => remove(p));
   const actions = el('div', 'actions');
   actions.append(toggle, undo);
 
   li.append(title, level, ...cells, compact, actions, panel);
   return li;
+}
+
+/** A bin (delete) icon, drawn inline so it follows the text colour. */
+function binIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of ['M3 6h18', 'M8 6V4h8v2', 'M19 6l-1 14H6L5 6', 'M10 11v6', 'M14 11v6']) {
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.append(path);
+  }
+  return svg;
 }
 
 function nextLabel(p) {
@@ -509,27 +531,27 @@ function stageCell(p, k, open) {
   const done = k === 0 || k <= p.revisionsDone ? slotDone(p, k) : null;
   if (done) {
     const tries = k === 0 ? 1 : slotAttempts(p, k).length;
-    const b = el('button', 'stage done-stage');
+    const b = el('button', 'st-btn');
     b.type = 'button';
-    const rating = done.rating ? (k === 0 ? SOLVE_LABEL : REVIEW_LABEL)[done.rating] : '';
-    b.append(el('span', 'stage-date', `✓ ${short(done.attemptedOn)}`),
-      el('span', `stage-rating r-${(done.rating || '').toLowerCase()}`, rating + (tries > 1 ? ` · ${tries} tries` : '')));
+    const rating = done.rating ? (k === 0 ? SOLVE_LABEL : REVIEW_LABEL)[done.rating] : 'Done';
+    b.append(el('span', 'st-date', short(done.attemptedOn)),
+      el('span', `st-rating r-${(done.rating || '').toLowerCase()}`, rating + (tries > 1 ? ` · ${tries} tries` : '')));
     b.title = `${k === 0 ? 'Solved' : `Revision ${k}`} on ${fmt(done.attemptedOn)}. Open the history.`;
     b.addEventListener('click', () => open('history', done.id));
     cell.append(b);
   } else if (k === nextRevision(p) && !p.fullyRevised) {
     const tries = slotAttempts(p, k).length;
     if (isDue(p)) {
-      const b = el('button', `btn stage-due${p.overdueDays > 0 ? ' overdue' : ''}`, 'Revise');
+      const b = el('button', `btn st-due${p.overdueDays > 0 ? ' overdue' : ''}`, 'Revise');
       b.type = 'button';
       b.title = p.overdueDays > 0 ? `Due ${fmt(p.nextDueOn)}, ${plural(p.overdueDays, 'day')} ago` : 'Due today';
       b.addEventListener('click', () => open('revise'));
       cell.append(b);
-      if (p.overdueDays > 0) cell.append(el('span', 'stage-late', `${p.overdueDays}d late`));
+      if (p.overdueDays > 0) cell.append(el('span', 'st-late', `${p.overdueDays}d late`));
     } else {
-      cell.append(el('span', 'stage-next', `due ${short(p.nextDueOn)}`));
+      cell.append(el('span', 'st-next', `due ${short(p.nextDueOn)}`));
     }
-    if (tries) cell.append(el('span', 'stage-tries', `↻ ${tries}`));
+    if (tries) cell.append(el('span', 'st-tries', `↻ ${tries}`));
   } else {
     cell.classList.add('muted');
     cell.textContent = '—';
@@ -1070,7 +1092,7 @@ $('catalog-search').addEventListener('input', () => state && renderCatalog(state
 
 // ---------- actions
 async function remove(p) {
-  if (!confirm(`Undo "${p.name}"? Your notes and revision history for it will be deleted.`)) return;
+  if (!confirm(`Delete "${p.name}"? It goes back to "to do", and all its notes, saved code and revisions are deleted.`)) return;
   try {
     await api(`/api/problems/${p.id}`, { method: 'DELETE' });
     await load();
