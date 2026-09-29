@@ -468,8 +468,8 @@ function catalogRow(c) {
     return li;
   }
 
-  const { button: toggle, panel, open } = panelToggle(p, 'list', 'history', 'History');
-  const cells = [0, 1, 2, 3].map((k) => stageCell(p, k, open));
+  const { button: toggle, panel, bind } = panelToggle(p, 'list', 'history', 'History');
+  const cells = [0, 1, 2, 3].map((k) => stageCell(p, k, bind));
 
   const compact = el('div', 'tcell compact');
   const dots = el('span', 'dots');
@@ -478,7 +478,7 @@ function catalogRow(c) {
   if (isDue(p)) {
     const go = el('button', `btn link next${p.overdueDays > 0 ? ' overdue' : ''}`, nextLabel(p));
     go.type = 'button';
-    go.addEventListener('click', () => open('revise'));
+    bind(go, 'revise', 'revise');
     compact.append(dots, go);
   } else {
     compact.append(dots, el('span', 'next', nextLabel(p)));
@@ -526,7 +526,7 @@ function nextLabel(p) {
 }
 
 /** A Solved / Revision k cell. */
-function stageCell(p, k, open) {
+function stageCell(p, k, bind) {
   const cell = el('div', k === 0 ? 'tcell solved' : 'tcell rev');
   const done = k === 0 || k <= p.revisionsDone ? slotDone(p, k) : null;
   if (done) {
@@ -537,7 +537,7 @@ function stageCell(p, k, open) {
     b.append(el('span', 'st-date', short(done.attemptedOn)),
       el('span', `st-rating r-${(done.rating || '').toLowerCase()}`, rating + (tries > 1 ? ` · ${tries} tries` : '')));
     b.title = `${k === 0 ? 'Solved' : `Revision ${k}`} on ${fmt(done.attemptedOn)}. Open the history.`;
-    b.addEventListener('click', () => open('history', done.id));
+    bind(b, 'history', `attempt:${done.id}`, done.id);
     cell.append(b);
   } else if (k === nextRevision(p) && !p.fullyRevised) {
     const tries = slotAttempts(p, k).length;
@@ -545,7 +545,7 @@ function stageCell(p, k, open) {
       const b = el('button', `btn st-due${p.overdueDays > 0 ? ' overdue' : ''}`, 'Revise');
       b.type = 'button';
       b.title = p.overdueDays > 0 ? `Due ${fmt(p.nextDueOn)}, ${plural(p.overdueDays, 'day')} ago` : 'Due today';
-      b.addEventListener('click', () => open('revise'));
+      bind(b, 'revise', 'revise');
       cell.append(b);
       if (p.overdueDays > 0) cell.append(el('span', 'st-late', `${p.overdueDays}d late`));
     } else {
@@ -561,6 +561,7 @@ function stageCell(p, k, open) {
 
 // ---------- the panel under a problem: revise form and/or its attempt history
 const openPanels = new Map();   // "where:id" → 'history' | 'revise', kept across reloads
+const openSources = new Map();  // "where:id" → which control opened it, so the same control closes it
 const drafts = new Map();       // unsaved text in the forms, kept across reloads
 const LANGUAGES = { JAVA: 'Java', PYTHON: 'Python', JAVASCRIPT: 'JavaScript', CPP: 'C++' };
 const CONFIDENCE = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
@@ -582,11 +583,19 @@ function panelToggle(p, where, mode, label) {
   button.type = 'button';
   button.setAttribute('aria-controls', panel.id);
 
+  /** Shows whether this control is the one holding the panel open (so clicking it again closes it). */
+  const mark = (node) => {
+    const on = openPanels.has(key) && openSources.get(key) === node.dataset.panelSource;
+    node.classList.toggle('is-open', on);
+    node.setAttribute('aria-expanded', String(on));
+    if (node.dataset.openTitle) node.title = on ? 'Click again to close' : node.dataset.openTitle;
+  };
   const draw = () => {
     const current = openPanels.get(key);
     panel.hidden = !current;
     button.setAttribute('aria-expanded', String(Boolean(current)));
     button.textContent = current ? 'Close' : label;
+    panel.parentElement?.querySelectorAll('[data-panel-source]').forEach(mark);
     panel.replaceChildren();
     if (!current) return;
     if (current === 'revise' && isDue(p)) panel.append(reviseForm(p, key));
@@ -608,12 +617,31 @@ function panelToggle(p, where, mode, label) {
     openPanels.set(key, m);
     draw();
   };
+  /** Makes {@code node} open the panel (in mode {@code m}) and, clicked again, close it. */
+  const bind = (node, m, source, attemptId) => {
+    node.dataset.panelSource = source;
+    if (node.title) node.dataset.openTitle = node.title;
+    node.setAttribute('aria-controls', panel.id);
+    node.addEventListener('click', () => {
+      if (openPanels.has(key) && openSources.get(key) === source) {
+        openPanels.delete(key);
+        openSources.delete(key);
+        draw();
+      } else {
+        openSources.set(key, source);
+        open(m, attemptId);
+      }
+    });
+    mark(node);
+  };
+  button.dataset.panelSource = 'button';
   button.addEventListener('click', () => {
-    if (openPanels.has(key)) openPanels.delete(key); else openPanels.set(key, mode);
+    if (openPanels.has(key)) { openPanels.delete(key); openSources.delete(key); }
+    else { openPanels.set(key, mode); openSources.set(key, 'button'); }
     draw();
   });
   draw();
-  return { button, panel, open };
+  return { button, panel, open, bind };
 }
 
 /**

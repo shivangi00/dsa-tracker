@@ -297,6 +297,11 @@ textarea { resize: vertical; }
 .btn.open-link { color: var(--accent); font-weight: 500; text-decoration: none; }
 .btn.open-link[hidden] { display: none; }
 
+/* The control holding a row's panel open: clicking it again closes it */
+.st-btn.is-open { background: var(--tint); box-shadow: 0 0 0 1.5px var(--accent); }
+.btn.st-due.is-open, .btn.link.is-open { background: var(--tint); }
+.btn.st-due.is-open::after, .btn.link.is-open::after, .st-btn.is-open .st-date::after { content: " ▴"; font-size: 10px; color: var(--ink-3); }
+
 /* Notes panel under a row */
 .notes { margin: 4px 0 6px; padding: 10px 12px; border-radius: 6px; background: var(--tint); font-size: 13px; }
 .notes-when { color: var(--ink-3); font-size: 12px; margin: 0 0 4px; }

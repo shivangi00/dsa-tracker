@@ -40,6 +40,7 @@ const CLAUDE_URL = 'https://claude.ai/new';
 
 let state = null;
 const openPanels = new Map();   // "topic:key" / "problem:key" → 'quiz' | 'design' | 'history'
+const openSources = new Map();  // same keys → which control opened it, so the same control closes it
 const openGroups = new Set();
 let groupsChosen = false;
 const quizzes = new Map();      // topic key → the quiz being taken (questions and chosen answers)
@@ -125,6 +126,7 @@ function renderDue(d) {
     go.addEventListener('click', () => {
       const key = `${r.kind === 'TOPIC' ? 'topic' : 'problem'}:${r.key}`;
       openPanels.set(key, r.kind === 'TOPIC' ? 'quiz' : 'design');
+      openSources.set(key, 'do');
       openGroupOf(r);
       render(state);
       requestAnimationFrame(() => document.querySelector(`[data-row="${key}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
@@ -237,21 +239,21 @@ function topicRow(t) {
   const li = el('li', item ? 'row done' : 'row');
   li.dataset.row = key;
   const title = nameLink(t.name, t.url);
-  const { button: toggle, panel, open } = panelToggle(key, item, t, item ? 'history' : 'quiz', item ? 'History' : 'Quiz');
+  const { button: toggle, panel, bind } = panelToggle(key, item, t, item ? 'history' : 'quiz', item ? 'History' : 'Quiz');
 
   if (!item) {
     const quizBtn = el('button', 'btn link', 'Take quiz');
     quizBtn.type = 'button';
     quizBtn.title = state.plan.newOpen ? 'After reading it: 5 questions to mark it studied'
       : 'Practice only: new topics stopped on day ' + state.plan.lastNewDayNo;
-    quizBtn.addEventListener('click', () => open('quiz'));
+    bind(quizBtn, 'quiz', 'first');
     const first = el('div', 'tcell solved');
     first.append(quizBtn);
     li.append(title, first, ...[1, 2, 3].map(() => el('div', 'tcell rev muted', '—')), el('div', 'actions'), panel);
     return li;
   }
-  const cells = [0, 1, 2, 3].map((k) => stageCell(item, k, open, 'quiz'));
-  li.append(title, ...cells, compactCell(item, open, 'quiz'), actions(toggle, item, t.name), panel);
+  const cells = [0, 1, 2, 3].map((k) => stageCell(item, k, bind, 'quiz'));
+  li.append(title, ...cells, compactCell(item, bind, 'quiz'), actions(toggle, item, t.name), panel);
   return li;
 }
 
@@ -262,7 +264,7 @@ function problemRow(p) {
   li.dataset.row = key;
   const title = nameLink(p.name, p.url);
   if (!p.scored) title.append(el('span', 'soon-tag', 'score soon'));
-  const { button: toggle, panel, open } = panelToggle(key, item, p, item ? 'history' : 'design', item ? 'History' : 'Design');
+  const { button: toggle, panel, bind } = panelToggle(key, item, p, item ? 'history' : 'design', item ? 'History' : 'Design');
 
   if (!item) {
     const go = el('button', 'btn link', 'Design it');
@@ -271,14 +273,14 @@ function problemRow(p) {
       go.disabled = true;
       go.title = `New problems stopped on day ${state.plan.lastNewDayNo}, so every revision fits before the plan ends.`;
     }
-    go.addEventListener('click', () => open('design'));
+    bind(go, 'design', 'first');
     const first = el('div', 'tcell solved');
     first.append(go);
     li.append(title, first, el('div', 'tcell rev muted', '—'), el('div', 'tcell rev muted', '—'), el('div', 'actions'), panel);
     return li;
   }
-  const cells = [0, 1, 2].map((k) => stageCell(item, k, open, 'design'));
-  li.append(title, ...cells, compactCell(item, open, 'design'), actions(toggle, item, p.name), panel);
+  const cells = [0, 1, 2].map((k) => stageCell(item, k, bind, 'design'));
+  li.append(title, ...cells, compactCell(item, bind, 'design'), actions(toggle, item, p.name), panel);
   return li;
 }
 
@@ -311,7 +313,7 @@ const bestOf = (a) => {
 };
 
 /** A Studied / Designed / Revision k cell. */
-function stageCell(item, k, open, doMode) {
+function stageCell(item, k, bind, doMode) {
   const cell = el('div', k === 0 ? 'tcell solved' : 'tcell rev');
   const done = k === 0 || k <= item.revisionsDone ? slotDone(item, k) : null;
   if (done) {
@@ -321,7 +323,7 @@ function stageCell(item, k, open, doMode) {
     b.append(el('span', 'st-date', short(done.attemptedOn)),
       el('span', `st-rating r-${done.rating.toLowerCase()}`, attemptLabel(item, done) + (tries > 1 ? ` · ${tries} tries` : '')));
     b.title = `${k === 0 ? (item.kind === 'TOPIC' ? 'Studied' : 'Designed') : `Revision ${k}`} on ${fmt(done.attemptedOn)}. Open the history.`;
-    b.addEventListener('click', () => open('history'));
+    bind(b, 'history', `attempt:${done.id}`);
     cell.append(b);
   } else if (k === item.revisionsDone + 1 && !item.fullyRevised) {
     const tries = slotAttempts(item, k).length;
@@ -329,7 +331,7 @@ function stageCell(item, k, open, doMode) {
       const b = el('button', `btn st-due${item.overdueDays > 0 ? ' overdue' : ''}`, item.kind === 'TOPIC' ? 'Quiz' : 'Revise');
       b.type = 'button';
       b.title = item.overdueDays > 0 ? `Due ${fmt(item.nextDueOn)}, ${plural(item.overdueDays, 'day')} ago` : 'Due today';
-      b.addEventListener('click', () => open(doMode));
+      bind(b, doMode, 'do');
       cell.append(b);
       if (item.overdueDays > 0) cell.append(el('span', 'st-late', `${item.overdueDays}d late`));
     } else {
@@ -344,7 +346,7 @@ function stageCell(item, k, open, doMode) {
 }
 
 /** On phones the revision cells collapse into dots and the next step. */
-function compactCell(item, open, doMode) {
+function compactCell(item, bind, doMode) {
   const c = el('div', 'tcell compact');
   const dots = el('span', 'dots');
   dots.setAttribute('aria-label', `${item.revisionsDone} of ${item.revisions} revisions done`);
@@ -355,7 +357,7 @@ function compactCell(item, open, doMode) {
     const go = el('button', `btn link next${item.overdueDays > 0 ? ' overdue' : ''}`,
       item.overdueDays > 0 ? `Revise · ${plural(item.overdueDays, 'day')} late` : 'Revise today');
     go.type = 'button';
-    go.addEventListener('click', () => open(doMode));
+    bind(go, doMode, 'do');
     c.append(go);
   } else c.append(el('span', 'next', `next ${short(item.nextDueOn)}`));
   return c;
@@ -370,11 +372,23 @@ function panelToggle(key, item, entry, mode, label) {
   button.setAttribute('aria-controls', panel.id);
   const isTopic = key.startsWith('topic:');
 
+  const mark = (node) => {
+    const on = openPanels.has(key) && openSources.get(key) === node.dataset.panelSource;
+    node.classList.toggle('is-open', on);
+    node.setAttribute('aria-expanded', String(on));
+    if (node.dataset.openTitle) node.title = on ? 'Click again to close' : node.dataset.openTitle;
+  };
+  const close = () => {
+    openPanels.delete(key);
+    openSources.delete(key);
+    if (isTopic) { quizzes.delete(entry.key); quizResults.delete(entry.key); }
+  };
   const draw = () => {
     const current = openPanels.get(key);
     panel.hidden = !current;
     button.setAttribute('aria-expanded', String(Boolean(current)));
     button.textContent = current ? 'Close' : label;
+    panel.parentElement?.querySelectorAll('[data-panel-source]').forEach(mark);
     panel.replaceChildren();
     if (!current) return;
     if (isTopic) {
@@ -388,14 +402,26 @@ function panelToggle(key, item, entry, mode, label) {
     }
     if (item) panel.append(historyBox(entry, item, current !== 'history'));
   };
-  const open = (m) => { openPanels.set(key, m); draw(); };
+  /** Makes {@code node} open the panel (in mode {@code m}) and, clicked again, close it. */
+  const bind = (node, m, source) => {
+    node.dataset.panelSource = source;
+    if (node.title) node.dataset.openTitle = node.title;
+    node.setAttribute('aria-controls', panel.id);
+    node.addEventListener('click', () => {
+      if (openPanels.has(key) && openSources.get(key) === source) close();
+      else { openSources.set(key, source); openPanels.set(key, m); }
+      draw();
+    });
+    mark(node);
+  };
+  button.dataset.panelSource = 'button';
   button.addEventListener('click', () => {
-    if (openPanels.has(key)) { openPanels.delete(key); if (isTopic) { quizzes.delete(entry.key); quizResults.delete(entry.key); } }
-    else openPanels.set(key, mode);
+    if (openPanels.has(key)) close();
+    else { openPanels.set(key, mode); openSources.set(key, 'button'); }
     draw();
   });
   draw();
-  return { button, panel, open };
+  return { button, panel, bind };
 }
 
 function startButton(text, onClick, cls = 'btn primary') {
