@@ -468,13 +468,11 @@ function catalogRow(c) {
     return li;
   }
 
-  const { button: toggle, panel, bind } = panelToggle(p, 'list', 'history', 'History');
+  const { panel, bind } = panelToggle(p, 'list', 'history', 'History');
   const cells = [0, 1, 2, 3].map((k) => stageCell(p, k, bind));
 
   const compact = el('div', 'tcell compact');
-  const dots = el('span', 'dots');
-  dots.setAttribute('aria-label', `${p.revisionsDone} of ${state.plan.revisions} revisions done`);
-  for (let k = 1; k <= state.plan.revisions; k++) dots.append(el('i', k <= p.revisionsDone ? 'dot on' : 'dot'));
+  const dots = stageChips(p, state.plan.revisions, 'Solved', bind);
   if (isDue(p)) {
     const go = el('button', `btn link next${p.overdueDays > 0 ? ' overdue' : ''}`, nextLabel(p));
     go.type = 'button';
@@ -491,7 +489,7 @@ function catalogRow(c) {
   undo.append(binIcon());
   undo.addEventListener('click', () => remove(p));
   const actions = el('div', 'actions');
-  actions.append(toggle, undo);
+  actions.append(undo);
 
   li.append(title, level, ...cells, compact, actions, panel);
   return li;
@@ -518,6 +516,24 @@ function binIcon() {
   return svg;
 }
 
+/** On phones, where the date columns are hidden: one small tab per finished sitting (Solved, R1, R2…). */
+function stageChips(p, revisions, firstLabel, bind) {
+  const chips = el('span', 'chips');
+  for (let k = 0; k <= revisions; k++) {
+    const done = k === 0 || k <= p.revisionsDone ? slotDone(p, k) : null;
+    if (done) {
+      const b = el('button', 'chip', k === 0 ? firstLabel : `R${k}`);
+      b.type = 'button';
+      b.title = `${k === 0 ? firstLabel : `Revision ${k}`} on ${fmt(done.attemptedOn)}`;
+      bind(b, 'history', `slot:${k}`);
+      chips.append(b);
+    } else if (k > 0) {
+      chips.append(el('span', 'chip todo', `R${k}`));
+    }
+  }
+  return chips;
+}
+
 function nextLabel(p) {
   if (p.fullyRevised) return '✓ Fully revised';
   if (p.overdueDays > 0) return `Revise · ${plural(p.overdueDays, 'day')} late`;
@@ -537,7 +553,7 @@ function stageCell(p, k, bind) {
     b.append(el('span', 'st-date', short(done.attemptedOn)),
       el('span', `st-rating r-${(done.rating || '').toLowerCase()}`, rating + (tries > 1 ? ` · ${tries} tries` : '')));
     b.title = `${k === 0 ? 'Solved' : `Revision ${k}`} on ${fmt(done.attemptedOn)}. Open the history.`;
-    bind(b, 'history', `attempt:${done.id}`, done.id);
+    bind(b, 'history', `slot:${k}`);
     cell.append(b);
   } else if (k === nextRevision(p) && !p.fullyRevised) {
     const tries = slotAttempts(p, k).length;
@@ -598,6 +614,13 @@ function panelToggle(p, where, mode, label) {
     panel.parentElement?.querySelectorAll('[data-panel-source]').forEach(mark);
     panel.replaceChildren();
     if (!current) return;
+    // A date cell opens just that sitting (like a tab); the History button opens everything.
+    const src = openSources.get(key) || '';
+    const only = current === 'history' && src.startsWith('slot:') ? Number(src.slice(5)) : null;
+    if (only !== null) {
+      panel.append(history(p, false, only));
+      return;
+    }
     if (current === 'revise' && isDue(p)) panel.append(reviseForm(p, key));
     else if (isDue(p)) {
       const go = el('button', 'btn primary revise-now', `Start revision ${nextRevision(p)}`);
@@ -835,8 +858,14 @@ function reviseForm(p, key) {
 }
 
 /** Every attempt, oldest first: notes, saved versions with their analyses, and today's editors. */
-function history(p, collapsed) {
+function history(p, collapsed, only = null) {
   const wrap = el('div', 'history');
+  if (only !== null) {
+    const body = el('div', 'history-body');
+    p.attempts.filter((a) => a.revision === only).forEach((a) => body.append(attemptBlock(p, a)));
+    wrap.append(body);
+    return wrap;
+  }
   if (collapsed) {
     const d = el('details', 'history-toggle');
     d.append(el('summary', '', `Earlier attempts (${p.attempts.length})`));

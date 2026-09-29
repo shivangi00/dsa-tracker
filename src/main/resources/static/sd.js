@@ -239,7 +239,7 @@ function topicRow(t) {
   const li = el('li', item ? 'row done' : 'row');
   li.dataset.row = key;
   const title = nameLink(t.name, t.url);
-  const { button: toggle, panel, bind } = panelToggle(key, item, t, item ? 'history' : 'quiz', item ? 'History' : 'Quiz');
+  const { panel, bind } = panelToggle(key, item, t, item ? 'history' : 'quiz', item ? 'History' : 'Quiz');
 
   if (!item) {
     const quizBtn = el('button', 'btn link', 'Take quiz');
@@ -253,7 +253,7 @@ function topicRow(t) {
     return li;
   }
   const cells = [0, 1, 2, 3].map((k) => stageCell(item, k, bind, 'quiz'));
-  li.append(title, ...cells, compactCell(item, bind, 'quiz'), actions(toggle, item, t.name), panel);
+  li.append(title, ...cells, compactCell(item, bind, 'quiz'), actions(item, t.name), panel);
   return li;
 }
 
@@ -264,7 +264,7 @@ function problemRow(p) {
   li.dataset.row = key;
   const title = nameLink(p.name, p.url);
   if (!p.scored) title.append(el('span', 'soon-tag', 'score soon'));
-  const { button: toggle, panel, bind } = panelToggle(key, item, p, item ? 'history' : 'design', item ? 'History' : 'Design');
+  const { panel, bind } = panelToggle(key, item, p, item ? 'history' : 'design', item ? 'History' : 'Design');
 
   if (!item) {
     const go = el('button', 'btn link', 'Design it');
@@ -280,11 +280,11 @@ function problemRow(p) {
     return li;
   }
   const cells = [0, 1, 2].map((k) => stageCell(item, k, bind, 'design'));
-  li.append(title, ...cells, compactCell(item, bind, 'design'), actions(toggle, item, p.name), panel);
+  li.append(title, ...cells, compactCell(item, bind, 'design'), actions(item, p.name), panel);
   return li;
 }
 
-function actions(toggle, item, name) {
+function actions(item, name) {
   const undo = el('button', 'btn icon delete');
   undo.type = 'button';
   undo.title = `Delete "${name}" and its history`;
@@ -296,7 +296,7 @@ function actions(toggle, item, name) {
     catch (e) { toast(e.message); }
   });
   const box = el('div', 'actions');
-  box.append(toggle, undo);
+  box.append(undo);
   return box;
 }
 
@@ -323,7 +323,7 @@ function stageCell(item, k, bind, doMode) {
     b.append(el('span', 'st-date', short(done.attemptedOn)),
       el('span', `st-rating r-${done.rating.toLowerCase()}`, attemptLabel(item, done) + (tries > 1 ? ` · ${tries} tries` : '')));
     b.title = `${k === 0 ? (item.kind === 'TOPIC' ? 'Studied' : 'Designed') : `Revision ${k}`} on ${fmt(done.attemptedOn)}. Open the history.`;
-    bind(b, 'history', `attempt:${done.id}`);
+    bind(b, 'history', `slot:${k}`);
     cell.append(b);
   } else if (k === item.revisionsDone + 1 && !item.fullyRevised) {
     const tries = slotAttempts(item, k).length;
@@ -348,10 +348,20 @@ function stageCell(item, k, bind, doMode) {
 /** On phones the revision cells collapse into dots and the next step. */
 function compactCell(item, bind, doMode) {
   const c = el('div', 'tcell compact');
-  const dots = el('span', 'dots');
-  dots.setAttribute('aria-label', `${item.revisionsDone} of ${item.revisions} revisions done`);
-  for (let k = 1; k <= item.revisions; k++) dots.append(el('i', k <= item.revisionsDone ? 'dot on' : 'dot'));
-  c.append(dots);
+  // On phones, where the date columns are hidden: one small tab per finished sitting.
+  const chips = el('span', 'chips');
+  for (let k = 0; k <= item.revisions; k++) {
+    const done = k === 0 || k <= item.revisionsDone ? slotDone(item, k) : null;
+    const first = item.kind === 'TOPIC' ? 'Studied' : 'Designed';
+    if (done) {
+      const b = el('button', 'chip', k === 0 ? first : `R${k}`);
+      b.type = 'button';
+      b.title = `${k === 0 ? first : `Revision ${k}`} on ${fmt(done.attemptedOn)}`;
+      bind(b, 'history', `slot:${k}`);
+      chips.append(b);
+    } else if (k > 0) chips.append(el('span', 'chip todo', `R${k}`));
+  }
+  c.append(chips);
   if (item.fullyRevised) c.append(el('span', 'next', '✓ Fully revised'));
   else if (isDue(item)) {
     const go = el('button', `btn link next${item.overdueDays > 0 ? ' overdue' : ''}`,
@@ -391,6 +401,13 @@ function panelToggle(key, item, entry, mode, label) {
     panel.parentElement?.querySelectorAll('[data-panel-source]').forEach(mark);
     panel.replaceChildren();
     if (!current) return;
+    // A date cell opens just that sitting (like a tab); the History button opens everything.
+    const src = openSources.get(key) || '';
+    const only = current === 'history' && src.startsWith('slot:') && !quizResults.has(entry.key) ? Number(src.slice(5)) : null;
+    if (item && only !== null) {
+      panel.append(historyBox(entry, item, false, only));
+      return;
+    }
     if (isTopic) {
       if (current === 'quiz' || quizResults.has(entry.key)) panel.append(quizBox(entry, item));
       else if (item && isDue(item)) panel.append(startButton(`Take the revision ${item.revisionsDone + 1} quiz`, () => { openPanels.set(key, 'quiz'); draw(); }));
@@ -818,10 +835,11 @@ function showPromptToCopy(prompt, near) {
 }
 
 // ---------- history
-function historyBox(entry, item, collapsed) {
+function historyBox(entry, item, collapsed, only = null) {
   const wrap = el('div', 'history');
   const body = el('div', 'history-body');
-  for (const a of item.attempts) body.append(attemptBlock(entry, item, a));
+  for (const a of item.attempts) if (only === null || a.revision === only) body.append(attemptBlock(entry, item, a));
+  if (only !== null) { wrap.append(body); return wrap; }
   if (collapsed) {
     const d = el('details', 'history-toggle');
     d.append(el('summary', '', `Earlier attempts (${item.attempts.length})`), body);
