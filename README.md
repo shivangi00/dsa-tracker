@@ -164,7 +164,7 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 - **Analyse with Claude ↗** copies a review prompt with your design to the clipboard and opens claude.ai in a new tab: paste it (Ctrl+V / ⌘V) and the review runs in your own Claude account, at no cost to the app. (Claude has no documented way to pre-fill a chat, hence the paste. Signed-out visitors see Claude's sign-in page first.)
 - **Versions**: a sitting keeps up to 5 saved versions, each with its score, collapsed with only a Delete button. The box underneath (Analyse / Save / Delete) starts from your latest version, so you can add what you missed and save the improvement as the next version.
 
-Stage 1 has rubrics and reference designs for the four Easy problems (Bitly, Dropbox, Yelp, Gopuff); the others say "score soon" but can still be written, saved, rated and analysed with Claude. All quiz questions, rubrics and reference designs are written for this app in its own words and link to Hello Interview rather than copying it; they live in `sd-topics.json` and `sd-problems.json`.
+Every problem has a rubric and a reference design: 8–9 key points for Easy, 9–10 for Medium and 10–12 for Hard, where interviews lean on deep dives (contention, consistency, hot keys, idempotency, failure recovery). The score stays out of 10. A test checks that each reference design covers every point of its own rubric. All quiz questions, rubrics and reference designs are written for this app in its own words and link to Hello Interview rather than copying it; they live in `sd-topics.json` and `sd-problems.json`.
 
 | Method | Path | Body | Notes |
 | --- | --- | --- | --- |

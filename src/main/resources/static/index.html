@@ -172,8 +172,11 @@
     </label>
     <label class="field">
       <span>Excalidraw link <em>optional</em></span>
-      <input name="excalidrawUrl" type="url" maxlength="500" pattern="https://.*"
-             placeholder="https://excalidraw.com/#json=…">
+      <span class="url-row">
+        <input name="excalidrawUrl" type="url" maxlength="500" pattern="https://.*"
+               placeholder="https://excalidraw.com/#json=…">
+        <a class="btn open-link" id="done-drawing-open" target="_blank" rel="noopener" title="Open the drawing in a new tab" hidden>Open ↗</a>
+      </span>
     </label>
     <div class="done-code">
       <div class="code-head">

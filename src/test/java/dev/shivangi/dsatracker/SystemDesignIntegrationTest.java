@@ -211,7 +211,8 @@ class SystemDesignIntegrationTest {
                 .andExpect(jsonPath("$.hits.length()").value(2));
         mvc.perform(post("/api/sd/score").with(csrf()).cookie(s).contentType(APPLICATION_JSON)
                         .content("{\"problemKey\":\"uber\",\"sections\":{\"highLevel\":\"match riders\"}}"))
-                .andExpect(jsonPath("$.scored").value(false));
+                .andExpect(jsonPath("$.scored").value(true))
+                .andExpect(jsonPath("$.hits.length()").value(0));
         assertEquals(0, jdbc.queryForObject(
                 "SELECT count(*) FROM sd_items i JOIN users u ON u.id = i.user_id WHERE u.username = 'sd-eve'", Integer.class));
     }

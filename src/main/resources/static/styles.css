@@ -292,6 +292,11 @@ textarea { resize: vertical; }
 .btn.ghost.danger:hover { background: color-mix(in srgb, var(--critical) 10%, transparent); }
 .new-version .analysis-slot:empty { display: none; }
 
+.url-row { display: flex; gap: 6px; align-items: center; }
+.url-row input { flex: 1; min-width: 0; }
+.btn.open-link { color: var(--accent); font-weight: 500; text-decoration: none; }
+.btn.open-link[hidden] { display: none; }
+
 /* Notes panel under a row */
 .notes { margin: 4px 0 6px; padding: 10px 12px; border-radius: 6px; background: var(--tint); font-size: 13px; }
 .notes-when { color: var(--ink-3); font-size: 12px; margin: 0 0 4px; }

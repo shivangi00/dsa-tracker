@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The system design content is complete and well formed. */
@@ -45,29 +44,24 @@ class SdCatalogTest {
     }
 
     @Test
-    void hasThirtyTwoProblemsAndTheFourEasyOnesAreScored() {
+    void hasThirtyTwoProblemsAndEveryOneIsScored() {
         List<SdCatalog.Problem> problems = catalog.problems();
         assertEquals(32, problems.size());
-        Set<String> levels = Set.of("EASY", "MEDIUM", "HARD");
+        Map<String, Long> byLevel = problems.stream()
+                .collect(Collectors.groupingBy(SdCatalog.Problem::level, Collectors.counting()));
+        assertEquals(Map.of("EASY", 4L, "MEDIUM", 16L, "HARD", 12L), byLevel);
         for (SdCatalog.Problem p : problems) {
-            assertTrue(levels.contains(p.level()), p.key());
             assertTrue(p.url().startsWith(SdCatalog.BASE_URL), p.key());
-            assertEquals(p.level().equals("EASY"), p.scored(), p.key());
-            if (!p.scored()) {
-                assertNull(p.reference());
-            }
+            assertTrue(p.scored(), p.key() + " has no rubric");
         }
-        assertEquals(List.of("bitly", "dropbox", "yelp", "gopuff"),
-                problems.stream().filter(SdCatalog.Problem::scored).map(SdCatalog.Problem::key).toList());
     }
 
     @Test
     void scoredProblemsHaveARubricAndACompleteReference() {
         for (SdCatalog.Problem p : catalog.problems()) {
-            if (!p.scored()) {
-                continue;
-            }
-            assertTrue(p.rubric().size() >= 8 && p.rubric().size() <= 9, p.key());
+            // Harder problems are judged on more deep dives, so they have more key points.
+            int min = p.level().equals("HARD") ? 10 : p.level().equals("MEDIUM") ? 9 : 8;
+            assertTrue(p.rubric().size() >= min && p.rubric().size() <= 12, p.key() + ": " + p.rubric().size() + " points");
             for (SdCatalog.RubricPoint r : p.rubric()) {
                 assertFalse(r.keywords().isEmpty(), r.point());
                 for (String k : r.keywords()) {
@@ -80,7 +74,7 @@ class SdCatalogTest {
             assertFalse(ref.entities().isEmpty(), p.key());
             assertFalse(ref.api().isEmpty(), p.key());
             assertFalse(ref.highLevel().isEmpty(), p.key());
-            assertTrue(ref.deepDives().size() >= 2, p.key());
+            assertTrue(ref.deepDives().size() >= (p.level().equals("EASY") ? 2 : 3), p.key());
         }
     }
 

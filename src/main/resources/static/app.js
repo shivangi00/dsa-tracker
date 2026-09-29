@@ -889,7 +889,7 @@ function notesEditor(a) {
   const actions = el('div', 'notes-actions');
   actions.append(save, status);
   form.append(field(a.revision === 0 ? 'What you learned' : 'What you noticed', notes, a.revision === 0 ? null : 'optional'),
-    field('Excalidraw link', drawing, 'optional'), actions, error);
+    drawingField(drawing), actions, error);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     error.hidden = true;
@@ -1010,6 +1010,28 @@ function versionEditor(p, a) {
   if (full) actions.append(el('span', 'save-status', '5 versions saved (the most). Delete one to save another.'));
   box.append(head, code, el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.'), actions, error, slot);
   return box;
+}
+
+/** A link field with an "Open ↗" link beside it, shown once the box holds an https:// link. */
+function drawingField(input) {
+  const row = el('div', 'url-row');
+  const open = el('a', 'btn open-link', 'Open ↗');
+  open.target = '_blank'; open.rel = 'noopener';
+  open.title = 'Open the drawing in a new tab';
+  const sync = () => {
+    const url = input.value.trim();
+    const ok = /^https:\/\/\S+$/.test(url);
+    open.hidden = !ok;
+    if (ok) open.href = url; else open.removeAttribute('href');
+  };
+  input.addEventListener('input', sync);
+  sync();
+  row.append(input, open);
+  const wrap = el('div', 'field');
+  const span = el('span', '', 'Excalidraw link');
+  span.append(el('em', '', 'optional'));
+  wrap.append(span, row);
+  return wrap;
 }
 
 function field(label, control, optional) {
@@ -1175,6 +1197,7 @@ const doneForm = $('done-form');
 function openDone(c) {
   doneTarget = c;
   doneForm.reset();
+  syncDoneDrawing();
   $('done-error').hidden = true;
   $('done-lang').value = lastLanguage();
   delete $('done-lang').dataset.manual;
@@ -1197,6 +1220,15 @@ $('done-rating').addEventListener('change', () => { $('done-error').hidden = tru
 
 // Your code, analysed before anything is saved. Esc in the code box first ends Tab-indenting;
 // it only closes the window if pressed again.
+// "Open ↗" beside the drawing link in the Mark as done window
+function syncDoneDrawing() {
+  const url = doneForm.excalidrawUrl.value.trim();
+  const open = $('done-drawing-open');
+  const ok = /^https:\/\/\S+$/.test(url);
+  open.hidden = !ok;
+  if (ok) open.href = url; else open.removeAttribute('href');
+}
+doneForm.excalidrawUrl.addEventListener('input', syncDoneDrawing);
 const doneCode = $('done-code');
 // First Esc: stop Tab-indenting (and keep the window open). Registered before indentWithTab,
 // which is what records that first Esc; a second Esc then closes the window as usual.

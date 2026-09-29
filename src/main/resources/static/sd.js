@@ -548,7 +548,7 @@ function designForm(problem, item) {
   const remember = () => saveDraft(draftKey, { ...draft(draftKey), drawing: drawing.value, notes: notes.value });
   drawing.addEventListener('input', remember);
   notes.addEventListener('input', remember);
-  box.append(timerBar(draftKey), editor.node, field('Excalidraw link', drawing, 'optional'),
+  box.append(timerBar(draftKey), editor.node, drawingField(drawing),
     field(first ? 'Notes' : 'What did you notice this time?', notes, 'optional'));
   editor.drawing = () => drawing.value.trim();
 
@@ -851,7 +851,7 @@ function notesEditor(a) {
   const status = el('span', 'save-status');
   const actions = el('div', 'notes-actions');
   actions.append(save, status);
-  form.append(field('Notes to remember', notes, 'optional'), field('Excalidraw link', drawing, 'optional'), actions, error);
+  form.append(field('Notes to remember', notes, 'optional'), drawingField(drawing), actions, error);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     error.hidden = true;
@@ -1004,6 +1004,28 @@ setInterval(() => {
 }, 1000);
 
 // ---------- helpers
+/** A link field with an "Open ↗" link beside it, shown once the box holds an https:// link. */
+function drawingField(input) {
+  const row = el('div', 'url-row');
+  const open = el('a', 'btn open-link', 'Open ↗');
+  open.target = '_blank'; open.rel = 'noopener';
+  open.title = 'Open the drawing in a new tab';
+  const sync = () => {
+    const url = input.value.trim();
+    const ok = /^https:\/\/\S+$/.test(url);
+    open.hidden = !ok;
+    if (ok) open.href = url; else open.removeAttribute('href');
+  };
+  input.addEventListener('input', sync);
+  sync();
+  row.append(input, open);
+  const wrap = el('div', 'field');
+  const span = el('span', '', 'Excalidraw link');
+  span.append(el('em', '', 'optional'));
+  wrap.append(span, row);
+  return wrap;
+}
+
 function field(label, control, optional) {
   const wrap = el('label', 'field');
   const span = el('span', '', label);
