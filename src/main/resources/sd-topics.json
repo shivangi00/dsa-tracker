@@ -1,0 +1,3660 @@
+[
+ {
+  "key": "networking-essentials",
+  "section": "Core Concepts",
+  "name": "Networking Essentials",
+  "path": "core-concepts/networking-essentials",
+  "questions": [
+   {
+    "q": "Which transport protocol guarantees ordered, reliable delivery of bytes?",
+    "options": [
+     "TCP",
+     "UDP",
+     "IP",
+     "DNS"
+    ],
+    "answer": 0,
+    "why": "TCP retransmits lost packets and reorders them; UDP sends datagrams with no delivery or ordering guarantees."
+   },
+   {
+    "q": "Why might a live video call or multiplayer game prefer UDP over TCP?",
+    "options": [
+     "A late packet is useless, so retransmitting it only adds delay",
+     "UDP encrypts traffic by default",
+     "UDP packets are always larger",
+     "TCP cannot cross the internet"
+    ],
+    "answer": 0,
+    "why": "For real-time media, dropping a late frame is better than waiting for TCP to retransmit it and stall everything behind it."
+   },
+   {
+    "q": "What does a Layer 7 load balancer look at that a Layer 4 one does not?",
+    "options": [
+     "HTTP details such as the path, headers and cookies",
+     "The IP address and port only",
+     "The physical cable",
+     "The DNS TTL"
+    ],
+    "answer": 0,
+    "why": "Layer 7 balancers understand the application protocol, so they can route /api and /images differently or use cookies for stickiness."
+   },
+   {
+    "q": "Which is the main reason to choose a Layer 4 load balancer?",
+    "options": [
+     "It is cheaper and faster and can pass through long-lived connections such as WebSockets",
+     "It can rewrite HTTP headers",
+     "It caches responses",
+     "It understands JSON"
+    ],
+    "answer": 0,
+    "why": "Layer 4 forwards TCP/UDP connections without parsing them, which is fast and works for any protocol, including persistent connections."
+   },
+   {
+    "q": "What does DNS do in a request's journey?",
+    "options": [
+     "Turns a hostname into an IP address",
+     "Encrypts the request",
+     "Balances load between database replicas",
+     "Stores session cookies"
+    ],
+    "answer": 0,
+    "why": "DNS resolves names like api.example.com to IP addresses; it can also do coarse load balancing by returning different IPs."
+   },
+   {
+    "q": "Server-Sent Events (SSE) are best described as…",
+    "options": [
+     "A one-way stream of updates from server to client over HTTP",
+     "A two-way binary protocol",
+     "A way to send files peer to peer",
+     "A database replication protocol"
+    ],
+    "answer": 0,
+    "why": "SSE keeps an HTTP response open and pushes events to the client; the client can't send messages back on the same channel."
+   },
+   {
+    "q": "When are WebSockets the better fit than SSE?",
+    "options": [
+     "When both client and server send frequent messages, such as chat",
+     "When the server sends a daily report",
+     "When you only need to download a file",
+     "When responses must be cached by a CDN"
+    ],
+    "answer": 0,
+    "why": "WebSockets give a full-duplex connection, ideal when both sides talk often; SSE is simpler when only the server pushes."
+   },
+   {
+    "q": "What is long polling?",
+    "options": [
+     "The client asks for updates and the server holds the request open until there is something new",
+     "The client polls every second forever",
+     "The server opens a connection to the client",
+     "A TCP keep-alive setting"
+    ],
+    "answer": 0,
+    "why": "Long polling reduces empty responses compared with regular polling by keeping each request open until data arrives or a timeout passes."
+   },
+   {
+    "q": "Why is gRPC popular for service-to-service calls inside a system?",
+    "options": [
+     "Compact binary messages (Protocol Buffers), strict contracts and HTTP/2 streaming",
+     "It is the only protocol browsers support",
+     "It needs no network",
+     "It stores data durably"
+    ],
+    "answer": 0,
+    "why": "gRPC is efficient and strongly typed, which suits internal traffic; REST/JSON is still common for public, browser-facing APIs."
+   },
+   {
+    "q": "A client times out calling a payment service. What makes retrying safe?",
+    "options": [
+     "An idempotency key, so a repeated request isn't processed twice",
+     "Retrying faster",
+     "Switching from TCP to UDP",
+     "A bigger timeout on the load balancer only"
+    ],
+    "answer": 0,
+    "why": "The first request may have succeeded before the timeout. Idempotency keys let the server recognise and ignore duplicates; exponential backoff with jitter avoids retry storms."
+   }
+  ]
+ },
+ {
+  "key": "api-design",
+  "section": "Core Concepts",
+  "name": "API Design",
+  "path": "core-concepts/api-design",
+  "questions": [
+   {
+    "q": "In REST, which method should be used to create a new resource whose ID the server assigns?",
+    "options": [
+     "POST",
+     "GET",
+     "PUT",
+     "HEAD"
+    ],
+    "answer": 0,
+    "why": "POST to a collection (POST /tweets) creates a resource and the server chooses its ID. PUT is for replacing a resource at a known URL."
+   },
+   {
+    "q": "Which HTTP methods are expected to be idempotent?",
+    "options": [
+     "GET, PUT and DELETE",
+     "POST only",
+     "POST and PATCH",
+     "None of them"
+    ],
+    "answer": 0,
+    "why": "Repeating GET, PUT or DELETE leaves the same state. POST usually creates something new each time, so it needs an idempotency key to be retried safely."
+   },
+   {
+    "q": "Which is the most RESTful URL for one user's orders?",
+    "options": [
+     "GET /users/{id}/orders",
+     "GET /getOrdersForUser?id=",
+     "POST /orders/fetch",
+     "GET /orders/user/list/all"
+    ],
+    "answer": 0,
+    "why": "REST models resources as nouns in the path and uses the HTTP method as the verb."
+   },
+   {
+    "q": "Why is cursor-based pagination preferred over offset pagination for a fast-changing feed?",
+    "options": [
+     "New items don't shift the pages, so you don't see duplicates or skip items, and it stays fast deep into the list",
+     "It needs no index",
+     "It always returns every item",
+     "It is easier to jump to page 500"
+    ],
+    "answer": 0,
+    "why": "A cursor (for example 'items older than this timestamp/ID') is stable as data changes and avoids scanning large offsets. Offsets are fine for small, stable lists."
+   },
+   {
+    "q": "What is GraphQL's main advantage?",
+    "options": [
+     "Clients fetch exactly the fields they need, from several resources, in one request",
+     "It is always faster than REST",
+     "It removes the need for a database",
+     "It works without HTTP"
+    ],
+    "answer": 0,
+    "why": "GraphQL avoids over- and under-fetching, which helps varied clients such as mobile apps. It adds complexity in caching and query cost control."
+   },
+   {
+    "q": "Where should the identity of the current user come from in an API?",
+    "options": [
+     "A validated auth token (e.g. JWT or session), not a user ID in the request body",
+     "A userId field the client sends",
+     "The client's IP address",
+     "A query parameter ?me=true"
+    ],
+    "answer": 0,
+    "why": "Anything in the body can be forged. The server derives who the caller is from authentication, then checks what they're allowed to do."
+   },
+   {
+    "q": "Which status code fits 'you are sending requests too fast'?",
+    "options": [
+     "429 Too Many Requests",
+     "404 Not Found",
+     "500 Internal Server Error",
+     "301 Moved Permanently"
+    ],
+    "answer": 0,
+    "why": "429 signals rate limiting, often with a Retry-After header telling the client when to try again."
+   },
+   {
+    "q": "How should an API evolve without breaking existing clients?",
+    "options": [
+     "Add optional fields and version breaking changes (e.g. /v2 or a version header)",
+     "Rename fields whenever needed",
+     "Remove old endpoints immediately",
+     "Change response types silently"
+    ],
+    "answer": 0,
+    "why": "Additive changes are backward compatible; breaking changes go behind a new version so old clients keep working."
+   },
+   {
+    "q": "In an interview, what should the API section usually cover?",
+    "options": [
+     "The main endpoints for each functional requirement, with inputs and outputs",
+     "Every internal class",
+     "The database vendor's pricing",
+     "The CSS of the client"
+    ],
+    "answer": 0,
+    "why": "A short list of endpoints that maps to the core requirements shows the contract between client and system; details can come later."
+   },
+   {
+    "q": "Why return 202 Accepted for a request that starts a long video transcoding job?",
+    "options": [
+     "The work continues asynchronously; the client polls or gets notified when it's done",
+     "It means the job failed",
+     "It forces the client to retry",
+     "It makes the job faster"
+    ],
+    "answer": 0,
+    "why": "202 tells the client the request was accepted for processing but isn't complete, often with a URL to check the job's status."
+   }
+  ]
+ },
+ {
+  "key": "data-modeling",
+  "section": "Core Concepts",
+  "name": "Data Modeling",
+  "path": "core-concepts/data-modeling",
+  "questions": [
+   {
+    "q": "When is a relational database (like PostgreSQL) a strong default?",
+    "options": [
+     "Structured data with relationships and a need for transactions",
+     "Only for storing images",
+     "Only when data never changes",
+     "When you need no schema at all"
+    ],
+    "answer": 0,
+    "why": "Relational databases give joins, constraints and ACID transactions, which fit most business data. Reach for other stores when a specific need demands it."
+   },
+   {
+    "q": "What does normalisation aim to reduce?",
+    "options": [
+     "Duplicated data and the update anomalies it causes",
+     "The number of servers",
+     "Network latency",
+     "Index size only"
+    ],
+    "answer": 0,
+    "why": "Normalised tables store each fact once. Denormalisation deliberately duplicates data to make reads faster, at the cost of keeping copies in sync."
+   },
+   {
+    "q": "Why might you denormalise, for example storing a like_count on a post?",
+    "options": [
+     "To avoid an expensive count or join on every read of a read-heavy screen",
+     "To save disk space",
+     "To make writes simpler",
+     "Because foreign keys are forbidden"
+    ],
+    "answer": 0,
+    "why": "Precomputed values make hot reads cheap; the trade-off is updating them on every write and handling drift."
+   },
+   {
+    "q": "In a key-value or wide-column store like DynamoDB or Cassandra, what should drive the schema?",
+    "options": [
+     "The access patterns: the queries you need to serve",
+     "The entity diagram alone",
+     "Alphabetical order of fields",
+     "The number of columns in the UI"
+    ],
+    "answer": 0,
+    "why": "These stores can't join or query arbitrary fields efficiently, so you design keys around how data will be read."
+   },
+   {
+    "q": "A 'user follows user' relationship with millions of users is best modelled as…",
+    "options": [
+     "A follows table (follower_id, followee_id) with indexes in both directions",
+     "A comma-separated list in the users table",
+     "One row per user with 10,000 follower columns",
+     "A JSON file per user on disk"
+    ],
+    "answer": 0,
+    "why": "A join table scales and supports both 'who do I follow' and 'who follows me' with the right indexes."
+   },
+   {
+    "q": "What is a good partition (shard) key?",
+    "options": [
+     "One that spreads traffic evenly and keeps data that's queried together in one place",
+     "The creation date for every table",
+     "A boolean flag",
+     "A value that almost every row shares"
+    ],
+    "answer": 0,
+    "why": "Low-cardinality or time-based keys create hot partitions. A high-cardinality key aligned with the main query balances load."
+   },
+   {
+    "q": "Where should large binary files such as videos be stored?",
+    "options": [
+     "In object storage (e.g. S3), with only the metadata and URL in the database",
+     "In a database text column",
+     "In the application server's memory",
+     "In a message queue"
+    ],
+    "answer": 0,
+    "why": "Object storage is cheap, durable and built for large blobs; databases handle the metadata and queries."
+   },
+   {
+    "q": "What does a foreign key constraint give you?",
+    "options": [
+     "The database refuses references to rows that don't exist",
+     "Faster full-text search",
+     "Automatic sharding",
+     "Caching"
+    ],
+    "answer": 0,
+    "why": "Referential integrity is enforced by the database rather than hoped for in application code."
+   },
+   {
+    "q": "Which store fits 'find all friends of friends within 3 hops' best?",
+    "options": [
+     "A graph database, or a relational DB with careful queries at small scale",
+     "A blob store",
+     "A CDN",
+     "A time series database"
+    ],
+    "answer": 0,
+    "why": "Graph databases are built for traversals. In interviews, a relational model is often fine unless traversal is the core problem."
+   },
+   {
+    "q": "In an interview's 'core entities' step, what do you list?",
+    "options": [
+     "The main nouns the system stores and how they relate (e.g. User, Tweet, Follow)",
+     "Every column type",
+     "The deployment scripts",
+     "The team structure"
+    ],
+    "answer": 0,
+    "why": "Naming entities early anchors the API and the data model; columns and indexes are refined later."
+   }
+  ]
+ },
+ {
+  "key": "caching",
+  "section": "Core Concepts",
+  "name": "Caching",
+  "path": "core-concepts/caching",
+  "questions": [
+   {
+    "q": "In the cache-aside pattern, who loads data into the cache on a miss?",
+    "options": [
+     "The application: read from the DB, then write to the cache",
+     "The database automatically",
+     "The CDN",
+     "The load balancer"
+    ],
+    "answer": 0,
+    "why": "Cache-aside (lazy loading) is the most common pattern: check the cache, fall back to the database, then populate the cache."
+   },
+   {
+    "q": "What does write-through caching do?",
+    "options": [
+     "Writes go to the cache and the database together, keeping the cache fresh",
+     "Writes skip the cache entirely",
+     "Writes go only to the cache and are lost on restart",
+     "Reads bypass the database"
+    ],
+    "answer": 0,
+    "why": "Write-through keeps cache and DB in step at the cost of slower writes; write-behind writes to the DB later, risking loss."
+   },
+   {
+    "q": "What is a cache stampede (thundering herd)?",
+    "options": [
+     "Many requests miss at once when a hot key expires and all hit the database",
+     "A cache that grows too large",
+     "A cache in another region",
+     "Too many cache servers"
+    ],
+    "answer": 0,
+    "why": "Fixes include request coalescing (one request refreshes, others wait), staggered TTLs and refreshing hot keys before they expire."
+   },
+   {
+    "q": "Which eviction policy removes the item that hasn't been used for the longest time?",
+    "options": [
+     "LRU (least recently used)",
+     "FIFO",
+     "Random",
+     "LFU (least frequently used)"
+    ],
+    "answer": 0,
+    "why": "LRU keeps recently used items; LFU keeps frequently used ones. LRU is the usual default."
+   },
+   {
+    "q": "What problem does a TTL (time to live) mainly address?",
+    "options": [
+     "Stale data: entries expire so they're reloaded eventually",
+     "Security",
+     "Network partitions",
+     "Disk failures"
+    ],
+    "answer": 0,
+    "why": "TTLs bound how stale cached data can get and let unused entries age out."
+   },
+   {
+    "q": "What is a CDN best at caching?",
+    "options": [
+     "Static and rarely changing content (images, video, scripts) close to users",
+     "Bank balances",
+     "Per-user private messages that change every second",
+     "Database write logs"
+    ],
+    "answer": 0,
+    "why": "CDNs serve content from edge locations near users, cutting latency and origin load."
+   },
+   {
+    "q": "How do you keep a cached value correct after the underlying data changes?",
+    "options": [
+     "Invalidate or update the cache entry on writes, and keep a TTL as a safety net",
+     "Never cache anything that changes",
+     "Restart the cache nightly",
+     "Increase the TTL"
+    ],
+    "answer": 0,
+    "why": "Invalidation on write plus a TTL is the practical combination; perfect consistency with a cache is hard, so decide how stale is acceptable."
+   },
+   {
+    "q": "A single celebrity's profile is read millions of times per second. What helps most?",
+    "options": [
+     "Replicating the hot key or adding a small in-process cache in front of the shared cache",
+     "Deleting the cache",
+     "Sharding by first letter",
+     "A longer database timeout"
+    ],
+    "answer": 0,
+    "why": "One key lives on one cache node, which becomes a hotspot. Local caches or key replication spread the load."
+   },
+   {
+    "q": "When is caching a poor fit?",
+    "options": [
+     "When data must always be exactly up to date and is rarely re-read",
+     "When reads vastly outnumber writes",
+     "For images",
+     "For computed results that are expensive"
+    ],
+    "answer": 0,
+    "why": "Caching pays off when the same data is read repeatedly and some staleness is acceptable."
+   },
+   {
+    "q": "Redis is often used as a cache because it…",
+    "options": [
+     "Keeps data in memory with sub-millisecond reads and supports expiry",
+     "Stores data only on tape",
+     "Is a relational database",
+     "Needs no memory"
+    ],
+    "answer": 0,
+    "why": "In-memory storage with TTLs and rich data structures makes Redis the default distributed cache in interviews."
+   }
+  ]
+ },
+ {
+  "key": "sharding",
+  "section": "Core Concepts",
+  "name": "Sharding",
+  "path": "core-concepts/sharding",
+  "questions": [
+   {
+    "q": "Why shard a database?",
+    "options": [
+     "One machine can no longer hold the data or handle the write load",
+     "To make joins easier",
+     "To avoid indexes",
+     "To use fewer servers"
+    ],
+    "answer": 0,
+    "why": "Sharding splits data across machines to scale storage and writes; read replicas alone only scale reads."
+   },
+   {
+    "q": "What is the main risk of range-based sharding on a timestamp?",
+    "options": [
+     "All new writes land on the newest shard, creating a hotspot",
+     "Data is lost",
+     "Queries become impossible",
+     "It needs a graph database"
+    ],
+    "answer": 0,
+    "why": "Recent data is usually the busiest, so ranges by time concentrate load. Hashing the key spreads writes."
+   },
+   {
+    "q": "What does hash-based sharding give up compared with range sharding?",
+    "options": [
+     "Efficient range queries across keys",
+     "Even distribution",
+     "The ability to scale",
+     "Durability"
+    ],
+    "answer": 0,
+    "why": "Hashing scatters neighbouring keys, so 'all orders from last week' has to ask every shard."
+   },
+   {
+    "q": "Why is choosing a shard key so important?",
+    "options": [
+     "It decides load balance and which queries stay on one shard; changing it later is expensive",
+     "It sets the database password",
+     "It only affects backups",
+     "It is changed daily"
+    ],
+    "answer": 0,
+    "why": "A bad key causes hotspots or scatter-gather queries, and resharding means moving lots of data."
+   },
+   {
+    "q": "What is a cross-shard (scatter-gather) query?",
+    "options": [
+     "A query that must ask many shards and merge the results",
+     "A query that uses one index",
+     "A query against a replica",
+     "A cached query"
+    ],
+    "answer": 0,
+    "why": "They are slower and less reliable, so the shard key should keep the most common queries on a single shard."
+   },
+   {
+    "q": "Which technique reduces data movement when shards are added?",
+    "options": [
+     "Consistent hashing",
+     "Modulo N hashing",
+     "Alphabetical ranges",
+     "Random placement with no directory"
+    ],
+    "answer": 0,
+    "why": "With hash % N, changing N remaps most keys; consistent hashing moves only a small fraction."
+   },
+   {
+    "q": "How do you keep 'all messages in a chat' fast in a sharded system?",
+    "options": [
+     "Shard by chat ID so a conversation lives on one shard",
+     "Shard by message timestamp",
+     "Shard by sender's country",
+     "Put each message on a random shard"
+    ],
+    "answer": 0,
+    "why": "Co-locating data that's read together avoids scatter-gather queries."
+   },
+   {
+    "q": "What becomes harder once data is sharded?",
+    "options": [
+     "Transactions and joins that span shards",
+     "Reading one row by its key",
+     "Adding an index on one shard",
+     "Caching"
+    ],
+    "answer": 0,
+    "why": "Cross-shard transactions need distributed coordination (e.g. two-phase commit or sagas), which is complex and slow."
+   },
+   {
+    "q": "A directory-based sharding scheme stores…",
+    "options": [
+     "A lookup table mapping keys (or ranges) to shards",
+     "Every row twice",
+     "Only the newest data",
+     "Encryption keys"
+    ],
+    "answer": 0,
+    "why": "A directory adds flexibility (you can move keys) but is another component that must be fast and highly available."
+   },
+   {
+    "q": "Before sharding, what should you usually try first?",
+    "options": [
+     "Indexes, caching, read replicas and a bigger machine",
+     "Rewriting the app in another language",
+     "Removing all indexes",
+     "A second load balancer"
+    ],
+    "answer": 0,
+    "why": "Sharding adds lasting complexity; many systems scale far with vertical scaling, caching and replicas."
+   }
+  ]
+ },
+ {
+  "key": "consistent-hashing",
+  "section": "Core Concepts",
+  "name": "Consistent Hashing",
+  "path": "core-concepts/consistent-hashing",
+  "questions": [
+   {
+    "q": "What problem does consistent hashing solve?",
+    "options": [
+     "Adding or removing a node remaps only a small fraction of keys",
+     "It encrypts keys",
+     "It sorts keys",
+     "It removes the need for replicas"
+    ],
+    "answer": 0,
+    "why": "With simple hash mod N, changing N moves almost every key. On a hash ring, only keys between neighbours move."
+   },
+   {
+    "q": "On a consistent hash ring, which node owns a key?",
+    "options": [
+     "The first node found clockwise from the key's position",
+     "The node with the most memory",
+     "A random node",
+     "The node with the smallest ID"
+    ],
+    "answer": 0,
+    "why": "Keys and nodes are hashed onto the same ring; a key belongs to the next node clockwise."
+   },
+   {
+    "q": "Why use virtual nodes?",
+    "options": [
+     "Each physical node takes many positions on the ring, spreading load evenly",
+     "To save memory",
+     "To avoid hashing",
+     "To make the ring smaller"
+    ],
+    "answer": 0,
+    "why": "With few nodes, ranges are uneven. Many virtual positions per node smooth the distribution and share the load of a failed node."
+   },
+   {
+    "q": "When a node leaves the ring, where do its keys go?",
+    "options": [
+     "To the next node(s) clockwise",
+     "They are deleted",
+     "To every node equally, always",
+     "Back to the client"
+    ],
+    "answer": 0,
+    "why": "Only the departing node's ranges move to its successors; the rest of the ring is untouched."
+   },
+   {
+    "q": "Which systems commonly use consistent hashing?",
+    "options": [
+     "Distributed caches and databases like Cassandra and DynamoDB",
+     "Single-server SQL databases",
+     "DNS root servers only",
+     "CSS preprocessors"
+    ],
+    "answer": 0,
+    "why": "It's the standard way to spread keys across a changing set of cache or storage nodes."
+   },
+   {
+    "q": "How are replicas usually placed on a hash ring?",
+    "options": [
+     "On the next N distinct nodes clockwise",
+     "On the same node",
+     "On a random node each read",
+     "Only in another region"
+    ],
+    "answer": 0,
+    "why": "Walking clockwise to the next distinct physical nodes gives replicas without an extra directory."
+   },
+   {
+    "q": "With hash(key) % 4 and 4 servers, adding a 5th server moves roughly…",
+    "options": [
+     "Most keys (about 80%)",
+     "No keys",
+     "Exactly one key",
+     "Only keys starting with A"
+    ],
+    "answer": 0,
+    "why": "Changing the modulus changes almost every key's result. Consistent hashing would move about 1/5 of them."
+   },
+   {
+    "q": "What is a 'hot key' problem that consistent hashing alone does not fix?",
+    "options": [
+     "One very popular key overwhelming its single owner node",
+     "Too many nodes",
+     "Keys that are too short",
+     "Even distribution"
+    ],
+    "answer": 0,
+    "why": "Hashing spreads different keys, not traffic to one key. Replicate hot keys or add local caching."
+   },
+   {
+    "q": "Consistent hashing is mainly about…",
+    "options": [
+     "Stable placement of keys across a changing set of nodes",
+     "Consistency of reads (like strong consistency)",
+     "Transactions",
+     "Compression"
+    ],
+    "answer": 0,
+    "why": "Despite the name, it's about key placement, not the C in CAP."
+   },
+   {
+    "q": "In an interview, when is it worth mentioning consistent hashing?",
+    "options": [
+     "When designing a distributed cache or store whose nodes scale up and down",
+     "For a single-server app",
+     "When choosing a CSS framework",
+     "For DNS TTLs"
+    ],
+    "answer": 0,
+    "why": "It shows you know how to add capacity without reshuffling all data."
+   }
+  ]
+ },
+ {
+  "key": "cap-theorem",
+  "section": "Core Concepts",
+  "name": "CAP Theorem",
+  "path": "core-concepts/cap-theorem",
+  "questions": [
+   {
+    "q": "According to CAP, during a network partition a distributed system must choose between…",
+    "options": [
+     "Consistency and availability",
+     "Latency and cost",
+     "Security and speed",
+     "SQL and NoSQL"
+    ],
+    "answer": 0,
+    "why": "Partitions happen, so the real choice is: return possibly stale data (available) or refuse until nodes agree (consistent)."
+   },
+   {
+    "q": "Which system should favour consistency?",
+    "options": [
+     "A ticket booking system where two people must not buy the same seat",
+     "A social media like counter",
+     "A news feed",
+     "A view counter"
+    ],
+    "answer": 0,
+    "why": "Double-selling is unacceptable, so it's better to reject or wait than to show wrong availability."
+   },
+   {
+    "q": "Which system can favour availability?",
+    "options": [
+     "Showing a user's profile picture or follower count",
+     "Transferring money between accounts",
+     "Assigning a unique username",
+     "Selling the last item in stock"
+    ],
+    "answer": 0,
+    "why": "Slightly stale data is harmless there, and staying up matters more."
+   },
+   {
+    "q": "What does 'eventual consistency' mean?",
+    "options": [
+     "If writes stop, all replicas converge to the same value over time",
+     "Reads are always up to date",
+     "Data is never replicated",
+     "Writes are rejected during failures"
+    ],
+    "answer": 0,
+    "why": "Replicas may briefly disagree, which is fine for many features and allows higher availability and lower latency."
+   },
+   {
+    "q": "A good way to present CAP in an interview is to…",
+    "options": [
+     "Decide per feature: e.g. strong consistency for bookings, eventual for browsing",
+     "Say the whole system is CA",
+     "Avoid mentioning it",
+     "Claim you can have all three always"
+    ],
+    "answer": 0,
+    "why": "Real systems mix guarantees; stating which parts need consistency shows judgement."
+   },
+   {
+    "q": "'Read-your-own-writes' consistency guarantees that…",
+    "options": [
+     "After you update something, you see your change, even if others see it later",
+     "Everyone sees every write instantly",
+     "Writes never fail",
+     "Reads come only from the leader for all users"
+    ],
+    "answer": 0,
+    "why": "It's a common middle ground: route a user's reads to the leader (or a fresh replica) briefly after their writes."
+   },
+   {
+    "q": "Which technique gives strong consistency for a single record in a replicated database?",
+    "options": [
+     "Reads and writes go through a leader, or use quorum reads/writes",
+     "Reading from any replica",
+     "Caching with a long TTL",
+     "Writing asynchronously to replicas only"
+    ],
+    "answer": 0,
+    "why": "A single leader, or overlapping quorums (R + W > N), ensures reads see the latest committed write."
+   },
+   {
+    "q": "PACELC extends CAP by noting that without a partition you trade off…",
+    "options": [
+     "Latency and consistency",
+     "Cost and security",
+     "Memory and CPU",
+     "Throughput and disk"
+    ],
+    "answer": 0,
+    "why": "Even when healthy, waiting for replicas to agree adds latency; that's the everyday trade-off."
+   },
+   {
+    "q": "Is 'CA' (consistent and available with no partition tolerance) a realistic choice for a distributed system?",
+    "options": [
+     "Not really: networks do partition, so you must handle it",
+     "Yes, it's the most common choice",
+     "Only for NoSQL",
+     "Only in the cloud"
+    ],
+    "answer": 0,
+    "why": "Partition tolerance isn't optional across machines; CA only describes a single-node system."
+   },
+   {
+    "q": "During a partition, an AP system would most likely…",
+    "options": [
+     "Keep serving reads and writes, reconciling conflicts later",
+     "Shut down entirely",
+     "Delete conflicting data",
+     "Switch to a single node permanently"
+    ],
+    "answer": 0,
+    "why": "AP systems stay responsive and resolve divergence afterwards (e.g. last write wins or merging)."
+   }
+  ]
+ },
+ {
+  "key": "db-indexing",
+  "section": "Core Concepts",
+  "name": "Database Indexing",
+  "path": "core-concepts/db-indexing",
+  "questions": [
+   {
+    "q": "What is the most common index structure in relational databases?",
+    "options": [
+     "B-tree",
+     "Hash map in memory only",
+     "Linked list",
+     "Bloom filter"
+    ],
+    "answer": 0,
+    "why": "B-trees keep keys sorted, supporting equality and range queries with O(log n) lookups."
+   },
+   {
+    "q": "What is the cost of adding an index?",
+    "options": [
+     "Slower writes and extra storage, since the index must be updated",
+     "Slower reads",
+     "Data loss",
+     "Nothing"
+    ],
+    "answer": 0,
+    "why": "Every insert, update or delete also updates each index, so index what your queries need, not everything."
+   },
+   {
+    "q": "A composite index on (user_id, created_at) helps most with…",
+    "options": [
+     "WHERE user_id = ? ORDER BY created_at",
+     "WHERE created_at > ? alone",
+     "Full-text search",
+     "WHERE email = ?"
+    ],
+    "answer": 0,
+    "why": "Composite indexes work left to right: filter on the first column, then sort or range on the next."
+   },
+   {
+    "q": "When does a hash index beat a B-tree?",
+    "options": [
+     "Exact-match lookups only, with no range queries",
+     "Range queries",
+     "Sorting",
+     "Prefix searches"
+    ],
+    "answer": 0,
+    "why": "Hash indexes are fast for equality but can't answer 'between' or ORDER BY."
+   },
+   {
+    "q": "Which index type finds text by the words it contains?",
+    "options": [
+     "An inverted index (full-text search, e.g. Elasticsearch)",
+     "A B-tree on the whole text",
+     "A foreign key",
+     "A primary key"
+    ],
+    "answer": 0,
+    "why": "Inverted indexes map each word to the documents containing it; LIKE '%word%' can't use a normal B-tree."
+   },
+   {
+    "q": "Which index helps 'find restaurants within 2 km'?",
+    "options": [
+     "A geospatial index (geohash, quadtree or R-tree)",
+     "A B-tree on name",
+     "A hash index on ID",
+     "No index can help"
+    ],
+    "answer": 0,
+    "why": "Spatial indexes group nearby points so proximity queries don't scan everything."
+   },
+   {
+    "q": "What is a covering index?",
+    "options": [
+     "An index that contains every column a query needs, so the table isn't read",
+     "An index on every column",
+     "An encrypted index",
+     "A backup copy"
+    ],
+    "answer": 0,
+    "why": "The query is answered from the index alone, saving extra lookups."
+   },
+   {
+    "q": "Which query can't use an index on email efficiently?",
+    "options": [
+     "WHERE lower(email) = ? (without a matching expression index)",
+     "WHERE email = ?",
+     "WHERE email IN (?, ?)",
+     "WHERE email > ? ORDER BY email"
+    ],
+    "answer": 0,
+    "why": "Wrapping the column in a function hides it from the index unless you index that expression."
+   },
+   {
+    "q": "Why is indexing a boolean column alone usually unhelpful?",
+    "options": [
+     "Low cardinality: each value matches a huge share of rows",
+     "Booleans can't be indexed",
+     "It makes reads slower",
+     "It breaks joins"
+    ],
+    "answer": 0,
+    "why": "If half the rows match, a full scan is often as fast. Partial or composite indexes can help."
+   },
+   {
+    "q": "In an interview, when should you mention indexes?",
+    "options": [
+     "When a key query would otherwise scan a large table, naming the columns to index",
+     "Never",
+     "Only for tiny tables",
+     "Instead of describing the API"
+    ],
+    "answer": 0,
+    "why": "Saying 'index on (user_id, created_at) for the feed query' shows you connect the data model to access patterns."
+   }
+  ]
+ },
+ {
+  "key": "numbers-to-know",
+  "section": "Core Concepts",
+  "name": "Numbers to Know",
+  "path": "core-concepts/numbers-to-know",
+  "questions": [
+   {
+    "q": "Roughly how fast is reading from memory compared with a network round trip within a data centre?",
+    "options": [
+     "Memory is about 1,000× faster (nanoseconds vs ~0.5 ms)",
+     "About the same",
+     "Network is faster",
+     "Memory is 2× faster"
+    ],
+    "answer": 0,
+    "why": "Memory access is ~100 ns; a round trip inside a data centre is ~0.5 ms. That's why caching in memory helps so much."
+   },
+   {
+    "q": "Roughly how many seconds are in a day, useful for requests-per-second estimates?",
+    "options": [
+     "About 100,000 (86,400)",
+     "About 1,000",
+     "About 10 million",
+     "About 3,600"
+    ],
+    "answer": 0,
+    "why": "Round to 10^5: 100 million requests a day is about 1,000 requests per second."
+   },
+   {
+    "q": "A single modern PostgreSQL server can typically handle…",
+    "options": [
+     "Thousands to tens of thousands of simple queries per second",
+     "About 10 queries per second",
+     "Billions of writes per second",
+     "Only one connection"
+    ],
+    "answer": 0,
+    "why": "Well-indexed single servers go far; don't shard before the numbers require it."
+   },
+   {
+    "q": "Redis on one node can usually serve on the order of…",
+    "options": [
+     "100,000+ operations per second",
+     "100 operations per second",
+     "1 operation per second",
+     "10 billion per second"
+    ],
+    "answer": 0,
+    "why": "In-memory stores handle very high throughput per node, which is why one cache cluster absorbs heavy reads."
+   },
+   {
+    "q": "If 1 billion users each store 1 KB of profile data, that's about…",
+    "options": [
+     "1 TB",
+     "1 GB",
+     "1 PB",
+     "1 MB"
+    ],
+    "answer": 0,
+    "why": "10^9 × 10^3 bytes = 10^12 bytes = 1 TB, which fits on a single large machine or a small cluster."
+   },
+   {
+    "q": "How long does a round trip between continents (e.g. US to Europe) take?",
+    "options": [
+     "About 100–150 ms",
+     "About 1 ms",
+     "About 10 seconds",
+     "About 1 µs"
+    ],
+    "answer": 0,
+    "why": "Distance and the speed of light put a floor on latency, which is why CDNs and regional deployments exist."
+   },
+   {
+    "q": "Kafka can typically handle, per broker, about…",
+    "options": [
+     "Hundreds of thousands to a million messages per second",
+     "10 messages per second",
+     "One message per minute",
+     "Unlimited, with no hardware"
+    ],
+    "answer": 0,
+    "why": "Sequential disk writes and batching give very high throughput; partitions scale it further."
+   },
+   {
+    "q": "Why do back-of-the-envelope estimates matter in an interview?",
+    "options": [
+     "They show whether you need sharding, caching or more machines, and justify design choices",
+     "They replace the design",
+     "Interviewers never ask",
+     "They set the database password"
+    ],
+    "answer": 0,
+    "why": "Quick numbers (QPS, storage, bandwidth) turn vague 'it needs to scale' into concrete decisions."
+   },
+   {
+    "q": "A 5 MB image served 10,000 times a second needs about how much bandwidth?",
+    "options": [
+     "About 50 GB/s, a job for a CDN",
+     "About 5 MB/s",
+     "About 50 KB/s",
+     "About 5 TB/s"
+    ],
+    "answer": 0,
+    "why": "5 MB × 10^4 = 5 × 10^10 bytes/s = 50 GB/s, far beyond one server, so serve it from a CDN."
+   },
+   {
+    "q": "Reading 1 MB sequentially from an SSD takes roughly…",
+    "options": [
+     "About 1 ms or less",
+     "About 1 second",
+     "About 1 minute",
+     "About 1 nanosecond"
+    ],
+    "answer": 0,
+    "why": "SSDs are fast for sequential reads; random reads and network hops dominate latency more often."
+   }
+  ]
+ },
+ {
+  "key": "realtime-updates",
+  "section": "Patterns",
+  "name": "Real-time Updates",
+  "path": "patterns/realtime-updates",
+  "questions": [
+   {
+    "q": "Clients need new chat messages within a second. Which approach avoids wasteful empty requests?",
+    "options": [
+     "A persistent connection such as WebSockets or SSE",
+     "Polling every 30 seconds",
+     "Emailing updates",
+     "Reloading the page"
+    ],
+    "answer": 0,
+    "why": "Persistent connections let the server push as soon as something happens, without clients repeatedly asking."
+   },
+   {
+    "q": "With users connected to many different servers, how does a message reach the right connection?",
+    "options": [
+     "A pub/sub layer (e.g. Redis pub/sub or Kafka) routes events to the server holding that user's connection",
+     "Every server stores every connection",
+     "The database pushes to browsers",
+     "Clients connect to each other"
+    ],
+    "answer": 0,
+    "why": "Servers subscribe to topics for their connected users; publishers don't need to know which server a user is on."
+   },
+   {
+    "q": "Why are WebSocket servers harder to scale than stateless HTTP servers?",
+    "options": [
+     "Each server holds long-lived connections, so load balancing and deploys must handle sticky, stateful clients",
+     "They can't use TCP",
+     "They need a relational database",
+     "They don't support JSON"
+    ],
+    "answer": 0,
+    "why": "Connections are pinned to servers; you need connection registries, graceful draining and reconnection logic."
+   },
+   {
+    "q": "When is simple polling actually a fine choice?",
+    "options": [
+     "Updates are infrequent and a few seconds' delay is acceptable",
+     "Every millisecond counts",
+     "Millions of updates per second",
+     "Two-way gaming traffic"
+    ],
+    "answer": 0,
+    "why": "Polling is simple, cacheable and stateless; don't over-engineer when delay is acceptable."
+   },
+   {
+    "q": "What should a client do when its real-time connection drops?",
+    "options": [
+     "Reconnect with backoff and fetch what it missed since its last event ID",
+     "Give up",
+     "Reload all data from scratch every second",
+     "Switch to email"
+    ],
+    "answer": 0,
+    "why": "Push channels are best-effort; resuming from a cursor or event ID avoids gaps."
+   },
+   {
+    "q": "For a live comment stream on a video with a million viewers, what reduces fan-out cost?",
+    "options": [
+     "Batching and sampling comments, and sharding viewers across servers subscribed to that video's topic",
+     "Sending each comment to each viewer individually from one server",
+     "Storing comments in the browser only",
+     "Polling the database per viewer"
+    ],
+    "answer": 0,
+    "why": "Topic-based fan-out across many servers, plus batching, keeps per-message work manageable."
+   },
+   {
+    "q": "Server-Sent Events are a good fit when…",
+    "options": [
+     "Only the server pushes updates, such as live scores or notifications",
+     "The client sends frequent messages",
+     "You need binary game state both ways",
+     "You need peer-to-peer calls"
+    ],
+    "answer": 0,
+    "why": "SSE is simple, works over plain HTTP and reconnects automatically, but it's one-way."
+   },
+   {
+    "q": "Where should the source of truth for messages live in a real-time system?",
+    "options": [
+     "In durable storage; the push channel only delivers notifications",
+     "In the WebSocket connection",
+     "In the load balancer",
+     "In the client's memory only"
+    ],
+    "answer": 0,
+    "why": "Connections are ephemeral. Persist first, then push, so reconnecting clients can catch up."
+   },
+   {
+    "q": "What is 'fan-out on write' in feeds or notifications?",
+    "options": [
+     "When something is posted, it's pushed to each follower's inbox immediately",
+     "Followers compute the feed when they open the app",
+     "Posts are never stored",
+     "Only the author sees posts"
+    ],
+    "answer": 0,
+    "why": "It makes reads fast but is expensive for accounts with millions of followers, which are often handled with fan-out on read instead."
+   },
+   {
+    "q": "Peer-to-peer (e.g. WebRTC) is most useful for…",
+    "options": [
+     "Audio/video calls where low latency matters and media can flow directly between users",
+     "Storing chat history",
+     "Search",
+     "Payments"
+    ],
+    "answer": 0,
+    "why": "Media goes directly between peers when possible, with servers used for signalling and relaying when needed."
+   }
+  ]
+ },
+ {
+  "key": "dealing-with-contention",
+  "section": "Patterns",
+  "name": "Dealing with Contention",
+  "path": "patterns/dealing-with-contention",
+  "questions": [
+   {
+    "q": "Two users try to book the last seat at the same moment. What prevents double booking in one database?",
+    "options": [
+     "A transaction with a row lock (SELECT … FOR UPDATE) or a conditional update",
+     "Two separate reads",
+     "A cache with a long TTL",
+     "Retrying until it works"
+    ],
+    "answer": 0,
+    "why": "The database serialises access to that row, so only one booking can succeed."
+   },
+   {
+    "q": "What is optimistic concurrency control?",
+    "options": [
+     "Read a version number, then update only if it hasn't changed; retry on conflict",
+     "Lock everything before reading",
+     "Ignore conflicts",
+     "Use only one server"
+    ],
+    "answer": 0,
+    "why": "It avoids holding locks and works well when conflicts are rare: UPDATE … WHERE id = ? AND version = ?."
+   },
+   {
+    "q": "When is pessimistic locking the better choice?",
+    "options": [
+     "When conflicts are frequent, so retries would waste work",
+     "When conflicts are extremely rare",
+     "When there is no database",
+     "For read-only data"
+    ],
+    "answer": 0,
+    "why": "If many writers compete for the same row, locking up front avoids repeated failed attempts."
+   },
+   {
+    "q": "How do sites like Ticketmaster hold a seat while a user pays?",
+    "options": [
+     "A short-lived reservation with an expiry (e.g. a TTL in Redis or a status with a timestamp)",
+     "Charging first and choosing seats later",
+     "Locking the database row for 10 minutes",
+     "No hold at all"
+    ],
+    "answer": 0,
+    "why": "A timed hold keeps the seat unavailable to others without long database locks; it's released if payment doesn't finish."
+   },
+   {
+    "q": "What does a distributed lock (e.g. via Redis or ZooKeeper) coordinate?",
+    "options": [
+     "Exclusive access to a resource across many servers",
+     "Encryption keys",
+     "CSS files",
+     "DNS records"
+    ],
+    "answer": 0,
+    "why": "When the resource spans services or databases, a lock service ensures only one worker proceeds; locks need expiries to survive crashes."
+   },
+   {
+    "q": "Why must distributed locks have a timeout?",
+    "options": [
+     "So a crashed holder doesn't block everyone forever",
+     "To make them faster",
+     "Because Redis requires it for strings",
+     "To save memory only"
+    ],
+    "answer": 0,
+    "why": "A lease that expires lets others proceed after a failure; fencing tokens stop a slow former holder from writing afterwards."
+   },
+   {
+    "q": "For an auction with thousands of bids per second on one item, what helps?",
+    "options": [
+     "Serialising bids per item, e.g. a queue or single-writer partition per auction, with conditional updates",
+     "Letting every server update the price freely",
+     "Caching the price and never checking",
+     "Accepting all bids and picking later at random"
+    ],
+    "answer": 0,
+    "why": "Routing all bids for one item to one ordered stream removes races without global locks."
+   },
+   {
+    "q": "What is a two-phase commit used for?",
+    "options": [
+     "Making a transaction commit atomically across multiple databases",
+     "Hashing passwords",
+     "Compressing logs",
+     "Load balancing"
+    ],
+    "answer": 0,
+    "why": "All participants prepare, then commit together. It's correct but slow and can block, so sagas are often preferred."
+   },
+   {
+    "q": "A saga handles a multi-service transaction by…",
+    "options": [
+     "Running local steps in order and compensating (undoing) earlier steps if a later one fails",
+     "Locking every service at once",
+     "Retrying forever",
+     "Ignoring failures"
+    ],
+    "answer": 0,
+    "why": "Sagas trade strict atomicity for availability, using compensating actions such as refunds."
+   },
+   {
+    "q": "In an interview, what's a good first answer to 'how do you prevent overselling'?",
+    "options": [
+     "Keep the critical check-and-decrement inside one database transaction or atomic update",
+     "Add a cache",
+     "Use eventual consistency",
+     "Add more servers"
+    ],
+    "answer": 0,
+    "why": "Start with the simplest correct mechanism (atomic updates), then discuss scaling it if the numbers demand."
+   }
+  ]
+ },
+ {
+  "key": "multi-step-processes",
+  "section": "Patterns",
+  "name": "Multi-step Processes",
+  "path": "patterns/multi-step-processes",
+  "questions": [
+   {
+    "q": "An order involves payment, inventory and shipping services. What keeps the process reliable if a server crashes midway?",
+    "options": [
+     "A durable workflow (orchestrator or workflow engine like Temporal) that records progress and resumes",
+     "Holding everything in memory",
+     "One giant database transaction across services",
+     "Asking the user to retry"
+    ],
+    "answer": 0,
+    "why": "Durable execution persists each step, so a crash resumes where it left off instead of losing or repeating work."
+   },
+   {
+    "q": "What is the difference between orchestration and choreography?",
+    "options": [
+     "Orchestration has a central coordinator; choreography has services react to each other's events",
+     "They are the same",
+     "Choreography needs a single database",
+     "Orchestration uses no messages"
+    ],
+    "answer": 0,
+    "why": "Orchestration is easier to follow and change; choreography reduces coupling but spreads the logic around."
+   },
+   {
+    "q": "Why must steps in a multi-step workflow be idempotent?",
+    "options": [
+     "Steps may be retried after failures, and must not charge or ship twice",
+     "To make them faster",
+     "Because workflows never retry",
+     "To avoid logging"
+    ],
+    "answer": 0,
+    "why": "At-least-once execution is normal; idempotency makes retries safe."
+   },
+   {
+    "q": "If shipping fails after payment succeeded, a saga would…",
+    "options": [
+     "Run a compensating action such as a refund",
+     "Leave the customer charged",
+     "Delete the order silently",
+     "Retry payment"
+    ],
+    "answer": 0,
+    "why": "Each step has an undo so the overall process ends in a consistent state."
+   },
+   {
+    "q": "How do you handle a step that waits for a human, like manager approval for days?",
+    "options": [
+     "A workflow engine that can sleep durably and resume on a signal or timer",
+     "A thread that blocks for days",
+     "Polling the database every millisecond",
+     "Keeping the HTTP request open"
+    ],
+    "answer": 0,
+    "why": "Durable timers and signals let workflows wait for long periods without holding resources."
+   },
+   {
+    "q": "What does an event-sourced approach store?",
+    "options": [
+     "Every event that happened, from which current state is rebuilt",
+     "Only the latest state",
+     "Only errors",
+     "Nothing durable"
+    ],
+    "answer": 0,
+    "why": "The event log gives a full audit trail and lets you replay or build new views, at the cost of complexity."
+   },
+   {
+    "q": "What is the 'transactional outbox' pattern?",
+    "options": [
+     "Writing the event to an outbox table in the same DB transaction as the data change, then publishing it",
+     "Emailing users",
+     "A cache for outgoing HTTP calls",
+     "A dead letter queue"
+    ],
+    "answer": 0,
+    "why": "It avoids the dual-write problem where the database update succeeds but the message publish fails (or vice versa)."
+   },
+   {
+    "q": "Where do failed messages usually go after repeated retries?",
+    "options": [
+     "A dead letter queue for inspection and reprocessing",
+     "They are deleted",
+     "Back to the user's browser",
+     "To the CDN"
+    ],
+    "answer": 0,
+    "why": "DLQs keep poison messages from blocking the queue while preserving them for debugging."
+   },
+   {
+    "q": "Why not use one distributed transaction across all services?",
+    "options": [
+     "It couples services tightly, blocks on failures and scales poorly",
+     "It's impossible to write",
+     "Databases forbid it",
+     "It uses too little memory"
+    ],
+    "answer": 0,
+    "why": "Sagas and workflows give reliability without global locks."
+   },
+   {
+    "q": "In an interview, when should you bring up a workflow engine?",
+    "options": [
+     "When a process has several steps across services, long waits, or needs guaranteed completion",
+     "For a single database insert",
+     "For static files",
+     "For DNS"
+    ],
+    "answer": 0,
+    "why": "It signals you know how to make long-running business processes reliable."
+   }
+  ]
+ },
+ {
+  "key": "scaling-reads",
+  "section": "Patterns",
+  "name": "Scaling Reads",
+  "path": "patterns/scaling-reads",
+  "questions": [
+   {
+    "q": "A read-heavy app (100 reads per write) is overloading its database. What's usually the first step?",
+    "options": [
+     "Add indexes and caching for hot queries",
+     "Shard immediately",
+     "Remove the database",
+     "Switch to UDP"
+    ],
+    "answer": 0,
+    "why": "Cheap wins first: make each query efficient, then serve repeated reads from a cache."
+   },
+   {
+    "q": "What do read replicas provide?",
+    "options": [
+     "Copies of the database that serve reads, spreading read load",
+     "More write capacity",
+     "Automatic sharding",
+     "Encryption"
+    ],
+    "answer": 0,
+    "why": "Writes still go to the leader; replicas scale reads but may lag slightly behind."
+   },
+   {
+    "q": "What's the main drawback of reading from replicas?",
+    "options": [
+     "Replication lag: a replica may return slightly stale data",
+     "They can't be indexed",
+     "They lose data",
+     "They are slower than the leader always"
+    ],
+    "answer": 0,
+    "why": "Route reads that must be fresh (like right after a user's own write) to the leader."
+   },
+   {
+    "q": "Which content belongs on a CDN?",
+    "options": [
+     "Images, videos and static assets requested by many users",
+     "Per-user bank balances",
+     "Write-ahead logs",
+     "Session tokens"
+    ],
+    "answer": 0,
+    "why": "CDNs cache shared content near users, cutting latency and origin load."
+   },
+   {
+    "q": "What is a materialised view or precomputed read model?",
+    "options": [
+     "Data computed ahead of time into the shape a screen needs",
+     "A backup",
+     "An index on a primary key",
+     "A load balancer setting"
+    ],
+    "answer": 0,
+    "why": "Precomputing expensive results (like a feed or leaderboard) makes reads cheap; updates happen on writes or in the background."
+   },
+   {
+    "q": "A celebrity's post is read millions of times a minute. What helps beyond a shared cache?",
+    "options": [
+     "Caching it in many places (local caches, CDN) or replicating the hot key",
+     "Putting it on one special shard",
+     "Disabling caching for it",
+     "Rate limiting all readers to zero"
+    ],
+    "answer": 0,
+    "why": "Hot keys overload a single cache node; spreading copies spreads the load."
+   },
+   {
+    "q": "Why is denormalisation common when scaling reads?",
+    "options": [
+     "It avoids joins on the hot path by storing data in the shape it's read",
+     "It saves disk",
+     "It makes writes simpler",
+     "It enforces constraints"
+    ],
+    "answer": 0,
+    "why": "Reads become single lookups; the cost moves to writes, which must update duplicates."
+   },
+   {
+    "q": "What is request coalescing?",
+    "options": [
+     "Combining many identical in-flight requests so only one hits the backend",
+     "Compressing requests",
+     "Encrypting requests",
+     "Sending requests to random servers"
+    ],
+    "answer": 0,
+    "why": "It prevents a burst of identical misses from overloading the database, e.g. when a cache entry expires."
+   },
+   {
+    "q": "Search queries over millions of documents are best served by…",
+    "options": [
+     "A search index such as Elasticsearch, kept in sync from the main database",
+     "LIKE '%term%' on the main table",
+     "A CDN",
+     "A message queue"
+    ],
+    "answer": 0,
+    "why": "Inverted indexes answer text queries quickly; syncing can use change data capture."
+   },
+   {
+    "q": "In an interview, how do you justify a cache?",
+    "options": [
+     "Point to the read/write ratio and latency targets from your estimates",
+     "Say caches are always good",
+     "Add one to every component",
+     "Avoid numbers"
+    ],
+    "answer": 0,
+    "why": "Tie the decision to numbers: '10:1 reads, 50 ms p99 target' makes the cache a reasoned choice."
+   }
+  ]
+ },
+ {
+  "key": "scaling-writes",
+  "section": "Patterns",
+  "name": "Scaling Writes",
+  "path": "patterns/scaling-writes",
+  "questions": [
+   {
+    "q": "A single database can't keep up with millions of writes per second. What's the core technique?",
+    "options": [
+     "Partition (shard) the data so writes spread across many machines",
+     "Add read replicas",
+     "Add a cache in front",
+     "Increase the TTL"
+    ],
+    "answer": 0,
+    "why": "Replicas and caches help reads; only partitioning spreads writes."
+   },
+   {
+    "q": "How does a message queue help with write spikes?",
+    "options": [
+     "It buffers bursts so consumers write at a steady rate",
+     "It makes writes synchronous",
+     "It deletes extra writes",
+     "It replaces the database"
+    ],
+    "answer": 0,
+    "why": "Queues absorb spikes and decouple producers from slower storage, at the cost of some delay."
+   },
+   {
+    "q": "Why batch writes?",
+    "options": [
+     "Fewer, larger writes cut per-request overhead and increase throughput",
+     "To make each write faster to appear",
+     "To avoid durability",
+     "To use more connections"
+    ],
+    "answer": 0,
+    "why": "Databases and disks handle a few big writes far better than many tiny ones."
+   },
+   {
+    "q": "Counting likes on a viral post with 100,000 likes per second: what avoids a hot row?",
+    "options": [
+     "Shard the counter into several sub-counters and sum them on read (or aggregate in memory and flush)",
+     "Update one row per like",
+     "Lock the row per like",
+     "Store likes in a CDN"
+    ],
+    "answer": 0,
+    "why": "Spreading increments across counters removes contention on a single row."
+   },
+   {
+    "q": "Which databases are designed for very high write throughput?",
+    "options": [
+     "LSM-tree stores like Cassandra, which append writes sequentially",
+     "Spreadsheets",
+     "Single-node SQLite",
+     "A CDN"
+    ],
+    "answer": 0,
+    "why": "Log-structured storage turns random writes into sequential ones, trading some read cost."
+   },
+   {
+    "q": "What is write-behind (write-back) caching?",
+    "options": [
+     "Writes go to the cache first and are flushed to the database later",
+     "Writes skip the cache",
+     "Writes go to two databases",
+     "Reads bypass the cache"
+    ],
+    "answer": 0,
+    "why": "It gives fast writes but risks losing data if the cache fails before flushing."
+   },
+   {
+    "q": "Why does the shard key matter even more for writes?",
+    "options": [
+     "A key that sends most writes to one shard (e.g. today's date) creates a hotspot",
+     "It doesn't matter",
+     "It only affects reads",
+     "It sets the replication factor"
+    ],
+    "answer": 0,
+    "why": "Evenly distributed keys spread write load; time-based keys concentrate it."
+   },
+   {
+    "q": "What does back-pressure do?",
+    "options": [
+     "Signals producers to slow down when consumers fall behind",
+     "Speeds up writes",
+     "Deletes old data",
+     "Encrypts messages"
+    ],
+    "answer": 0,
+    "why": "Without it, queues grow without limit or systems fall over under overload."
+   },
+   {
+    "q": "For analytics events (clicks, views) at huge volume, a common design is…",
+    "options": [
+     "Stream them into Kafka and aggregate with a stream processor into summarised tables",
+     "Insert each event into a relational table synchronously",
+     "Email them",
+     "Store them in cookies"
+    ],
+    "answer": 0,
+    "why": "Streaming plus aggregation reduces billions of raw events to manageable, query-ready results."
+   },
+   {
+    "q": "In an interview, what should you estimate before designing for write scale?",
+    "options": [
+     "Peak writes per second and data size per write",
+     "The number of CSS files",
+     "The database's brand",
+     "Nothing"
+    ],
+    "answer": 0,
+    "why": "Numbers decide whether one database is enough or partitioning and queues are needed."
+   }
+  ]
+ },
+ {
+  "key": "large-blobs",
+  "section": "Patterns",
+  "name": "Handling Large Blobs",
+  "path": "patterns/large-blobs",
+  "questions": [
+   {
+    "q": "How should clients upload large files like videos?",
+    "options": [
+     "Directly to object storage using a pre-signed URL, bypassing your app servers",
+     "Through your API servers in one request",
+     "Into the database",
+     "By email"
+    ],
+    "answer": 0,
+    "why": "Pre-signed URLs let clients upload straight to S3-like storage, so app servers don't carry gigabytes of traffic."
+   },
+   {
+    "q": "What is a pre-signed URL?",
+    "options": [
+     "A temporary URL granting limited permission to upload or download one object",
+     "A permanent public link",
+     "A DNS record",
+     "An encryption key"
+    ],
+    "answer": 0,
+    "why": "Your server signs it with an expiry; the client uses it without needing storage credentials."
+   },
+   {
+    "q": "Why use multipart (chunked) uploads for large files?",
+    "options": [
+     "Parts upload in parallel and failed parts can be retried without starting over",
+     "It makes files smaller",
+     "It's required for images",
+     "It avoids storage costs"
+    ],
+    "answer": 0,
+    "why": "Resumable, parallel uploads are faster and more reliable on flaky networks."
+   },
+   {
+    "q": "How do you serve large files to many users worldwide?",
+    "options": [
+     "Through a CDN in front of object storage",
+     "From the database",
+     "From a single app server",
+     "Via WebSockets"
+    ],
+    "answer": 0,
+    "why": "CDNs cache content near users and absorb bandwidth."
+   },
+   {
+    "q": "Where does the file's metadata (owner, name, size, status) go?",
+    "options": [
+     "In a database, with a pointer to the object's storage key",
+     "Inside the file",
+     "In the CDN",
+     "In the message queue only"
+    ],
+    "answer": 0,
+    "why": "Databases handle queries and permissions; object storage holds the bytes."
+   },
+   {
+    "q": "How does your system know an upload to object storage finished?",
+    "options": [
+     "Storage event notifications (or the client confirming), which update the metadata status",
+     "It polls the client's disk",
+     "It assumes success immediately",
+     "The CDN tells it"
+    ],
+    "answer": 0,
+    "why": "Event notifications trigger processing (like thumbnails or transcoding) once the object exists."
+   },
+   {
+    "q": "What problem does content-addressed storage (naming chunks by their hash) help with?",
+    "options": [
+     "Deduplication: identical chunks are stored once",
+     "Encryption",
+     "Faster DNS",
+     "Load balancing"
+    ],
+    "answer": 0,
+    "why": "Services like Dropbox avoid storing duplicate data and only upload changed chunks."
+   },
+   {
+    "q": "Why not stream large downloads through your application servers?",
+    "options": [
+     "They'd spend bandwidth and connections on bytes instead of logic, limiting scale",
+     "It's not possible over HTTP",
+     "Browsers forbid it",
+     "It encrypts data twice"
+    ],
+    "answer": 0,
+    "why": "Let the storage/CDN serve bytes directly using signed download URLs."
+   },
+   {
+    "q": "How do you keep private files private while using signed URLs?",
+    "options": [
+     "Short expiries and checking permissions before issuing each URL",
+     "Making the bucket public",
+     "Long-lived URLs shared widely",
+     "Putting the password in the URL"
+    ],
+    "answer": 0,
+    "why": "The permission check happens when the URL is generated; the expiry limits how long it can be used."
+   },
+   {
+    "q": "Video platforms usually process uploads by…",
+    "options": [
+     "Transcoding into several resolutions asynchronously after upload",
+     "Serving the original file only",
+     "Transcoding in the browser",
+     "Storing only thumbnails"
+    ],
+    "answer": 0,
+    "why": "Background workers produce adaptive-bitrate versions so playback suits each device and connection."
+   }
+  ]
+ },
+ {
+  "key": "long-running-tasks",
+  "section": "Patterns",
+  "name": "Managing Long Running Tasks",
+  "path": "patterns/long-running-tasks",
+  "questions": [
+   {
+    "q": "A report takes 2 minutes to generate. How should the API respond?",
+    "options": [
+     "Accept the job (e.g. 202 with a job ID), process it in the background, and let the client check status",
+     "Keep the HTTP request open for 2 minutes",
+     "Refuse the request",
+     "Generate it in the browser"
+    ],
+    "answer": 0,
+    "why": "Asynchronous jobs keep APIs responsive and resilient to timeouts."
+   },
+   {
+    "q": "What sits between the API and background workers?",
+    "options": [
+     "A queue (e.g. SQS, Kafka, Redis-based) holding jobs",
+     "The CDN",
+     "The DNS resolver",
+     "The browser"
+    ],
+    "answer": 0,
+    "why": "Queues decouple accepting work from doing it and let you scale workers independently."
+   },
+   {
+    "q": "How does the client find out the job is done?",
+    "options": [
+     "Polling a status endpoint, or a push notification/webhook",
+     "It guesses",
+     "It keeps a socket to the worker",
+     "It refreshes the database directly"
+    ],
+    "answer": 0,
+    "why": "Store job status in a database; clients poll or receive a push when it changes."
+   },
+   {
+    "q": "Why must job handlers be idempotent?",
+    "options": [
+     "Queues deliver at least once, so a job may run twice",
+     "To make them faster",
+     "Because workers never crash",
+     "To avoid logging"
+    ],
+    "answer": 0,
+    "why": "Retries after crashes or timeouts are normal; repeating a job must be safe."
+   },
+   {
+    "q": "What is a visibility timeout in a queue?",
+    "options": [
+     "How long a job is hidden from other workers after one picks it up; it reappears if not finished",
+     "How long a message is stored",
+     "The delay before sending",
+     "A TTL in the CDN"
+    ],
+    "answer": 0,
+    "why": "If the worker dies, the job becomes visible again and another worker retries it."
+   },
+   {
+    "q": "How do you scale background processing for bursts?",
+    "options": [
+     "Auto-scale workers based on queue depth",
+     "Add more API servers only",
+     "Increase the database TTL",
+     "Make jobs synchronous"
+    ],
+    "answer": 0,
+    "why": "Queue length is a direct signal of backlog; more workers drain it faster."
+   },
+   {
+    "q": "What should happen to a job that keeps failing?",
+    "options": [
+     "After a few retries with backoff, move it to a dead letter queue",
+     "Retry forever",
+     "Delete it silently",
+     "Crash the worker"
+    ],
+    "answer": 0,
+    "why": "This keeps the queue flowing and preserves failures for debugging."
+   },
+   {
+    "q": "For jobs that must run at a specific time (e.g. reminders), you'd use…",
+    "options": [
+     "A scheduler that stores due times and enqueues jobs when they're due",
+     "A thread sleeping for days",
+     "Client-side timers only",
+     "A CDN"
+    ],
+    "answer": 0,
+    "why": "Durable scheduling survives restarts and scales across workers."
+   },
+   {
+    "q": "How do you report progress on a long job, like '45% done'?",
+    "options": [
+     "The worker updates a status record periodically, which the client reads",
+     "The queue calculates it",
+     "The CDN shows it",
+     "It can't be done"
+    ],
+    "answer": 0,
+    "why": "Progress is just state the worker writes and the API exposes."
+   },
+   {
+    "q": "In an interview, what's the tell that a task needs this pattern?",
+    "options": [
+     "It takes longer than a normal request should (seconds to hours) or can fail and be retried",
+     "It's a simple read",
+     "It returns cached data",
+     "It changes CSS"
+    ],
+    "answer": 0,
+    "why": "Anything slow or unreliable goes async: transcoding, exports, crawling, ML inference."
+   }
+  ]
+ },
+ {
+  "key": "redis",
+  "section": "Key Technologies",
+  "name": "Redis",
+  "path": "deep-dives/redis",
+  "questions": [
+   {
+    "q": "Where does Redis keep its data primarily?",
+    "options": [
+     "In memory, with optional persistence to disk",
+     "Only on disk",
+     "In the browser",
+     "In object storage"
+    ],
+    "answer": 0,
+    "why": "Memory gives sub-millisecond access; snapshots (RDB) or an append-only file (AOF) add durability."
+   },
+   {
+    "q": "Which Redis structure suits a leaderboard?",
+    "options": [
+     "Sorted set (ZADD / ZRANGE by score)",
+     "List",
+     "Plain string",
+     "Bitmap only"
+    ],
+    "answer": 0,
+    "why": "Sorted sets keep members ordered by score with O(log n) updates and fast top-k queries."
+   },
+   {
+    "q": "How can Redis implement a simple rate limiter?",
+    "options": [
+     "INCR a key per user per time window with an expiry",
+     "Store requests in a CDN",
+     "Use a relational join",
+     "Use pub/sub only"
+    ],
+    "answer": 0,
+    "why": "Atomic INCR plus EXPIRE counts requests per window; sorted sets can do sliding windows."
+   },
+   {
+    "q": "What does Redis pub/sub NOT guarantee?",
+    "options": [
+     "Delivery to subscribers that are offline: messages aren't stored",
+     "That messages reach online subscribers",
+     "That it works over TCP",
+     "Channel names"
+    ],
+    "answer": 0,
+    "why": "Pub/sub is fire-and-forget; use Redis Streams or Kafka when you need persistence and replay."
+   },
+   {
+    "q": "Why is Redis single-threaded command execution useful?",
+    "options": [
+     "Each command is atomic, so operations like INCR don't race",
+     "It makes Redis slow",
+     "It prevents persistence",
+     "It means no clustering"
+    ],
+    "answer": 0,
+    "why": "Commands run one at a time, giving atomicity without locks; Lua scripts extend this to multi-step logic."
+   },
+   {
+    "q": "How does Redis Cluster spread data?",
+    "options": [
+     "Keys map to 16,384 hash slots divided among nodes",
+     "Alphabetically",
+     "By creation time",
+     "It can't be distributed"
+    ],
+    "answer": 0,
+    "why": "Hash slots let the cluster rebalance by moving slots between nodes."
+   },
+   {
+    "q": "Which Redis feature supports proximity search (drivers near a rider)?",
+    "options": [
+     "Geospatial commands (GEOADD / GEOSEARCH)",
+     "HyperLogLog",
+     "Bitfields only",
+     "Transactions"
+    ],
+    "answer": 0,
+    "why": "Redis geo indexes points with geohashes stored in a sorted set."
+   },
+   {
+    "q": "What's a risk of using Redis as your only database?",
+    "options": [
+     "Data can be lost between persistence points, and memory limits dataset size",
+     "It can't store strings",
+     "It's too slow",
+     "It has no expiry"
+    ],
+    "answer": 0,
+    "why": "It's excellent as a cache or for ephemeral state; durable systems of record usually live elsewhere."
+   },
+   {
+    "q": "How can Redis act as a distributed lock?",
+    "options": [
+     "SET key value NX PX <ttl>: only one client succeeds, and the lock expires",
+     "A sorted set of all servers",
+     "DEL on every request",
+     "Pub/sub"
+    ],
+    "answer": 0,
+    "why": "NX makes the set conditional; the TTL releases the lock if the holder dies."
+   },
+   {
+    "q": "HyperLogLog in Redis is used for…",
+    "options": [
+     "Approximate counting of unique items with tiny memory",
+     "Exact sums",
+     "Sorting strings",
+     "Geospatial search"
+    ],
+    "answer": 0,
+    "why": "It estimates distinct counts (e.g. unique visitors) with about 1% error using ~12 KB."
+   }
+  ]
+ },
+ {
+  "key": "elasticsearch",
+  "section": "Key Technologies",
+  "name": "Elasticsearch",
+  "path": "deep-dives/elasticsearch",
+  "questions": [
+   {
+    "q": "What data structure powers Elasticsearch's full-text search?",
+    "options": [
+     "An inverted index from terms to documents",
+     "A B-tree on whole documents",
+     "A linked list",
+     "A hash ring"
+    ],
+    "answer": 0,
+    "why": "Inverted indexes find documents containing given words quickly."
+   },
+   {
+    "q": "Should Elasticsearch usually be your primary source of truth?",
+    "options": [
+     "No: keep data in a primary database and sync it into Elasticsearch",
+     "Yes, always",
+     "Only for payments",
+     "Only for images"
+    ],
+    "answer": 0,
+    "why": "It's optimised for search, not transactions; it's usually a secondary, rebuildable index."
+   },
+   {
+    "q": "How is data commonly kept in sync from the main database to Elasticsearch?",
+    "options": [
+     "Change data capture or a queue of updates",
+     "Manual copying each night only",
+     "The CDN",
+     "Browser uploads"
+    ],
+    "answer": 0,
+    "why": "CDC streams database changes to the index with low delay."
+   },
+   {
+    "q": "What does an analyzer do?",
+    "options": [
+     "Breaks text into tokens and normalises them (lowercasing, stemming)",
+     "Encrypts documents",
+     "Balances shards",
+     "Compresses images"
+    ],
+    "answer": 0,
+    "why": "Analysis decides how text is indexed and matched, e.g. 'Running' matching 'run'."
+   },
+   {
+    "q": "How does Elasticsearch scale?",
+    "options": [
+     "Indexes are split into shards spread across nodes, with replicas",
+     "It can't scale",
+     "By using a bigger single CPU only",
+     "Through DNS"
+    ],
+    "answer": 0,
+    "why": "Shards spread data and queries; replicas add read capacity and resilience."
+   },
+   {
+    "q": "Are new documents searchable instantly in Elasticsearch?",
+    "options": [
+     "Near real-time: new documents appear after a refresh (about 1 second by default)",
+     "Always instant",
+     "Only after a day",
+     "Never"
+    ],
+    "answer": 0,
+    "why": "Indexing becomes searchable at the next refresh; that's usually fine for search."
+   },
+   {
+    "q": "Which feature ranks results by relevance?",
+    "options": [
+     "Scoring such as BM25",
+     "Primary keys",
+     "Foreign keys",
+     "TTL"
+    ],
+    "answer": 0,
+    "why": "Relevance scoring weighs term frequency and rarity to order results."
+   },
+   {
+    "q": "Elasticsearch fits which interview problem best?",
+    "options": [
+     "Searching posts by keyword (e.g. FB Post Search)",
+     "Processing payments",
+     "Counting likes exactly",
+     "Storing large videos"
+    ],
+    "answer": 0,
+    "why": "Keyword search with filters and ranking is its core use."
+   },
+   {
+    "q": "Why is deep pagination (page 10,000) expensive in Elasticsearch?",
+    "options": [
+     "Each shard must collect and sort many results before discarding them",
+     "It isn't supported at all",
+     "It skips scoring",
+     "It deletes data"
+    ],
+    "answer": 0,
+    "why": "Use search_after or scroll-style cursors instead of large offsets."
+   },
+   {
+    "q": "Besides text, Elasticsearch can also do…",
+    "options": [
+     "Geo queries and aggregations (counts, histograms)",
+     "Two-phase commits",
+     "Video transcoding",
+     "DNS resolution"
+    ],
+    "answer": 0,
+    "why": "Geo distance filters and aggregations make it useful for location search and analytics dashboards."
+   }
+  ]
+ },
+ {
+  "key": "kafka",
+  "section": "Key Technologies",
+  "name": "Kafka",
+  "path": "deep-dives/kafka",
+  "questions": [
+   {
+    "q": "What is Kafka at its core?",
+    "options": [
+     "A distributed, durable, append-only log of messages organised into topics",
+     "A relational database",
+     "An in-memory cache",
+     "A CDN"
+    ],
+    "answer": 0,
+    "why": "Producers append to topics; consumers read at their own pace and can replay."
+   },
+   {
+    "q": "How does Kafka preserve message order?",
+    "options": [
+     "Order is guaranteed within a partition, not across a whole topic",
+     "Globally across all topics",
+     "It never preserves order",
+     "Only for small messages"
+    ],
+    "answer": 0,
+    "why": "Use a key (e.g. user ID) so related messages land in the same partition and stay ordered."
+   },
+   {
+    "q": "What decides which partition a message goes to?",
+    "options": [
+     "The message key's hash (or round-robin if there's no key)",
+     "The consumer",
+     "The broker's CPU",
+     "Alphabetical order of content"
+    ],
+    "answer": 0,
+    "why": "Keys keep related events together; choose them to avoid hot partitions."
+   },
+   {
+    "q": "What is a consumer group?",
+    "options": [
+     "Consumers sharing a topic's partitions so each message is processed by one member",
+     "A backup cluster",
+     "A list of topics",
+     "A DNS setting"
+    ],
+    "answer": 0,
+    "why": "Adding consumers (up to the partition count) scales processing in parallel."
+   },
+   {
+    "q": "Can a consumer re-read old messages in Kafka?",
+    "options": [
+     "Yes, by resetting its offset, as long as messages are within retention",
+     "No, messages are deleted when read",
+     "Only once",
+     "Only the newest message"
+    ],
+    "answer": 0,
+    "why": "Retention keeps messages for a set time or size; replay helps recovery and backfills."
+   },
+   {
+    "q": "What limits the parallelism of one consumer group?",
+    "options": [
+     "The number of partitions",
+     "The number of topics",
+     "Message size",
+     "The broker's disk brand"
+    ],
+    "answer": 0,
+    "why": "Each partition is read by one consumer in a group, so more partitions allow more parallel consumers."
+   },
+   {
+    "q": "Kafka is a good choice when you need…",
+    "options": [
+     "High-throughput event streaming with durability and replay",
+     "Complex SQL joins",
+     "Storing large files",
+     "Sub-millisecond key lookups"
+    ],
+    "answer": 0,
+    "why": "Event pipelines, logs, analytics and decoupling services are its sweet spot."
+   },
+   {
+    "q": "Kafka's default delivery guarantee to consumers is best described as…",
+    "options": [
+     "At least once: design consumers to handle duplicates",
+     "Exactly once always, with no effort",
+     "At most once",
+     "Never"
+    ],
+    "answer": 0,
+    "why": "Exactly-once is possible within Kafka's transactions, but idempotent consumers are the safe design."
+   },
+   {
+    "q": "How does Kafka stay durable if a broker fails?",
+    "options": [
+     "Partitions are replicated to other brokers",
+     "It keeps data in client memory",
+     "It emails backups",
+     "It doesn't"
+    ],
+    "answer": 0,
+    "why": "With a replication factor of 3, a leader failure promotes an in-sync replica."
+   },
+   {
+    "q": "Why can one very popular key cause trouble in Kafka?",
+    "options": [
+     "All its messages go to one partition, overloading one consumer",
+     "Kafka rejects popular keys",
+     "It deletes the topic",
+     "It slows DNS"
+    ],
+    "answer": 0,
+    "why": "Split hot keys (e.g. add a suffix) or aggregate before sending to spread the load."
+   }
+  ]
+ },
+ {
+  "key": "temporal",
+  "section": "Key Technologies",
+  "name": "Temporal",
+  "path": "deep-dives/temporal",
+  "questions": [
+   {
+    "q": "What problem does Temporal solve?",
+    "options": [
+     "Running multi-step workflows reliably, resuming after crashes (durable execution)",
+     "Serving static files",
+     "Full-text search",
+     "Caching"
+    ],
+    "answer": 0,
+    "why": "It records workflow progress so code continues from the last completed step after failures."
+   },
+   {
+    "q": "In Temporal, what's the difference between a workflow and an activity?",
+    "options": [
+     "Workflows orchestrate deterministic logic; activities do the side effects (API calls, DB writes)",
+     "They're the same",
+     "Activities orchestrate workflows",
+     "Workflows run in the browser"
+    ],
+    "answer": 0,
+    "why": "Workflows must be deterministic so they can be replayed; external work goes in retryable activities."
+   },
+   {
+    "q": "Why must workflow code be deterministic?",
+    "options": [
+     "Temporal replays the history to rebuild state, and replay must reach the same decisions",
+     "To make it faster",
+     "Because it runs in SQL",
+     "To avoid logging"
+    ],
+    "answer": 0,
+    "why": "Random numbers, current time and direct I/O must go through Temporal APIs or activities."
+   },
+   {
+    "q": "How does Temporal handle a failing payment API call?",
+    "options": [
+     "Activities retry automatically with a configurable policy",
+     "It crashes the workflow permanently",
+     "It ignores the failure",
+     "It asks the user"
+    ],
+    "answer": 0,
+    "why": "Built-in retries with backoff make transient failures invisible to business logic."
+   },
+   {
+    "q": "A workflow needs to wait 3 days for an approval. In Temporal you would…",
+    "options": [
+     "Use a durable timer or wait for a signal; no resources are held while waiting",
+     "Sleep a thread for 3 days",
+     "Poll every millisecond",
+     "Keep an HTTP request open"
+    ],
+    "answer": 0,
+    "why": "Durable timers survive restarts and cost nothing while waiting."
+   },
+   {
+    "q": "Which interview problems benefit from a workflow engine?",
+    "options": [
+     "Order processing, payments or ride booking with several dependent steps",
+     "Serving a static homepage",
+     "A URL redirect",
+     "A simple counter"
+    ],
+    "answer": 0,
+    "why": "Anything with multi-step, long-running, must-complete processes."
+   },
+   {
+    "q": "What does a Temporal 'signal' do?",
+    "options": [
+     "Sends an external event into a running workflow",
+     "Deletes a workflow",
+     "Starts a database",
+     "Resolves DNS"
+    ],
+    "answer": 0,
+    "why": "Signals let the outside world (like a user approving) influence a waiting workflow."
+   },
+   {
+    "q": "Compared with building a saga by hand over queues, Temporal…",
+    "options": [
+     "Keeps the sequence, retries and compensation in ordinary code with state persisted for you",
+     "Requires no servers at all",
+     "Removes the need for idempotency",
+     "Only works for one step"
+    ],
+    "answer": 0,
+    "why": "You write the process as code; Temporal handles durability. Activities should still be idempotent."
+   },
+   {
+    "q": "Where is workflow state stored?",
+    "options": [
+     "In Temporal's persistence layer as an event history",
+     "Only in worker memory",
+     "In the browser",
+     "Nowhere"
+    ],
+    "answer": 0,
+    "why": "The history is the durable record used for replay and visibility."
+   },
+   {
+    "q": "What's a downside of adding Temporal?",
+    "options": [
+     "Another system to run and learn, plus determinism rules for workflow code",
+     "It loses data",
+     "It can't retry",
+     "It only supports one language"
+    ],
+    "answer": 0,
+    "why": "It's powerful but adds operational weight; use it when reliability of long processes matters."
+   }
+  ]
+ },
+ {
+  "key": "api-gateway",
+  "section": "Key Technologies",
+  "name": "API Gateway",
+  "path": "deep-dives/api-gateway",
+  "questions": [
+   {
+    "q": "What is an API gateway's main job?",
+    "options": [
+     "A single entry point that routes requests to the right backend service",
+     "Storing user data",
+     "Transcoding video",
+     "Running database migrations"
+    ],
+    "answer": 0,
+    "why": "Clients talk to one endpoint; the gateway forwards to microservices."
+   },
+   {
+    "q": "Which cross-cutting concerns often live in the gateway?",
+    "options": [
+     "Authentication, rate limiting, logging and TLS termination",
+     "Business logic for orders",
+     "Database indexes",
+     "Video storage"
+    ],
+    "answer": 0,
+    "why": "Centralising them avoids repeating the same code in every service."
+   },
+   {
+    "q": "How is an API gateway different from a load balancer?",
+    "options": [
+     "A gateway routes by API path and applies policies; a load balancer spreads traffic across instances",
+     "They are identical",
+     "A load balancer handles auth",
+     "A gateway stores data"
+    ],
+    "answer": 0,
+    "why": "They often work together: gateway decides which service, load balancer picks an instance."
+   },
+   {
+    "q": "What's a risk of putting too much in the gateway?",
+    "options": [
+     "It becomes a bottleneck and a place where business logic gets tangled",
+     "It speeds everything up",
+     "It removes the need for services",
+     "It stores too little"
+    ],
+    "answer": 0,
+    "why": "Keep it thin: routing and policies, not domain rules."
+   },
+   {
+    "q": "In an interview, should you always draw an API gateway?",
+    "options": [
+     "It's fine to include in a microservice design, but don't spend time on it unless it matters",
+     "Never",
+     "It must be the first deep dive",
+     "Only for single-server apps"
+    ],
+    "answer": 0,
+    "why": "It's a standard box; focus deep dives on what's unique to the problem."
+   },
+   {
+    "q": "How does a gateway help with rate limiting?",
+    "options": [
+     "It can reject excess requests per client before they reach services",
+     "It deletes old data",
+     "It caches the database",
+     "It resizes images"
+    ],
+    "answer": 0,
+    "why": "Stopping abuse at the edge protects everything behind it."
+   },
+   {
+    "q": "What does 'backend for frontend' mean?",
+    "options": [
+     "Separate gateway layers tailored to each client type (web, mobile)",
+     "A frontend that runs on the server",
+     "A database for frontends",
+     "A CSS framework"
+    ],
+    "answer": 0,
+    "why": "Each client gets responses shaped for its needs without burdening core services."
+   },
+   {
+    "q": "Why must the gateway itself be highly available?",
+    "options": [
+     "Every request passes through it, so if it's down, everything is down",
+     "It stores all data",
+     "It's optional",
+     "It only handles admin traffic"
+    ],
+    "answer": 0,
+    "why": "Run multiple instances behind a load balancer across zones."
+   },
+   {
+    "q": "TLS termination at the gateway means…",
+    "options": [
+     "HTTPS is decrypted at the gateway, and internal traffic can use simpler or separate encryption",
+     "All traffic is unencrypted",
+     "Clients don't use HTTPS",
+     "Certificates live in the database"
+    ],
+    "answer": 0,
+    "why": "It centralises certificate handling; many systems still encrypt internal traffic too."
+   },
+   {
+    "q": "Can a gateway aggregate responses from several services?",
+    "options": [
+     "Yes, it can combine calls into one response for the client",
+     "No, never",
+     "Only for images",
+     "Only through DNS"
+    ],
+    "answer": 0,
+    "why": "Aggregation reduces client round trips, though heavy aggregation belongs in a dedicated service."
+   }
+  ]
+ },
+ {
+  "key": "cassandra",
+  "section": "Key Technologies",
+  "name": "Cassandra",
+  "path": "deep-dives/cassandra",
+  "questions": [
+   {
+    "q": "Cassandra is best known for…",
+    "options": [
+     "Very high write throughput and linear scaling across many nodes",
+     "Complex joins",
+     "Strong ACID transactions across tables",
+     "Storing video files"
+    ],
+    "answer": 0,
+    "why": "Its log-structured storage and leaderless design handle huge write volumes."
+   },
+   {
+    "q": "What decides which node stores a row?",
+    "options": [
+     "The partition key, hashed onto a token ring",
+     "The clustering key",
+     "The row's size",
+     "The client IP"
+    ],
+    "answer": 0,
+    "why": "Consistent hashing of the partition key spreads data and requests."
+   },
+   {
+    "q": "What does the clustering key control?",
+    "options": [
+     "The sort order of rows within a partition",
+     "Which node stores the partition",
+     "Replication factor",
+     "Encryption"
+    ],
+    "answer": 0,
+    "why": "E.g. partition by chat_id, cluster by message timestamp so a chat's messages are stored in order."
+   },
+   {
+    "q": "How should you design Cassandra tables?",
+    "options": [
+     "One table per query pattern, duplicating data as needed",
+     "Normalised with joins",
+     "One giant table for everything",
+     "Around the UI colour scheme"
+    ],
+    "answer": 0,
+    "why": "Cassandra has no joins; you model each query's shape directly."
+   },
+   {
+    "q": "What does tunable consistency mean in Cassandra?",
+    "options": [
+     "Each read/write chooses how many replicas must respond (ONE, QUORUM, ALL)",
+     "Consistency is fixed",
+     "It uses two-phase commit",
+     "Only the leader answers"
+    ],
+    "answer": 0,
+    "why": "QUORUM reads and writes together give strong consistency; ONE favours speed and availability."
+   },
+   {
+    "q": "Why is a partition key like 'country' a bad idea for user events?",
+    "options": [
+     "A few countries would create huge, hot partitions",
+     "Countries can't be strings",
+     "It's too random",
+     "It prevents writes"
+    ],
+    "answer": 0,
+    "why": "Partitions should be many and bounded in size to spread load evenly."
+   },
+   {
+    "q": "Cassandra's architecture is…",
+    "options": [
+     "Leaderless: any node can accept reads and writes",
+     "Single leader",
+     "Master-slave only",
+     "Client-side"
+    ],
+    "answer": 0,
+    "why": "No single leader means no single point of failure; replicas reconcile differences."
+   },
+   {
+    "q": "Which interview problem suits Cassandra?",
+    "options": [
+     "Storing chat messages or activity events at massive scale",
+     "A bank ledger requiring multi-row transactions",
+     "Full-text search",
+     "Serving images"
+    ],
+    "answer": 0,
+    "why": "High-volume, append-heavy data read by key and time range fits well."
+   },
+   {
+    "q": "How are conflicting writes resolved by default?",
+    "options": [
+     "Last write wins, based on timestamps",
+     "Manual approval",
+     "Two-phase commit",
+     "They're rejected"
+    ],
+    "answer": 0,
+    "why": "Simple and fast, but clock skew can matter; model data to avoid conflicts where it's important."
+   },
+   {
+    "q": "Deletes in Cassandra create…",
+    "options": [
+     "Tombstones that are cleaned up later during compaction",
+     "Immediate disk space",
+     "Locks on the table",
+     "Nothing"
+    ],
+    "answer": 0,
+    "why": "Heavy deletes can slow reads until compaction removes tombstones, a known pitfall."
+   }
+  ]
+ },
+ {
+  "key": "dynamodb",
+  "section": "Key Technologies",
+  "name": "DynamoDB",
+  "path": "deep-dives/dynamodb",
+  "questions": [
+   {
+    "q": "DynamoDB is…",
+    "options": [
+     "A fully managed key-value and document database on AWS",
+     "A self-hosted SQL database",
+     "A message queue",
+     "A CDN"
+    ],
+    "answer": 0,
+    "why": "AWS runs the servers, scaling and replication; you design keys and access patterns."
+   },
+   {
+    "q": "What does a DynamoDB primary key consist of?",
+    "options": [
+     "A partition key, optionally with a sort key",
+     "Any column you like per query",
+     "Only a UUID",
+     "A foreign key"
+    ],
+    "answer": 0,
+    "why": "The partition key spreads items; the sort key orders items within a partition for range queries."
+   },
+   {
+    "q": "How do you query by an attribute other than the primary key?",
+    "options": [
+     "Add a global secondary index (GSI) on that attribute",
+     "Scan the table every time",
+     "Use a join",
+     "You can't"
+    ],
+    "answer": 0,
+    "why": "GSIs support alternative access patterns; scans read the whole table and are costly."
+   },
+   {
+    "q": "Are DynamoDB reads strongly consistent by default?",
+    "options": [
+     "No, eventually consistent by default; strong reads are an option on the base table",
+     "Yes, always",
+     "Only on GSIs",
+     "Never available"
+    ],
+    "answer": 0,
+    "why": "You can request strongly consistent reads (not on GSIs), which cost more."
+   },
+   {
+    "q": "What DynamoDB feature supports 'do this only if the item is unchanged'?",
+    "options": [
+     "Conditional writes",
+     "Streams",
+     "TTL",
+     "Scans"
+    ],
+    "answer": 0,
+    "why": "Condition expressions enable optimistic concurrency, e.g. booking only if a seat is still available."
+   },
+   {
+    "q": "DynamoDB Streams provide…",
+    "options": [
+     "A change log of item updates for triggers and syncing",
+     "Video streaming",
+     "Full-text search",
+     "Two-phase commit"
+    ],
+    "answer": 0,
+    "why": "Streams feed Lambda functions or pipelines, e.g. syncing to a search index."
+   },
+   {
+    "q": "What causes throttling in DynamoDB?",
+    "options": [
+     "Hot partitions or exceeding provisioned capacity",
+     "Too many tables",
+     "Small items",
+     "Using sort keys"
+    ],
+    "answer": 0,
+    "why": "Spread traffic with high-cardinality partition keys, or use on-demand capacity."
+   },
+   {
+    "q": "Does DynamoDB support transactions?",
+    "options": [
+     "Yes, ACID transactions across multiple items (with limits)",
+     "No",
+     "Only on one attribute",
+     "Only across regions"
+    ],
+    "answer": 0,
+    "why": "TransactWriteItems groups writes atomically, useful for things like inventory and orders."
+   },
+   {
+    "q": "What does DynamoDB TTL do?",
+    "options": [
+     "Automatically deletes items after an expiry time",
+     "Speeds up reads",
+     "Encrypts data",
+     "Creates indexes"
+    ],
+    "answer": 0,
+    "why": "Great for sessions, temporary holds or expiring data without cleanup jobs."
+   },
+   {
+    "q": "DAX is…",
+    "options": [
+     "An in-memory cache in front of DynamoDB",
+     "A query language",
+     "A backup service",
+     "A load balancer"
+    ],
+    "answer": 0,
+    "why": "It gives microsecond reads for read-heavy workloads."
+   }
+  ]
+ },
+ {
+  "key": "postgres",
+  "section": "Key Technologies",
+  "name": "PostgreSQL",
+  "path": "deep-dives/postgres",
+  "questions": [
+   {
+    "q": "Why is PostgreSQL a strong default in interviews?",
+    "options": [
+     "ACID transactions, rich SQL, indexes and it scales further than many expect",
+     "It's the only free database",
+     "It can't do joins",
+     "It stores only JSON"
+    ],
+    "answer": 0,
+    "why": "Start with Postgres unless a requirement clearly needs something else."
+   },
+   {
+    "q": "How does Postgres let readers and writers avoid blocking each other?",
+    "options": [
+     "MVCC: each transaction sees a snapshot of row versions",
+     "Global table locks",
+     "Single-threaded execution",
+     "Disabling indexes"
+    ],
+    "answer": 0,
+    "why": "Multi-version concurrency control keeps old row versions for concurrent readers; VACUUM cleans them later."
+   },
+   {
+    "q": "How do you scale reads on Postgres?",
+    "options": [
+     "Read replicas via streaming replication, plus caching",
+     "Sharding the leader for reads",
+     "Removing indexes",
+     "Using UDP"
+    ],
+    "answer": 0,
+    "why": "Replicas serve reads; writes still go to one primary."
+   },
+   {
+    "q": "Which feature supports storing and querying semi-structured data?",
+    "options": [
+     "JSONB columns with GIN indexes",
+     "BLOB only",
+     "CSV import only",
+     "It has no such feature"
+    ],
+    "answer": 0,
+    "why": "JSONB lets you mix flexible documents with relational data and still index them."
+   },
+   {
+    "q": "Which extension adds geospatial queries to Postgres?",
+    "options": [
+     "PostGIS",
+     "Redis",
+     "Kafka",
+     "Lucene"
+    ],
+    "answer": 0,
+    "why": "PostGIS provides spatial types and indexes for proximity search."
+   },
+   {
+    "q": "How do you lock a row to prevent a concurrent update?",
+    "options": [
+     "SELECT … FOR UPDATE inside a transaction",
+     "SELECT * with no transaction",
+     "CREATE INDEX",
+     "VACUUM"
+    ],
+    "answer": 0,
+    "why": "The row stays locked until the transaction ends, preventing races like double booking."
+   },
+   {
+    "q": "Postgres's built-in full-text search is…",
+    "options": [
+     "Good for moderate needs; dedicated engines like Elasticsearch scale further",
+     "Unavailable",
+     "Faster than every search engine",
+     "Only for numbers"
+    ],
+    "answer": 0,
+    "why": "tsvector/tsquery with GIN indexes cover many cases before adding Elasticsearch."
+   },
+   {
+    "q": "Which isolation level prevents all anomalies but may abort transactions?",
+    "options": [
+     "Serializable",
+     "Read uncommitted",
+     "Read committed",
+     "None"
+    ],
+    "answer": 0,
+    "why": "Serializable makes transactions behave as if run one at a time, retrying on conflicts."
+   },
+   {
+    "q": "What happens when a Postgres primary fails?",
+    "options": [
+     "A replica is promoted (via failover tooling), possibly losing the last un-replicated writes if async",
+     "Data is always lost",
+     "The database can't recover",
+     "Clients must rebuild it"
+    ],
+    "answer": 0,
+    "why": "Synchronous replication avoids loss at the cost of write latency."
+   },
+   {
+    "q": "What does a partial index index?",
+    "options": [
+     "Only rows matching a condition, e.g. WHERE status = 'active'",
+     "Half the columns",
+     "Random rows",
+     "Nothing"
+    ],
+    "answer": 0,
+    "why": "Smaller, faster indexes for the rows queries actually target."
+   }
+  ]
+ },
+ {
+  "key": "flink",
+  "section": "Key Technologies",
+  "name": "Flink",
+  "path": "deep-dives/flink",
+  "questions": [
+   {
+    "q": "Apache Flink is mainly used for…",
+    "options": [
+     "Stateful stream processing of events in real time",
+     "Storing files",
+     "Serving web pages",
+     "Relational transactions"
+    ],
+    "answer": 0,
+    "why": "It computes aggregates, joins and alerts over continuous streams such as Kafka topics."
+   },
+   {
+    "q": "What is a tumbling window?",
+    "options": [
+     "Fixed-size, non-overlapping time buckets (e.g. counts per minute)",
+     "A window that overlaps every second",
+     "An unbounded window",
+     "A database lock"
+    ],
+    "answer": 0,
+    "why": "Each event belongs to exactly one window; sliding windows overlap."
+   },
+   {
+    "q": "Why does Flink distinguish event time from processing time?",
+    "options": [
+     "Events can arrive late or out of order; event time uses when they actually happened",
+     "To save memory",
+     "Because clocks never differ",
+     "For encryption"
+    ],
+    "answer": 0,
+    "why": "Correct analytics (like ad clicks per minute) should group by when the event occurred."
+   },
+   {
+    "q": "What are watermarks in Flink?",
+    "options": [
+     "Markers estimating how far event time has progressed, deciding when a window can close",
+     "Images in logs",
+     "Encryption keys",
+     "Kafka offsets"
+    ],
+    "answer": 0,
+    "why": "They balance waiting for late events against producing results promptly."
+   },
+   {
+    "q": "How does Flink recover state after a failure?",
+    "options": [
+     "From periodic checkpoints, replaying input from the checkpointed position",
+     "It restarts from zero",
+     "It asks users",
+     "It can't recover"
+    ],
+    "answer": 0,
+    "why": "Checkpoints plus replayable sources like Kafka give exactly-once state semantics."
+   },
+   {
+    "q": "Which interview problem is a natural fit for Flink?",
+    "options": [
+     "Ad click aggregation or top-k trending in near real time",
+     "A URL shortener's redirect",
+     "User login",
+     "Storing profile photos"
+    ],
+    "answer": 0,
+    "why": "Continuous aggregation over high-volume streams is its core use."
+   },
+   {
+    "q": "Where does Flink keep operator state for large jobs?",
+    "options": [
+     "In a state backend such as RocksDB, checkpointed to durable storage",
+     "In the browser",
+     "In DNS",
+     "Nowhere"
+    ],
+    "answer": 0,
+    "why": "Local state is fast; checkpoints make it recoverable."
+   },
+   {
+    "q": "How does Flink scale?",
+    "options": [
+     "Operators run in parallel across task slots, often keyed by a field",
+     "Only vertically",
+     "It can't",
+     "By adding CDN nodes"
+    ],
+    "answer": 0,
+    "why": "Keyed streams partition work so each parallel instance handles a subset of keys."
+   },
+   {
+    "q": "How are late events handled after a window closes?",
+    "options": [
+     "Allowed lateness can update results, or they go to a side output",
+     "They crash the job",
+     "They're always counted twice",
+     "They're sent back to the source"
+    ],
+    "answer": 0,
+    "why": "You choose a policy: update, drop or redirect late data."
+   },
+   {
+    "q": "Batch vs streaming: why might you run both?",
+    "options": [
+     "Streaming gives fast approximate results; batch recomputes exact results later (reconciliation)",
+     "They can't coexist",
+     "Batch is always faster",
+     "Streaming is only for logs"
+    ],
+    "answer": 0,
+    "why": "Many analytics systems pair a real-time path with a periodic batch correction."
+   }
+  ]
+ },
+ {
+  "key": "zookeeper",
+  "section": "Key Technologies",
+  "name": "ZooKeeper",
+  "path": "deep-dives/zookeeper",
+  "questions": [
+   {
+    "q": "What is ZooKeeper used for?",
+    "options": [
+     "Coordination: configuration, leader election, locks and service membership",
+     "Storing videos",
+     "Full-text search",
+     "Caching web pages"
+    ],
+    "answer": 0,
+    "why": "It's a small, strongly consistent store for coordination data between distributed nodes."
+   },
+   {
+    "q": "How does ZooKeeper stay consistent?",
+    "options": [
+     "A leader orders writes, replicated to a majority (quorum) of servers",
+     "Every node writes independently",
+     "Last write wins",
+     "It isn't consistent"
+    ],
+    "answer": 0,
+    "why": "Quorum-based replication means it keeps working as long as a majority is up."
+   },
+   {
+    "q": "What is an ephemeral node (znode)?",
+    "options": [
+     "A node that disappears when the client's session ends",
+     "A permanent config value",
+     "A backup file",
+     "A cache entry with TTL"
+    ],
+    "answer": 0,
+    "why": "Ephemeral nodes track live members: if a server dies, its node vanishes and others notice."
+   },
+   {
+    "q": "How is leader election done with ZooKeeper?",
+    "options": [
+     "Clients create sequential ephemeral nodes; the lowest number is the leader",
+     "Random choice by clients",
+     "The biggest server wins",
+     "By DNS"
+    ],
+    "answer": 0,
+    "why": "If the leader's node disappears, the next in sequence takes over."
+   },
+   {
+    "q": "What does a watch do?",
+    "options": [
+     "Notifies a client when a znode changes",
+     "Encrypts data",
+     "Speeds up writes",
+     "Deletes old data"
+    ],
+    "answer": 0,
+    "why": "Watches let services react to config or membership changes without polling."
+   },
+   {
+    "q": "Why keep a ZooKeeper ensemble at an odd number of nodes (3 or 5)?",
+    "options": [
+     "A majority is needed; odd sizes tolerate failures most efficiently",
+     "Even numbers are unsupported",
+     "To save licence fees",
+     "For faster DNS"
+    ],
+    "answer": 0,
+    "why": "5 nodes tolerate 2 failures; 6 nodes still only tolerate 2."
+   },
+   {
+    "q": "Should you store large data in ZooKeeper?",
+    "options": [
+     "No: it's for small coordination data, not bulk storage",
+     "Yes, it's a general database",
+     "Only videos",
+     "Only logs"
+    ],
+    "answer": 0,
+    "why": "Data lives in memory and every write goes through the leader; keep it small."
+   },
+   {
+    "q": "Which systems historically relied on ZooKeeper?",
+    "options": [
+     "Kafka (older versions), HBase and Hadoop",
+     "Browsers",
+     "CDNs",
+     "Spreadsheets"
+    ],
+    "answer": 0,
+    "why": "Newer Kafka versions use their own KRaft consensus instead."
+   },
+   {
+    "q": "What's a modern alternative for coordination?",
+    "options": [
+     "etcd (used by Kubernetes)",
+     "Memcached",
+     "A CDN",
+     "FTP"
+    ],
+    "answer": 0,
+    "why": "etcd provides similar consistent key-value coordination using Raft."
+   },
+   {
+    "q": "In an interview, when does coordination like ZooKeeper come up?",
+    "options": [
+     "Assigning work to crawler or scheduler nodes, leader election, or tracking which servers are alive",
+     "Serving images",
+     "Sending emails",
+     "Hashing passwords"
+    ],
+    "answer": 0,
+    "why": "Any time nodes must agree on who does what."
+   }
+  ]
+ },
+ {
+  "key": "proximity-search",
+  "section": "Advanced Topics",
+  "name": "Proximity Search",
+  "path": "deep-dives/proximity-search",
+  "questions": [
+   {
+    "q": "Why can't a normal B-tree on latitude and longitude answer 'nearby' queries well?",
+    "options": [
+     "It orders one dimension at a time, so a 2-D radius search scans too much",
+     "B-trees can't store decimals",
+     "It's too fast",
+     "It needs a CDN"
+    ],
+    "answer": 0,
+    "why": "Spatial indexes group points by area so nearby points are found together."
+   },
+   {
+    "q": "What is a geohash?",
+    "options": [
+     "An encoding of a location into a string where shared prefixes mean nearby areas",
+     "A password hash",
+     "A DNS record",
+     "A map image"
+    ],
+    "answer": 0,
+    "why": "Longer prefixes mean smaller cells; searching a cell and its neighbours finds nearby points."
+   },
+   {
+    "q": "Why search neighbouring geohash cells too?",
+    "options": [
+     "A nearby point can sit just across a cell boundary with a different prefix",
+     "To slow the query",
+     "Because geohashes are random",
+     "To save memory"
+    ],
+    "answer": 0,
+    "why": "Checking the 8 neighbours avoids missing points near edges."
+   },
+   {
+    "q": "What does a quadtree do?",
+    "options": [
+     "Recursively splits space into four quadrants, splitting denser areas more",
+     "Stores only four points",
+     "Sorts strings",
+     "Encrypts coordinates"
+    ],
+    "answer": 0,
+    "why": "It adapts to density: cities get small cells, oceans big ones."
+   },
+   {
+    "q": "Which tool gives proximity search out of the box?",
+    "options": [
+     "PostGIS, Redis GEO, or Elasticsearch geo queries",
+     "A plain hash map",
+     "A message queue",
+     "A CDN"
+    ],
+    "answer": 0,
+    "why": "In interviews, naming an existing geo index is usually enough before discussing internals."
+   },
+   {
+    "q": "For drivers whose locations change every few seconds, which store fits well?",
+    "options": [
+     "An in-memory geo index such as Redis GEO, updated frequently",
+     "A nightly batch file",
+     "A relational table with no index",
+     "Object storage"
+    ],
+    "answer": 0,
+    "why": "Fast-changing locations need cheap updates; in-memory indexes handle that."
+   },
+   {
+    "q": "For restaurants that rarely move, what's a good approach?",
+    "options": [
+     "A geo index in the database or search engine, updated only when a restaurant changes",
+     "Updating locations every second",
+     "Storing locations in cookies",
+     "No index"
+    ],
+    "answer": 0,
+    "why": "Static data can live in PostGIS or Elasticsearch with filters like cuisine and rating."
+   },
+   {
+    "q": "How does geohash precision relate to cell size?",
+    "options": [
+     "More characters mean smaller cells",
+     "Fewer characters mean smaller cells",
+     "Precision doesn't matter",
+     "Cells are always 1 km"
+    ],
+    "answer": 0,
+    "why": "Choose a precision matching your search radius."
+   },
+   {
+    "q": "How do you rank results after finding nearby candidates?",
+    "options": [
+     "Compute exact distances for the candidates and sort (plus other signals like rating)",
+     "Trust the cell order",
+     "Sort alphabetically",
+     "Random order"
+    ],
+    "answer": 0,
+    "why": "The index narrows candidates cheaply; exact distance refines the order."
+   },
+   {
+    "q": "What's a scaling approach for global geo data?",
+    "options": [
+     "Partition by region or geohash prefix across nodes",
+     "One global table on one server",
+     "Store it in DNS",
+     "Put it in the CDN only"
+    ],
+    "answer": 0,
+    "why": "Queries are local, so partitioning by area keeps each query on few nodes (watch dense-city hotspots)."
+   }
+  ]
+ },
+ {
+  "key": "time-series-databases",
+  "section": "Advanced Topics",
+  "name": "Time Series Databases",
+  "path": "deep-dives/time-series-databases",
+  "questions": [
+   {
+    "q": "What kind of data are time series databases built for?",
+    "options": [
+     "Timestamped measurements such as metrics, sensor readings or prices",
+     "Social graphs",
+     "Large video files",
+     "Documents with full-text search"
+    ],
+    "answer": 0,
+    "why": "They optimise for appending data points over time and querying by time ranges."
+   },
+   {
+    "q": "Why are writes to a time series database usually append-only?",
+    "options": [
+     "New points arrive in time order and old points rarely change",
+     "Updates are forbidden by law",
+     "To save CPU",
+     "Because they have no disk"
+    ],
+    "answer": 0,
+    "why": "Append-heavy workloads allow compression and fast sequential writes."
+   },
+   {
+    "q": "What is downsampling?",
+    "options": [
+     "Keeping lower-resolution summaries of old data (e.g. hourly averages)",
+     "Deleting all data",
+     "Encrypting data",
+     "Increasing precision"
+    ],
+    "answer": 0,
+    "why": "Recent data at full detail, older data summarised, saves huge amounts of storage."
+   },
+   {
+    "q": "Why do time series databases compress so well?",
+    "options": [
+     "Consecutive values and timestamps are similar, so deltas are tiny",
+     "They don't compress",
+     "They store images",
+     "They use random IDs"
+    ],
+    "answer": 0,
+    "why": "Techniques like delta-of-delta encoding shrink data dramatically."
+   },
+   {
+    "q": "What are retention policies?",
+    "options": [
+     "Rules that delete or downsample data older than a set age",
+     "Backup schedules",
+     "User permissions",
+     "Index types"
+    ],
+    "answer": 0,
+    "why": "Metrics from two years ago rarely need per-second detail."
+   },
+   {
+    "q": "Which interview problem would use a time series database?",
+    "options": [
+     "Metrics monitoring or price tracking",
+     "A URL shortener",
+     "A chat app's message store",
+     "A document editor"
+    ],
+    "answer": 0,
+    "why": "Monitoring dashboards and price history are classic time series workloads."
+   },
+   {
+    "q": "What is 'high cardinality' a problem for in time series databases?",
+    "options": [
+     "Too many unique label combinations (e.g. per-user tags) creating huge numbers of series",
+     "Too few data points",
+     "Short retention",
+     "Small values"
+    ],
+    "answer": 0,
+    "why": "Each unique tag combination is a separate series; unbounded labels explode memory and indexes."
+   },
+   {
+    "q": "Examples of time series databases include…",
+    "options": [
+     "InfluxDB, TimescaleDB and Prometheus's storage",
+     "Redis only",
+     "Neo4j",
+     "S3"
+    ],
+    "answer": 0,
+    "why": "TimescaleDB builds on Postgres; Prometheus is common for metrics."
+   },
+   {
+    "q": "How are time series usually partitioned?",
+    "options": [
+     "By time chunks (and often by series), so old chunks can be dropped cheaply",
+     "By username",
+     "Randomly",
+     "They can't be"
+    ],
+    "answer": 0,
+    "why": "Dropping a whole time chunk is far cheaper than deleting rows one by one."
+   },
+   {
+    "q": "Typical queries on time series data are…",
+    "options": [
+     "Aggregations over time windows (avg CPU per minute over the last day)",
+     "Joins across many tables",
+     "Full-text search",
+     "Graph traversals"
+    ],
+    "answer": 0,
+    "why": "They're optimised for range scans and rollups."
+   }
+  ]
+ },
+ {
+  "key": "data-structures-for-big-data",
+  "section": "Advanced Topics",
+  "name": "Data Structures for Big Data",
+  "path": "deep-dives/data-structures-for-big-data",
+  "questions": [
+   {
+    "q": "What does a Bloom filter tell you?",
+    "options": [
+     "An item is definitely not in the set, or probably is",
+     "The exact count of items",
+     "The order of items",
+     "The item's location"
+    ],
+    "answer": 0,
+    "why": "No false negatives, some false positives, using very little memory."
+   },
+   {
+    "q": "A web crawler uses a Bloom filter to…",
+    "options": [
+     "Cheaply skip URLs it has probably already seen",
+     "Store page contents",
+     "Rank pages",
+     "Resolve DNS"
+    ],
+    "answer": 0,
+    "why": "Checking billions of URLs in memory avoids a database lookup for most of them."
+   },
+   {
+    "q": "Count-Min Sketch estimates…",
+    "options": [
+     "How often items appear in a stream, using fixed memory (may overestimate)",
+     "Exact unique counts",
+     "Sorted order",
+     "Geographic distance"
+    ],
+    "answer": 0,
+    "why": "Useful for heavy hitters and trending items like top-k videos."
+   },
+   {
+    "q": "HyperLogLog estimates…",
+    "options": [
+     "The number of distinct items (cardinality) with small memory",
+     "The sum of values",
+     "The median",
+     "The most frequent item"
+    ],
+    "answer": 0,
+    "why": "About 1–2% error using kilobytes, e.g. unique visitors per day."
+   },
+   {
+    "q": "Why use probabilistic data structures?",
+    "options": [
+     "Exact answers would need too much memory or time at huge scale; small errors are acceptable",
+     "They're always exact",
+     "They're easier to debug",
+     "Databases forbid exact counts"
+    ],
+    "answer": 0,
+    "why": "Trading a little accuracy for massive savings is often worth it."
+   },
+   {
+    "q": "Can you delete items from a standard Bloom filter?",
+    "options": [
+     "No: bits are shared, so clearing one could remove others (counting Bloom filters allow it)",
+     "Yes, easily",
+     "Only the first item",
+     "Only in Redis"
+    ],
+    "answer": 0,
+    "why": "Counting Bloom filters use counters instead of bits to support deletion."
+   },
+   {
+    "q": "What controls a Bloom filter's false positive rate?",
+    "options": [
+     "Its size in bits and the number of hash functions relative to items stored",
+     "The order of insertion",
+     "The item length only",
+     "Nothing"
+    ],
+    "answer": 0,
+    "why": "More bits per item lowers the false positive rate."
+   },
+   {
+    "q": "Finding the top 10 trending hashtags in a stream of billions uses…",
+    "options": [
+     "A Count-Min Sketch plus a small heap of candidates",
+     "Sorting all hashtags every second",
+     "A Bloom filter alone",
+     "A relational join"
+    ],
+    "answer": 0,
+    "why": "The sketch estimates counts; the heap tracks the current leaders."
+   },
+   {
+    "q": "A skip list is used in…",
+    "options": [
+     "Redis sorted sets and some databases, for ordered data with fast search",
+     "Bloom filters",
+     "DNS",
+     "Image compression"
+    ],
+    "answer": 0,
+    "why": "Skip lists give O(log n) search, insert and range queries with simple code."
+   },
+   {
+    "q": "In an interview, when should you mention these structures?",
+    "options": [
+     "When exact answers at scale would be too expensive, like unique counts, dedup or top-k",
+     "In every answer",
+     "Never",
+     "Only for tiny datasets"
+    ],
+    "answer": 0,
+    "why": "They show you can trade precision for scale deliberately."
+   }
+  ]
+ },
+ {
+  "key": "vector-databases",
+  "section": "Advanced Topics",
+  "name": "Vector Databases",
+  "path": "deep-dives/vector-databases",
+  "questions": [
+   {
+    "q": "What does a vector database store and search?",
+    "options": [
+     "Embeddings (lists of numbers) and finds the most similar ones",
+     "Only text strings",
+     "Relational rows with joins",
+     "Video files"
+    ],
+    "answer": 0,
+    "why": "Similar meaning becomes nearby vectors, enabling semantic search and recommendations."
+   },
+   {
+    "q": "What is an embedding?",
+    "options": [
+     "A numeric vector representing content, produced by a model, where similar content is close",
+     "An encrypted file",
+     "A database index on IDs",
+     "An HTML tag"
+    ],
+    "answer": 0,
+    "why": "Text, images or users are mapped into the same space so distance means similarity."
+   },
+   {
+    "q": "Why use approximate nearest neighbour (ANN) search?",
+    "options": [
+     "Exact search over millions of high-dimensional vectors is too slow",
+     "ANN is always exact",
+     "It uses more memory for no reason",
+     "It's required by law"
+    ],
+    "answer": 0,
+    "why": "ANN indexes like HNSW trade a little accuracy for large speed-ups."
+   },
+   {
+    "q": "HNSW is…",
+    "options": [
+     "A graph-based index that navigates layers of neighbours to find close vectors",
+     "A hashing algorithm for passwords",
+     "A message queue",
+     "A SQL dialect"
+    ],
+    "answer": 0,
+    "why": "It's one of the most popular ANN algorithms for its speed and recall."
+   },
+   {
+    "q": "Which similarity measures are common for embeddings?",
+    "options": [
+     "Cosine similarity, dot product or Euclidean distance",
+     "Alphabetical order",
+     "Levenshtein distance only",
+     "Row count"
+    ],
+    "answer": 0,
+    "why": "The choice matches how the embedding model was trained."
+   },
+   {
+    "q": "Where do vector databases appear in AI applications?",
+    "options": [
+     "Retrieval-augmented generation: finding relevant documents to give an LLM as context",
+     "Training GPUs",
+     "Storing model weights only",
+     "DNS resolution"
+    ],
+    "answer": 0,
+    "why": "RAG retrieves the closest chunks to a query and includes them in the prompt."
+   },
+   {
+    "q": "How do you combine vector search with filters (e.g. only English docs)?",
+    "options": [
+     "Metadata filtering alongside the vector query (pre- or post-filtering)",
+     "You can't",
+     "Delete other documents",
+     "Use a CDN"
+    ],
+    "answer": 0,
+    "why": "Most vector stores support filters; how they're applied affects recall and speed."
+   },
+   {
+    "q": "Can PostgreSQL do vector search?",
+    "options": [
+     "Yes, with the pgvector extension",
+     "No, never",
+     "Only for images",
+     "Only through Kafka"
+    ],
+    "answer": 0,
+    "why": "pgvector is a pragmatic choice when data already lives in Postgres."
+   },
+   {
+    "q": "What is 'recall' in ANN search?",
+    "options": [
+     "The share of true nearest neighbours the index actually returns",
+     "Query latency",
+     "Disk usage",
+     "The number of users"
+    ],
+    "answer": 0,
+    "why": "Tuning index parameters trades recall against speed and memory."
+   },
+   {
+    "q": "Hybrid search combines…",
+    "options": [
+     "Keyword (e.g. BM25) and vector similarity results",
+     "Two databases for backups",
+     "SQL and CSS",
+     "Caching and queues"
+    ],
+    "answer": 0,
+    "why": "Keywords catch exact terms; vectors catch meaning. Together they often rank best."
+   }
+  ]
+ },
+ {
+  "key": "change-data-capture",
+  "section": "Advanced Topics",
+  "name": "Change Data Capture",
+  "path": "deep-dives/change-data-capture",
+  "questions": [
+   {
+    "q": "What is change data capture (CDC)?",
+    "options": [
+     "Streaming every insert, update and delete from a database to other systems",
+     "A backup tool",
+     "A caching layer",
+     "A load balancer"
+    ],
+    "answer": 0,
+    "why": "Other systems (search, caches, analytics) stay in sync with the source of truth."
+   },
+   {
+    "q": "Where does log-based CDC read changes from?",
+    "options": [
+     "The database's write-ahead log / replication log",
+     "Application logs",
+     "The browser",
+     "The CDN"
+    ],
+    "answer": 0,
+    "why": "Reading the log captures every committed change without adding load from polling queries."
+   },
+   {
+    "q": "Which tool is a common CDC connector?",
+    "options": [
+     "Debezium, often publishing to Kafka",
+     "Memcached",
+     "Nginx",
+     "Terraform"
+    ],
+    "answer": 0,
+    "why": "Debezium reads Postgres/MySQL logs and emits change events."
+   },
+   {
+    "q": "Why is CDC better than 'write to the DB, then also write to the search index' in app code?",
+    "options": [
+     "It avoids the dual-write problem where one write succeeds and the other fails",
+     "It's slower",
+     "It needs no database",
+     "It removes indexes"
+    ],
+    "answer": 0,
+    "why": "The database log is the single source of truth; downstream systems derive from it."
+   },
+   {
+    "q": "Which use case suits CDC?",
+    "options": [
+     "Keeping Elasticsearch in sync with Postgres",
+     "Serving images",
+     "Hashing passwords",
+     "Rate limiting"
+    ],
+    "answer": 0,
+    "why": "Search indexes, caches and data warehouses are classic CDC consumers."
+   },
+   {
+    "q": "What must CDC consumers handle?",
+    "options": [
+     "Duplicates and ordering per key, so updates apply correctly",
+     "Nothing",
+     "Only inserts",
+     "Only schema changes"
+    ],
+    "answer": 0,
+    "why": "At-least-once delivery means consumers should be idempotent, and order matters per row."
+   },
+   {
+    "q": "How does CDC help with cache invalidation?",
+    "options": [
+     "Change events trigger cache updates or deletes when data changes",
+     "It disables the cache",
+     "It sets longer TTLs",
+     "It prevents writes"
+    ],
+    "answer": 0,
+    "why": "Invalidation driven by actual changes is more reliable than app code remembering to do it."
+   },
+   {
+    "q": "What is the lag in CDC?",
+    "options": [
+     "The delay between a change committing and consumers applying it, usually seconds or less",
+     "Always hours",
+     "Zero, always",
+     "The size of the database"
+    ],
+    "answer": 0,
+    "why": "Downstream views are eventually consistent; monitor lag."
+   },
+   {
+    "q": "How does the outbox pattern relate to CDC?",
+    "options": [
+     "Events written to an outbox table are published by CDC, reliably tied to the transaction",
+     "They're unrelated",
+     "Outbox replaces the database",
+     "CDC deletes the outbox"
+    ],
+    "answer": 0,
+    "why": "CDC on the outbox table gives reliable event publishing without dual writes."
+   },
+   {
+    "q": "What happens to CDC when the schema changes?",
+    "options": [
+     "Consumers must handle new or changed fields; schema registries help manage versions",
+     "Nothing ever",
+     "CDC stops forever",
+     "The database refuses changes"
+    ],
+    "answer": 0,
+    "why": "Plan for schema evolution so downstream systems don't break."
+   }
+  ]
+ }
+]

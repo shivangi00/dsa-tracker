@@ -2,6 +2,8 @@
 
 A minimalist tracker for working through the **NeetCode 150**, for any number of people. Each person signs up, picks a start date, and each day marks problems done with what they learned (plus an optional Excalidraw link). Every problem gets three revisions, scheduled by an Anki-style algorithm driven by your own ratings and fitted to a 100-day plan; every attempt keeps your notes and saved code versions; a short weekly test checks you can spot the same patterns in new problems, and motivation comes from long-term memory rather than streaks.
 
+A second tracker, **System design** (the switch at the top of every page), follows [Hello Interview](https://www.hellointerview.com/learn/system-design/in-a-hurry/introduction) on the same account and the same 100-day plan: a quiz for each topic, and written designs, scored for coverage, for each design problem.
+
 **Stack:** Java 21 · Spring Boot 3.5 · Spring Security · PostgreSQL 16 · Flyway · plain HTML/CSS/JS (no build step) · Spring Session (sessions in Postgres) · Docker · GitHub Actions CI
 
 ## Run it
@@ -150,6 +152,34 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 
   To compare complexities written in different styles, each is evaluated at typical sizes (n = 1000, k = 20 for the length of one item) and counts as better only if it is at least 3× smaller: O(n log n) → O(n) counts, O(V + E) vs O(n) doesn't. Two exponential complexities aren't compared. Suggestions are worked out when the page loads, so improving the list improves old analyses too.
 
+## System design tracker
+
+`/system-design.html`, reached with the **DSA | System design** switch in the header. Same sign-in, same start date, same plan: new topics and problems until day 85, every revision done by day 100. It doesn't change anything in the DSA tracker (separate tables: `sd_items`, `sd_attempts`, `sd_answers`, from `V12`).
+
+**Topics** (31, in Hello Interview's four sections: Core Concepts, Patterns, Key Technologies, Advanced Topics). Read the topic on Hello Interview (the name links there), then take its quiz: 5 of its 10 multiple-choice questions, the ones you haven't seen first, then the ones you got wrong last time, with options shuffled. Grading happens on the server. The score is your rating: 5/5 Easy, 4 Good ("Medium" the first time), 3 Hard, 0–2 Again. The first quiz marks the topic studied; **three revisions** follow, each another quiz. Again repeats the revision tomorrow. A quiz that isn't due is practice: graded, but nothing is saved. Each attempt has optional notes and an Excalidraw link, editable on its day and frozen after, like DSA attempts.
+
+**Design problems** (32: 4 Easy, 16 Medium, 12 Hard). Write your design in five parts (requirements, core entities, API, high-level design, deep dives), with an optional 45-minute timer, then rate how it went (Forgot / Hard / Medium / Easy, as in DSA). **Two revisions** follow, each a fresh design. Unsaved text is kept in the browser, so a reload doesn't lose it.
+
+- **Analyse** gives a free, built-in **coverage score out of 10**: 2 points for structure (0.4 per part with 30+ characters) and 8 for the share of the problem's key points you mention, spotted by keywords (`DesignScorer`). It lists what a strong answer also covers, then a **reference design** behind a toggle. It measures coverage, not quality, and says so.
+- **Analyse with Claude ↗** copies a review prompt with your design to the clipboard and opens claude.ai in a new tab: paste it (Ctrl+V / ⌘V) and the review runs in your own Claude account, at no cost to the app. (Claude has no documented way to pre-fill a chat, hence the paste. Signed-out visitors see Claude's sign-in page first.)
+- **Versions**: a sitting keeps up to 5 saved versions, each with its score, collapsed with only a Delete button. The box underneath (Analyse / Save / Delete) starts from your latest version, so you can add what you missed and save the improvement as the next version.
+
+Stage 1 has rubrics and reference designs for the four Easy problems (Bitly, Dropbox, Yelp, Gopuff); the others say "score soon" but can still be written, saved, rated and analysed with Claude. All quiz questions, rubrics and reference designs are written for this app in its own words and link to Hello Interview rather than copying it; they live in `sd-topics.json` and `sd-problems.json`.
+
+| Method | Path | Body | Notes |
+| --- | --- | --- | --- |
+| GET | `/api/sd/dashboard` | | plan, stats, due list, every topic and problem with its history |
+| GET | `/api/sd/topics/{key}/quiz` | | 5 questions; `mode` FIRST / REVIEW / PRACTICE |
+| POST | `/api/sd/topics/{key}/quiz` | `{ answers: [{ index, choice }], notes? }` | graded result; saved unless PRACTICE |
+| POST | `/api/sd/problems/{key}/done` | `{ rating, notes?, excalidrawUrl?, sections? }` | first design; 409 after day 85 |
+| POST | `/api/sd/items/{id}/reviews` | same | a problem's revision; 409 if not due |
+| PATCH | `/api/sd/attempts/{id}` | `{ notes, excalidrawUrl }` | on its day only |
+| POST | `/api/sd/attempts/{id}/answers` | `{ sections }` | Save: the next version, scored (max 5) |
+| DELETE | `/api/sd/answers/{id}` | | on its day only |
+| POST | `/api/sd/score` | `{ problemKey, sections }` | Analyse: score without saving |
+| GET | `/api/sd/problems/{key}` | | rubric points and reference design |
+| GET / DELETE | `/api/sd/items/{id}` | | one item / undo it and its history |
+
 ## API
 
 | Method | Path | Body | Notes |
@@ -192,12 +222,14 @@ src/main/java/dev/shivangi/dsatracker/
                  ComplexityExpression, ApproachRecommender, BestApproaches ← "a better approach exists" (pure Java)
   service/       AuthService, ProblemService, AnalysisService, DashboardService, WeeklyTestService
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
+  sd/            the system design tracker: SdCatalog, Quiz, DesignScorer (pure Java), SdService, SdController, entities
 src/main/resources/
-  db/migration/V1…V11      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history
+  db/migration/V1…V12      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   interview-tips.json     interview talking points for each of the 150 problems
-  static/        theme.js (day/night mode, loaded first so there's no flash), http.js (fetch + CSRF header), auth.html/js, index.html + app.js, test.html/js, styles.css
-src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)
+  sd-topics.json, sd-problems.json   system design quizzes, rubrics and reference designs
+  static/        theme.js (day/night mode, loaded first so there's no flash), http.js (fetch + CSRF header), auth.html/js, index.html + app.js, system-design.html + sd.js, test.html/js, styles.css
+src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, SystemDesignIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)
 Dockerfile (Render), Dockerfile.vercel + vercel.json (Vercel, kept in case its limits change), docker-compose.yml, .github/workflows/ci.yml, .env.example, DEPLOY.md
 ```
 

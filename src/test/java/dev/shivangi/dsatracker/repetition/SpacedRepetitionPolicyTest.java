@@ -233,4 +233,33 @@ class SpacedRepetitionPolicyTest {
         ScheduleState dueSoon = policy.onFirstSolve(day(20), AGAIN);   // due day 21 already
         assertEquals(dueSoon, policy.pullForward(dueSoon, day(20)));
     }
+
+    @Test
+    void twoRevisionPolicyCompletesAfterTheSecond() {
+        SpacedRepetitionPolicy two = new SpacedRepetitionPolicy(2);
+        assertEquals(2, two.revisions());
+        ScheduleState s = two.onFirstSolve(day1, GOOD, day(100));
+        s = two.onReview(s, s.nextDueOn(), GOOD, day(100));
+        assertEquals(1, s.reps());
+        assertTrue(s.nextDueOn() != null);
+        s = two.onReview(s, s.nextDueOn(), GOOD, day(100));
+        assertEquals(2, s.reps());
+        assertNull(s.nextDueOn());
+        ScheduleState done = s;
+        assertThrows(IllegalStateException.class, () -> two.onReview(done, day(100), GOOD, day(100)));
+    }
+
+    @Test
+    void twoRevisionDeadlineSplitsTheDaysLeftInTwo() {
+        SpacedRepetitionPolicy two = new SpacedRepetitionPolicy(2);
+        // Day 90 of 100: 10 days left, 2 revisions, so no gap longer than 5; Easy (5) fits exactly.
+        assertEquals(5, two.onFirstSolve(day(90), EASY, day(100)).intervalDays());
+        // With three revisions the same day allows only 3.
+        assertEquals(3, policy.onFirstSolve(day(90), EASY, day(100)).intervalDays());
+    }
+
+    @Test
+    void atLeastOneRevision() {
+        assertThrows(IllegalArgumentException.class, () -> new SpacedRepetitionPolicy(0));
+    }
 }

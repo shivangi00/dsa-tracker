@@ -36,6 +36,9 @@ import java.util.Map;
  * <p><b>The workload.</b> {@link #spread} brings a review forward by up to a quarter of its gap
  * (at most 3 days) when {@value #MAX_REVIEWS_PER_DAY} reviews are already due that day. Never later,
  * so the deadline still holds.
+ *
+ * <p>The number of revisions is {@value #REVISIONS} by default (DSA problems); the system design
+ * tracker uses the same rules with 3 per topic and 2 per design problem.
  */
 public final class SpacedRepetitionPolicy {
 
@@ -58,6 +61,26 @@ public final class SpacedRepetitionPolicy {
     private static final Map<Rating, Integer> FIRST_GAP = Map.of(
             Rating.AGAIN, 1, Rating.HARD, 2, Rating.GOOD, 3, Rating.EASY, 5);
 
+    /** Revisions before an item is complete: 3 for DSA problems (the default). */
+    private final int revisions;
+
+    /** The DSA schedule: {@value #REVISIONS} revisions. */
+    public SpacedRepetitionPolicy() {
+        this(REVISIONS);
+    }
+
+    /** The same rules with a different number of revisions (system design: 3 per topic, 2 per problem). */
+    public SpacedRepetitionPolicy(int revisions) {
+        if (revisions < 1) {
+            throw new IllegalArgumentException("At least one revision");
+        }
+        this.revisions = revisions;
+    }
+
+    public int revisions() {
+        return revisions;
+    }
+
     /** First solve with no deadline (tests, or problems outside a plan). */
     public ScheduleState onFirstSolve(LocalDate day, Rating rating) {
         return onFirstSolve(day, rating, null);
@@ -65,7 +88,7 @@ public final class SpacedRepetitionPolicy {
 
     /** First solve: the gap and ease follow how it went, capped so three revisions fit before {@code planEnd}. */
     public ScheduleState onFirstSolve(LocalDate day, Rating rating, LocalDate planEnd) {
-        int gap = Math.min(FIRST_GAP.get(rating), cap(day, planEnd, REVISIONS));
+        int gap = Math.min(FIRST_GAP.get(rating), cap(day, planEnd, revisions));
         return new ScheduleState(gap, easeAfter(START_EASE, rating), 0, 0, day, day.plusDays(gap));
     }
 
@@ -89,7 +112,7 @@ public final class SpacedRepetitionPolicy {
      */
     public ScheduleState onReview(ScheduleState s, LocalDate today, Rating rating, LocalDate planEnd) {
         if (s.nextDueOn() == null) {
-            throw new IllegalStateException("This problem is fully revised: all " + REVISIONS + " revisions are done");
+            throw new IllegalStateException("Fully revised: all " + revisions + " revisions are done");
         }
         if (!s.isDueOn(today)) {
             throw new IllegalStateException("This review isn't due until " + s.nextDueOn());
@@ -101,11 +124,11 @@ public final class SpacedRepetitionPolicy {
         }
         int reps = s.reps() + 1;
         int natural = naturalGap(s, daysLate, rating);
-        if (reps >= REVISIONS) {
+        if (reps >= revisions) {
             // Fully revised: nothing more is due. The gap still says how well it's known (memory stages).
             return new ScheduleState(natural, ease, reps, s.lapses(), today, null);
         }
-        int gap = Math.min(natural, cap(today, planEnd, REVISIONS - reps));
+        int gap = Math.min(natural, cap(today, planEnd, revisions - reps));
         return new ScheduleState(gap, ease, reps, s.lapses(), today, today.plusDays(gap));
     }
 

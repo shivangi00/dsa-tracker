@@ -1,0 +1,730 @@
+[
+ {
+  "key": "bitly",
+  "level": "EASY",
+  "name": "Bitly (URL shortener)",
+  "path": "problem-breakdowns/bitly",
+  "rubric": [
+   {
+    "point": "Generate unique short codes: a counter or ID encoded in base62, or a hash with collision handling",
+    "keywords": [
+     "base62",
+     "base 62",
+     "base-62",
+     "counter",
+     "collision",
+     "unique id",
+     "id generator",
+     "snowflake",
+     "hash"
+    ]
+   },
+   {
+    "point": "Scale the ID counter: a central counter (e.g. Redis INCR) that hands out ranges of IDs to servers in batches",
+    "keywords": [
+     "incr",
+     "batch",
+     "range of ids",
+     "id range",
+     "ranges",
+     "block of",
+     "ticket server",
+     "pre-allocat"
+    ]
+   },
+   {
+    "point": "Redirects are read-heavy: cache short-to-long mappings (Redis, and/or a CDN at the edge)",
+    "keywords": [
+     "cache",
+     "redis",
+     "cdn",
+     "memcache"
+    ]
+   },
+   {
+    "point": "Explain the redirect status: 302 keeps traffic flowing through you (analytics, editable links); 301 lets browsers cache it",
+    "keywords": [
+     "301",
+     "302",
+     "redirect"
+    ]
+   },
+   {
+    "point": "Custom aliases: check the alias isn't taken, in the same namespace as generated codes",
+    "keywords": [
+     "custom alias",
+     "alias",
+     "vanity",
+     "custom url",
+     "custom short"
+    ]
+   },
+   {
+    "point": "Expiration: store an expiry time, reject expired links on redirect, clean up in the background",
+    "keywords": [
+     "expir",
+     "ttl",
+     "expire"
+    ]
+   },
+   {
+    "point": "Store mappings keyed by short code (primary key / key-value lookup) for O(1) reads",
+    "keywords": [
+     "primary key",
+     "index",
+     "key-value",
+     "key value",
+     "dynamodb",
+     "lookup"
+    ]
+   },
+   {
+    "point": "Scale out stateless read servers behind a load balancer, separately from the (much rarer) writes",
+    "keywords": [
+     "load balancer",
+     "horizontal",
+     "stateless",
+     "read replica",
+     "replica",
+     "scale out",
+     "separate service"
+    ]
+   },
+   {
+    "point": "Back-of-the-envelope numbers: reads vastly outnumber writes (e.g. 100:1), redirect latency target",
+    "keywords": [
+     "per second",
+     "qps",
+     "rps",
+     "100:1",
+     "read-heavy",
+     "read heavy",
+     "reads per",
+     "latency",
+     "per day",
+     "outnumber",
+     "million",
+     "billion"
+    ]
+   }
+  ],
+  "reference": {
+   "functional": [
+    "Create a short URL for a long URL, optionally with a custom alias and an expiry date",
+    "Visiting the short URL redirects to the original URL"
+   ],
+   "nonFunctional": [
+    "Redirects are fast (well under 100 ms) and highly available",
+    "Short codes are unique",
+    "Scale: roughly 100 million new links and billions of redirects per day; reads outnumber writes by about 100 to 1",
+    "Eventual consistency is fine for analytics; a new link should work right away for its creator"
+   ],
+   "entities": [
+    "Link: short_code (primary key), long_url, owner_id, created_at, expires_at",
+    "User (optional, for managing links)"
+   ],
+   "api": [
+    "POST /urls { longUrl, customAlias?, expiresAt? } → { shortUrl }",
+    "GET /{shortCode} → 302 redirect to the long URL (404 if unknown or expired)"
+   ],
+   "highLevel": [
+    "A write service validates the long URL, gets a unique code and stores the Link row",
+    "A read (redirect) service looks up the code in a cache first, then the database, and returns a redirect",
+    "Both are stateless and scale behind a load balancer; the redirect path gets many more instances",
+    "A key-value or relational store keyed by short_code keeps lookups O(1)"
+   ],
+   "deepDives": [
+    {
+     "title": "Generating unique codes",
+     "body": "Take a globally increasing number and encode it in base62 (a–z, A–Z, 0–9): 7 characters give 62^7 ≈ 3.5 trillion codes. To avoid one counter becoming a bottleneck, each write server grabs a batch of, say, 1,000 IDs at a time from a central counter (Redis INCRBY or a database sequence) and hands them out locally. Hashing the long URL also works but needs collision checks and retries; random codes are harder to guess, which some products want."
+    },
+    {
+     "title": "Fast, highly available redirects",
+     "body": "Redirects dominate traffic, so put an in-memory cache (Redis) in front of the database and let a CDN cache popular redirects at the edge. Use 302 if you want every click to reach you (analytics, editable destinations); 301 lets browsers cache the redirect and cuts load but loses visibility."
+    },
+    {
+     "title": "Custom aliases and expiry",
+     "body": "A custom alias is just a chosen short_code: insert it with a uniqueness check (the primary key rejects duplicates). Keep generated codes and aliases in the same table so they can't collide. Store expires_at, check it on redirect, and remove expired rows with a background job or database TTL."
+    },
+    {
+     "title": "Scaling storage",
+     "body": "A billion links of ~500 bytes is ~500 GB, which fits a small cluster. If it grows, partition by short_code hash so reads spread evenly."
+    }
+   ]
+  }
+ },
+ {
+  "key": "dropbox",
+  "level": "EASY",
+  "name": "Dropbox (file storage and sync)",
+  "path": "problem-breakdowns/dropbox",
+  "rubric": [
+   {
+    "point": "Clients upload file bytes directly to object storage (S3) using pre-signed URLs, not through app servers",
+    "keywords": [
+     "presigned",
+     "pre-signed",
+     "signed url",
+     "s3",
+     "blob storage",
+     "object storage"
+    ]
+   },
+   {
+    "point": "Split large files into chunks: multipart, parallel and resumable uploads",
+    "keywords": [
+     "chunk",
+     "multipart",
+     "resum"
+    ]
+   },
+   {
+    "point": "Keep file metadata (owner, name, size, chunk list, status) in a database, separate from the bytes",
+    "keywords": [
+     "metadata"
+    ]
+   },
+   {
+    "point": "Fingerprint chunks by content hash to deduplicate and verify integrity",
+    "keywords": [
+     "fingerprint",
+     "dedup",
+     "checksum",
+     "sha",
+     "content hash",
+     "hash"
+    ]
+   },
+   {
+    "point": "Sync changes to other devices: a change log/cursor per user, delivered by polling or push (WebSocket/SSE)",
+    "keywords": [
+     "sync",
+     "poll",
+     "websocket",
+     "sse",
+     "push",
+     "cursor",
+     "change log",
+     "changelog",
+     "notification"
+    ]
+   },
+   {
+    "point": "Only upload changed chunks when a file is edited (delta sync)",
+    "keywords": [
+     "delta",
+     "changed chunk",
+     "only the changed",
+     "modified chunk",
+     "only changed"
+    ]
+   },
+   {
+    "point": "Serve downloads with signed URLs and a CDN for popular files",
+    "keywords": [
+     "cdn",
+     "download"
+    ]
+   },
+   {
+    "point": "Sharing and permissions: an access list checked before issuing URLs",
+    "keywords": [
+     "share",
+     "sharing",
+     "permission",
+     "acl",
+     "access control"
+    ]
+   },
+   {
+    "point": "Handle conflicting edits: versioning, conflict copies or last-write-wins",
+    "keywords": [
+     "conflict",
+     "version"
+    ]
+   }
+  ],
+  "reference": {
+   "functional": [
+    "Upload and download files from any device",
+    "Share files with other users",
+    "Files sync automatically across a user's devices"
+   ],
+   "nonFunctional": [
+    "Durable: files are never lost",
+    "Large files (up to many GB) upload reliably on flaky connections",
+    "Sync appears within seconds",
+    "Availability over strict consistency for browsing; no silent data loss on conflicts"
+   ],
+   "entities": [
+    "File: id, owner_id, name, size, status, chunk list, version, updated_at",
+    "Chunk: fingerprint (hash), storage key",
+    "Share: file_id, user_id, permission"
+   ],
+   "api": [
+    "POST /files { name, size, chunkFingerprints } → { fileId, uploadUrls for missing chunks }",
+    "PATCH /files/{id} { status: uploaded } (or storage events confirm it)",
+    "GET /files/{id} → { metadata, signed download URL }",
+    "POST /files/{id}/shares { userId, permission }",
+    "GET /changes?cursor= → changes since the cursor"
+   ],
+   "highLevel": [
+    "File service stores metadata in a relational database",
+    "Object storage (S3) holds chunks; clients upload and download directly with pre-signed URLs",
+    "A sync service keeps a per-user change log; clients poll it or receive push notifications",
+    "A CDN serves frequently downloaded files"
+   ],
+   "deepDives": [
+    {
+     "title": "Uploading large files",
+     "body": "The client splits files into chunks (e.g. 5–10 MB), hashes each one, and asks the file service which chunks are missing. It uploads those in parallel straight to object storage with pre-signed URLs (S3 multipart upload), retrying individual parts. When all parts are in, the metadata status flips to uploaded, either confirmed by the client or by storage events."
+    },
+    {
+     "title": "Deduplication and delta sync",
+     "body": "Because chunks are named by content hash, an edited file only re-uploads the chunks that changed, and identical chunks across files or users are stored once."
+    },
+    {
+     "title": "Keeping devices in sync",
+     "body": "Every change appends to the user's change log with an increasing cursor. Clients remember their last cursor and ask for newer changes, via long polling or a WebSocket nudge, then download what changed. Local changes go through the same upload path."
+    },
+    {
+     "title": "Conflicts",
+     "body": "If two devices edit the same version offline, keep both: save the later one as a conflict copy (or a new version) rather than silently overwriting. Version numbers on the metadata row detect the conflict (optimistic concurrency)."
+    }
+   ]
+  }
+ },
+ {
+  "key": "yelp",
+  "level": "EASY",
+  "name": "Yelp (local business search and reviews)",
+  "path": "problem-breakdowns/yelp",
+  "rubric": [
+   {
+    "point": "Find businesses near a location with a geospatial index (geohash, quadtree, PostGIS or Elasticsearch geo)",
+    "keywords": [
+     "geohash",
+     "quadtree",
+     "quad tree",
+     "postgis",
+     "geospatial",
+     "geo",
+     "r-tree",
+     "h3",
+     "s2"
+    ]
+   },
+   {
+    "point": "Search by name and category with full-text search (e.g. Elasticsearch) and filters",
+    "keywords": [
+     "elasticsearch",
+     "full-text",
+     "full text",
+     "inverted",
+     "text search",
+     "opensearch"
+    ]
+   },
+   {
+    "point": "Precompute each business's average rating (and review count) instead of averaging on every read",
+    "keywords": [
+     "average",
+     "precompute",
+     "denormal",
+     "avg_rating",
+     "rating count",
+     "review count"
+    ]
+   },
+   {
+    "point": "Update the average safely under concurrent reviews (atomic update or transaction)",
+    "keywords": [
+     "atomic",
+     "transaction",
+     "optimistic",
+     "lock",
+     "concurrent"
+    ]
+   },
+   {
+    "point": "Enforce one review per user per business with a unique constraint",
+    "keywords": [
+     "unique constraint",
+     "one review",
+     "unique index",
+     "constraint",
+     "once per"
+    ]
+   },
+   {
+    "point": "Keep the search index in sync with the database (change data capture or events)",
+    "keywords": [
+     "cdc",
+     "change data capture",
+     "debezium",
+     "sync",
+     "stream"
+    ]
+   },
+   {
+    "point": "Paginate search results and reviews (cursor-based)",
+    "keywords": [
+     "paginat",
+     "cursor",
+     "page"
+    ]
+   },
+   {
+    "point": "Cache popular searches and business pages; the workload is read-heavy",
+    "keywords": [
+     "cache",
+     "redis",
+     "cdn",
+     "read-heavy",
+     "read heavy"
+    ]
+   }
+  ],
+  "reference": {
+   "functional": [
+    "Search for businesses by name, category and location",
+    "View a business with its reviews",
+    "Leave one review (rating and text) per business"
+   ],
+   "nonFunctional": [
+    "Search results in under ~500 ms",
+    "Read-heavy: far more searches and views than reviews",
+    "Highly available; eventual consistency is fine for ratings",
+    "Scale: millions of businesses, hundreds of millions of reviews"
+   ],
+   "entities": [
+    "Business: id, name, category, location (lat/long), avg_rating, review_count",
+    "Review: id, business_id, user_id, rating, text, created_at (unique on business_id + user_id)",
+    "User"
+   ],
+   "api": [
+    "GET /businesses?query=&category=&lat=&long=&radius=&cursor= → businesses",
+    "GET /businesses/{id} → business with a page of reviews",
+    "POST /businesses/{id}/reviews { rating, text }"
+   ],
+   "highLevel": [
+    "A search service queries a search index (Elasticsearch) with geo and text filters",
+    "A business service reads business details and reviews from a relational database",
+    "A review service writes reviews and updates the business's rating in the same transaction",
+    "CDC streams business changes into the search index; a cache serves hot business pages"
+   ],
+   "deepDives": [
+    {
+     "title": "Proximity search",
+     "body": "Index each business's location in a geospatial index: Elasticsearch geo_point with a geo_distance filter, PostGIS, or geohash prefixes. Businesses rarely move, so updates are cheap. Combine the location filter with text and category matching, then rank by distance, rating and relevance."
+    },
+    {
+     "title": "Average ratings",
+     "body": "Store avg_rating and review_count on the business row. When a review is added, update both atomically in the same transaction as the insert (new_avg = (avg × count + rating) / (count + 1)), so concurrent reviews don't overwrite each other."
+    },
+    {
+     "title": "One review per user",
+     "body": "A unique constraint on (business_id, user_id) enforces it at the database, not just in the UI."
+    },
+    {
+     "title": "Keeping search in sync",
+     "body": "The relational database is the source of truth. Change data capture publishes changes to the search index within seconds; slight delay is acceptable for search."
+    }
+   ]
+  }
+ },
+ {
+  "key": "gopuff",
+  "level": "EASY",
+  "name": "Local Delivery Service (e.g. Gopuff)",
+  "path": "problem-breakdowns/gopuff",
+  "rubric": [
+   {
+    "point": "Track inventory per distribution centre (warehouse), not just globally",
+    "keywords": [
+     "inventory",
+     "warehouse",
+     "distribution center",
+     "distribution centre",
+     "fulfilment",
+     "fulfillment"
+    ]
+   },
+   {
+    "point": "Availability depends on which centres can reach the customer in time: nearby centres by distance or travel time",
+    "keywords": [
+     "nearby",
+     "distance",
+     "travel time",
+     "radius",
+     "geospatial",
+     "within",
+     "eta"
+    ]
+   },
+   {
+    "point": "Prevent overselling: decrement stock atomically in a transaction when an order is placed",
+    "keywords": [
+     "transaction",
+     "atomic",
+     "oversell",
+     "over-sell",
+     "lock",
+     "conditional",
+     "for update"
+    ]
+   },
+   {
+    "point": "Cache availability for browsing (read-heavy) with a short TTL",
+    "keywords": [
+     "cache",
+     "ttl",
+     "redis"
+    ]
+   },
+   {
+    "point": "Partition data by region or distribution centre",
+    "keywords": [
+     "partition",
+     "shard",
+     "region"
+    ]
+   },
+   {
+    "point": "Strong consistency for orders and stock, eventual consistency for browsing",
+    "keywords": [
+     "strong consistency",
+     "strongly consistent",
+     "eventual",
+     "consistency"
+    ]
+   },
+   {
+    "point": "Scale inventory reads with read replicas",
+    "keywords": [
+     "replica"
+    ]
+   },
+   {
+    "point": "Orders and payments are idempotent and tracked through statuses",
+    "keywords": [
+     "idempotent",
+     "idempoten",
+     "payment",
+     "status"
+    ]
+   }
+  ],
+  "reference": {
+   "functional": [
+    "Customers see which items are available for delivery to their location",
+    "Customers place orders for multiple items",
+    "Orders are fulfilled from a nearby distribution centre"
+   ],
+   "nonFunctional": [
+    "Availability checks are fast (under ~100 ms)",
+    "Orders must never be placed for stock that doesn't exist (strong consistency)",
+    "Browsing tolerates slight staleness",
+    "Scale: thousands of centres, millions of customers"
+   ],
+   "entities": [
+    "DistributionCentre: id, location",
+    "Item: id, name, price",
+    "Inventory: centre_id, item_id, quantity",
+    "Order: id, customer_id, centre_id, status, items"
+   ],
+   "api": [
+    "GET /availability?lat=&long=&items= → available items and quantities",
+    "POST /orders { items, location, paymentToken } → order"
+   ],
+   "highLevel": [
+    "An availability service finds centres that can deliver to the location (distance or travel-time check) and sums their inventory",
+    "Inventory lives in a relational database, partitioned by region, with read replicas for availability queries",
+    "An order service checks and decrements inventory in one transaction, then takes payment",
+    "A cache holds recent availability results per area with a short TTL"
+   ],
+   "deepDives": [
+    {
+     "title": "Which centres can serve a customer",
+     "body": "Pre-filter centres within a radius using a geospatial index, then confirm with travel times (a maps/ETA service) for the few candidates. Cache the centre list per area, since centres don't move."
+    },
+    {
+     "title": "Preventing overselling",
+     "body": "Placing an order runs one transaction: lock or conditionally update each inventory row (UPDATE … SET qty = qty − n WHERE qty ≥ n), and fail the whole order if any item is short. Take payment with an idempotency key; if payment fails, release the stock."
+    },
+    {
+     "title": "Fast availability at scale",
+     "body": "Availability reads far outnumber orders. Serve them from read replicas and a short-TTL cache per area; a few seconds of staleness is fine because the order transaction is the final check."
+    }
+   ]
+  }
+ },
+ {
+  "key": "ticketmaster",
+  "level": "MEDIUM",
+  "name": "Ticketmaster",
+  "path": "problem-breakdowns/ticketmaster"
+ },
+ {
+  "key": "instagram",
+  "level": "MEDIUM",
+  "name": "Instagram",
+  "path": "problem-breakdowns/instagram"
+ },
+ {
+  "key": "fb-news-feed",
+  "level": "MEDIUM",
+  "name": "FB News Feed",
+  "path": "problem-breakdowns/fb-news-feed"
+ },
+ {
+  "key": "tinder",
+  "level": "MEDIUM",
+  "name": "Tinder",
+  "path": "problem-breakdowns/tinder"
+ },
+ {
+  "key": "leetcode",
+  "level": "MEDIUM",
+  "name": "LeetCode",
+  "path": "problem-breakdowns/leetcode"
+ },
+ {
+  "key": "whatsapp",
+  "level": "MEDIUM",
+  "name": "WhatsApp",
+  "path": "problem-breakdowns/whatsapp"
+ },
+ {
+  "key": "strava",
+  "level": "MEDIUM",
+  "name": "Strava",
+  "path": "problem-breakdowns/strava"
+ },
+ {
+  "key": "distributed-cache",
+  "level": "MEDIUM",
+  "name": "Distributed Cache",
+  "path": "problem-breakdowns/distributed-cache"
+ },
+ {
+  "key": "distributed-rate-limiter",
+  "level": "MEDIUM",
+  "name": "Rate Limiter",
+  "path": "problem-breakdowns/distributed-rate-limiter"
+ },
+ {
+  "key": "online-auction",
+  "level": "MEDIUM",
+  "name": "Online Auction",
+  "path": "problem-breakdowns/online-auction"
+ },
+ {
+  "key": "youtube",
+  "level": "MEDIUM",
+  "name": "YouTube",
+  "path": "problem-breakdowns/youtube"
+ },
+ {
+  "key": "job-scheduler",
+  "level": "MEDIUM",
+  "name": "Job Scheduler",
+  "path": "problem-breakdowns/job-scheduler"
+ },
+ {
+  "key": "fb-live-comments",
+  "level": "MEDIUM",
+  "name": "FB Live Comments",
+  "path": "problem-breakdowns/fb-live-comments"
+ },
+ {
+  "key": "google-news",
+  "level": "MEDIUM",
+  "name": "News Aggregator",
+  "path": "problem-breakdowns/google-news"
+ },
+ {
+  "key": "camelcamelcamel",
+  "level": "MEDIUM",
+  "name": "Price Tracking Service",
+  "path": "problem-breakdowns/camelcamelcamel"
+ },
+ {
+  "key": "notification-system",
+  "level": "MEDIUM",
+  "name": "Notification System",
+  "path": "problem-breakdowns/notification-system"
+ },
+ {
+  "key": "top-k",
+  "level": "HARD",
+  "name": "YouTube Top K",
+  "path": "problem-breakdowns/top-k"
+ },
+ {
+  "key": "uber",
+  "level": "HARD",
+  "name": "Uber",
+  "path": "problem-breakdowns/uber"
+ },
+ {
+  "key": "robinhood",
+  "level": "HARD",
+  "name": "Robinhood",
+  "path": "problem-breakdowns/robinhood"
+ },
+ {
+  "key": "google-docs",
+  "level": "HARD",
+  "name": "Google Docs",
+  "path": "problem-breakdowns/google-docs"
+ },
+ {
+  "key": "web-crawler",
+  "level": "HARD",
+  "name": "Web Crawler",
+  "path": "problem-breakdowns/web-crawler"
+ },
+ {
+  "key": "ad-click-aggregator",
+  "level": "HARD",
+  "name": "Ad Click Aggregator",
+  "path": "problem-breakdowns/ad-click-aggregator"
+ },
+ {
+  "key": "fb-post-search",
+  "level": "HARD",
+  "name": "FB Post Search",
+  "path": "problem-breakdowns/fb-post-search"
+ },
+ {
+  "key": "payment-system",
+  "level": "HARD",
+  "name": "Payment System",
+  "path": "problem-breakdowns/payment-system"
+ },
+ {
+  "key": "metrics-monitoring",
+  "level": "HARD",
+  "name": "Metrics Monitoring",
+  "path": "problem-breakdowns/metrics-monitoring"
+ },
+ {
+  "key": "online-chess",
+  "level": "HARD",
+  "name": "Online Chess",
+  "path": "problem-breakdowns/online-chess"
+ },
+ {
+  "key": "chatgpt",
+  "level": "HARD",
+  "name": "ChatGPT",
+  "path": "problem-breakdowns/chatgpt"
+ },
+ {
+  "key": "flash-sale",
+  "level": "HARD",
+  "name": "Flash Sale",
+  "path": "problem-breakdowns/flash-sale"
+ }
+]
