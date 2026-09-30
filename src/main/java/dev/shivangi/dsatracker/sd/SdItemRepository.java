@@ -12,6 +12,9 @@ public interface SdItemRepository extends JpaRepository<SdItem, Long> {
 
     List<SdItem> findByUserId(Long userId);
 
+    /** Topics and problems due today or overdue (for the badge on the System design tab). */
+    long countByUserIdAndNextDueOnLessThanEqual(Long userId, LocalDate today);
+
     Optional<SdItem> findByIdAndUserId(Long id, Long userId);
 
     Optional<SdItem> findByUserIdAndKindAndItemKey(Long userId, SdKind kind, String itemKey);

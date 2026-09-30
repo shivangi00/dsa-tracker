@@ -578,6 +578,8 @@ body { transition: background-color .2s, color .2s; }
 .tracker-switch a span { display: block; padding: 4px 12px; font-size: 13px; border-radius: 5px; color: var(--ink-2); }
 .tracker-switch a:hover span { color: var(--ink); }
 .tracker-switch a[aria-current=page] span { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.due-badge { display: inline-block; min-width: 17px; height: 17px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: var(--critical); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; vertical-align: 1px; font-variant-numeric: tabular-nums; }
+.due-badge[hidden] { display: none; }
 .tracker-switch a:focus-visible { outline: 2px solid var(--accent); border-radius: 5px; }
 .sd-stats { margin-bottom: 36px; }
 .sd-topic .row { grid-template-columns: minmax(0, 1fr) repeat(4, 112px) 104px; }

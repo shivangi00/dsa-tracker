@@ -615,4 +615,86 @@ class HeuristicComplexityAnalyserTest {
         assertEquals("O(1)", a.space(), String.join("\n", a.reasons()));
         assertTrue(a.reasons().stream().anyMatch(r -> r.contains("isn't counted as extra space")));
     }
+
+    // ---------------------------------------------------------------- reading a string piece by piece
+
+    private void expectTime(String time, String code, CodeLanguage lang) {
+        ComplexityAnalysis a = analyser.analyse(code, lang);
+        assertEquals(time, a.time(), String.join("\n", a.reasons()));
+    }
+
+    /** Encode and Decode Strings: indexOf/substring start at the pointer, which then jumps past them. */
+    @Test
+    void decodingPieceByPieceIsLinear() {
+        expectTime("O(n)", """
+                class Solution {
+                    public String encode(String arr[]) {
+                        StringBuilder sb = new StringBuilder();
+                        for(int i = 0; i < arr.length; i++) {
+                            int len = arr[i].length();
+                            sb.append(len);
+                            sb.append("#");
+                            sb.append(arr[i]);
+                        }
+                        return sb.toString();
+                    }
+
+                    public ArrayList<String> decode(String s) {
+                        ArrayList<String> ans = new ArrayList<>();
+                        int i = 0;
+                        int n = s.length();
+                        while(i < n) {
+                            int delimiterIndex = s.indexOf('#', i);
+                            int len = Integer.parseInt(s.substring(i, delimiterIndex));
+                            int stringStartIndex = delimiterIndex + 1;
+                            int stringEndIndex = stringStartIndex + len;
+                            ans.add(s.substring(stringStartIndex, stringEndIndex));
+                            i = stringEndIndex;
+                        }
+                        return ans;
+                    }
+                }""", JAVA);
+    }
+
+    @Test
+    void decodingPieceByPieceInPythonIsLinear() {
+        expectTime("O(n)", """
+                class Solution:
+                    def decode(self, s):
+                        res, i = [], 0
+                        while i < len(s):
+                            j = s.index('#', i)
+                            length = int(s[i:j])
+                            res.append(s[j + 1:j + 1 + length])
+                            i = j + 1 + length
+                        return res""", PYTHON);
+    }
+
+    /** Re-reading from the start on every pass really is quadratic. */
+    @Test
+    void rereadingFromTheStartIsStillQuadratic() {
+        expectTime("O(n²)", """
+                class Solution {
+                    public int count(String s) {
+                        int i = 0, total = 0;
+                        while (i < s.length()) {
+                            String prefix = s.substring(0, i);
+                            total += prefix.length();
+                            i = i + 2;
+                        }
+                        return total;
+                    }
+                }""", JAVA);
+        expectTime("O(n²)", """
+                class Solution {
+                    public int count(String s) {
+                        int i = 0, total = 0;
+                        while (i < s.length()) {
+                            total += s.indexOf('#');
+                            i++;
+                        }
+                        return total;
+                    }
+                }""", JAVA);
+    }
 }

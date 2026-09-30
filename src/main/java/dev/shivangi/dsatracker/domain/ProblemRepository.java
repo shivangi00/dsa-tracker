@@ -16,6 +16,9 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
 
     boolean existsByUserIdAndCatalogId(Long userId, Integer catalogId);
 
+    /** Revisions due today or overdue (for the badge on the DSA tab). */
+    long countByUserIdAndNextDueOnLessThanEqual(Long userId, LocalDate today);
+
     List<Problem> findByUserIdOrderBySolvedOnDescIdDesc(Long userId);
 
     /** Problems marked done in a date range (a plan week), for weekly tests. */

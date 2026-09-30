@@ -58,6 +58,8 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                     + "|\\.toCharArray\\s*\\(|\\.includes\\s*\\(|\\.reverse\\s*\\(|\\breversed\\s*\\(|\\.copy\\s*\\("
                     + "|\\.clone\\s*\\(|Arrays\\.fill\\s*\\(|Arrays\\.copyOf\\w*\\s*\\(|\\bnew\\s+ArrayList\\s*<[^>]*>\\s*\\(\\s*\\w"
                     + "|\\bheapq\\.heapify\\s*\\(|\\b(list|set|Counter)\\s*\\(\\s*\\w|\\w\\s*\\[[^\\]\\[]*:[^\\]\\[]*\\]");
+    /** A while loop driven by a pointer: "while (i < n)", "while i < len(s)". */
+    private static final Pattern POINTER_LOOP = Pattern.compile("^\\s*while\\b\\s*\\(?\\s*(\\w+)\\s*<=?");
     private static final Pattern AGGREGATE = Pattern.compile("\\b(sum|max|min|any|all)\\s*\\(");
     private static final Pattern RANGE_CONST = Pattern.compile("\\bin\\s+range\\s*\\(\\s*-?\\d+\\s*(,\\s*-?\\d+\\s*)?(,\\s*-?\\d+\\s*)?\\)");
     /** A C-style for loop whose start AND end are numbers: "for (int i = 0; i < 26; i++)". */
@@ -381,7 +383,13 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                     c = Cx.max(c, Cx.power(fors));
                     reason(lineOf(stmt) + "a comprehension goes over the input" + where + " → " + Cx.power(fors).format(grid) + ".");
                 }
-                if (LINEAR_CALL.matcher(stmt).find()) {
+                if (LINEAR_CALL.matcher(stmt).find() && !ctx.loops.isEmpty()
+                        && readsOnlyAhead(stmt, ctx.loops.get(ctx.loops.size() - 1))) {
+                    // Worded once per loop (same text is shown once), at the loop's line.
+                    reason("Line " + ctx.loops.get(ctx.loops.size() - 1).line + ": the substring / indexOf calls in this loop"
+                            + " only read the next piece, and the loop jumps its pointer past what was read, so each"
+                            + " character is read a constant number of times: O(n) in total, not O(n) per pass.");
+                } else if (LINEAR_CALL.matcher(stmt).find()) {
                     c = Cx.max(c, Cx.N);
                     if (!where.isEmpty()) {
                         reason("A call that copies or scans a whole string or list (slice, substring, split, join, copy…)"
@@ -406,6 +414,59 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 }
             }
             return c;
+        }
+
+        /**
+         * A pointer loop that consumes its input piece by piece, e.g. decoding "4#abcd3#xyz":
+         * {@code while (i < n) { j = s.indexOf('#', i); ... s.substring(j + 1, end) ...; i = end; }}.
+         * The calls start at the pointer (never at 0) and the loop moves the pointer past what they read,
+         * so across all passes every character is read a constant number of times: O(n) total.
+         */
+        boolean readsOnlyAhead(String stmt, Node loop) {
+            Matcher w = POINTER_LOOP.matcher(loop.header);
+            if (!w.find()) {
+                return false;
+            }
+            String ptr = w.group(1);
+            // The pointer must jump: "i = end" or "i += len", not "i++" / "i = i + 1".
+            Matcher a = Pattern.compile("\\b" + Pattern.quote(ptr) + "\\s*(\\+=|=(?!=))\\s*([^;\\n]+)").matcher(loop.body);
+            boolean jumps = false;
+            while (a.find()) {
+                String rhs = a.group(2).replaceAll("\\s+", "");
+                boolean step = a.group(1).equals("+=") ? rhs.equals("1") : rhs.equals(ptr + "+1") || rhs.equals("1+" + ptr);
+                if (!step) {
+                    jumps = true;
+                }
+            }
+            if (!jumps) {
+                return false;
+            }
+            // Every scanning call in the statement must be a bounded read that doesn't start from 0.
+            Matcher any = LINEAR_CALL.matcher(stmt);
+            while (any.find()) {
+                String call = any.group();
+                if (call.startsWith(".substring") || call.startsWith(".indexOf") || call.startsWith(".index")) {
+                    String args = argsAt(stmt, any.end() - 1);
+                    if (args == null) {
+                        return false;
+                    }
+                    String first = call.startsWith(".substring") ? args.split(",")[0].strip() : null;
+                    if (first != null && first.equals("0")) {
+                        return false;               // substring(0, i) re-reads from the start
+                    }
+                    if (!call.startsWith(".substring") && !topLevelComma(args)) {
+                        return false;               // indexOf(x) with no start scans from the beginning
+                    }
+                } else if (call.matches("\\w\\s*\\[[^\\]\\[]*:[^\\]\\[]*\\]")) {
+                    String inside = call.substring(call.indexOf('[') + 1, call.length() - 1);
+                    if (inside.split(":", -1)[0].isBlank() || inside.split(":", -1)[0].strip().equals("0")) {
+                        return false;               // s[:j] re-reads from the start
+                    }
+                } else {
+                    return false;                   // split, join, copy… are whole-input operations
+                }
+            }
+            return true;
         }
 
         boolean heapOp(String stmt) {

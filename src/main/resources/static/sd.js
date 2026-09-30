@@ -1,6 +1,7 @@
 // System design tracker. Plain JavaScript, no build step. All rules live on the server
 // (/api/sd/...); this file shows the data and sends your answers.
 import { api } from './http.js';
+import { refreshDueBadges } from './due-badges.js';
 
 const $ = (id) => document.getElementById(id);
 const DAY_MS = 86_400_000;
@@ -67,6 +68,7 @@ async function load() {
   try {
     state = await api('/api/sd/dashboard');
     render(state);
+    refreshDueBadges('systemDesign');
   } catch (e) {
     $('plan-line').textContent = `Couldn't load: ${e.message}`;
   }

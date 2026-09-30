@@ -114,6 +114,9 @@ class SystemDesignIntegrationTest {
                 .andExpect(jsonPath("$.problems.length()").value(32))
                 .andExpect(jsonPath("$.stats.topicsStudied").value(0))
                 .andExpect(jsonPath("$.firstGaps.PROBLEM.GOOD").value(3));
+        mvc.perform(get("/api/due-counts").cookie(s))
+                .andExpect(jsonPath("$.dsa").value(0))
+                .andExpect(jsonPath("$.systemDesign").value(0));
         mvc.perform(get("/api/sd/dashboard")).andExpect(status().isUnauthorized());
     }
 
@@ -142,6 +145,7 @@ class SystemDesignIntegrationTest {
 
         // Due: the next quiz is revision 1; under 50% repeats it.
         jdbc.update("UPDATE sd_items SET next_due_on = CURRENT_DATE WHERE item_key = 'caching'");
+        mvc.perform(get("/api/due-counts").cookie(s)).andExpect(jsonPath("$.systemDesign").value(1));
         JsonNode review = quiz(s, "caching");
         assertEquals("REVIEW", review.path("mode").asText());
         mvc.perform(post("/api/sd/topics/caching/quiz").with(csrf()).cookie(s)

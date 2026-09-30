@@ -191,6 +191,7 @@ Every problem has a rubric and a reference design: 8â€“9 key points for Easy, 9â
 | POST | `/api/auth/recover` | `{ username, recoveryCode, password, confirmPassword }` | `{ me, recoveryCode }` (the new code); signs out other sessions and signs you in; 400 if they don't match |
 | GET / PATCH | `/api/me` | `{ startDate }` | your account: `{ username, startDate, hasRecoveryCode }` |
 | POST | `/api/me/recovery-code` | `{ password }` | `{ recoveryCode }`: a new code; the old one stops working |
+| GET | `/api/due-counts` | | `{ dsa, systemDesign }`: revisions due today in each tracker, for the red badges on the DSA / System design switch and the count in the browser tab title |
 | GET | `/api/dashboard` | | due revisions, plan (key dates, pace, 14-day workload), memory stages, recall, study days, weekly tests, all 150 problems with their attempt history |
 | POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl, code?, codeLanguage?, rating }` | `rating` is AGAIN / HARD / GOOD / EASY (shown as Forgot / Hard / Medium / Easy; missing = GOOD) and sets the first revision; code is saved as version 1 and analysed; 409 after day 85 |
 | POST | `/api/analysis/preview` | `{ code, codeLanguage, catalogId? }` | analyses code without saving it (the Mark as done window); with `catalogId`, includes a recommendation |
