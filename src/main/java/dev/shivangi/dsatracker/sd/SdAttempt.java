@@ -60,6 +60,10 @@ public class SdAttempt {
     @Column(name = "quiz_detail")
     private String quizDetail;
 
+    /** The option chosen for each question, one per line, in quiz_detail's order. Null before V13. */
+    @Column(name = "quiz_choices")
+    private String quizChoices;
+
     protected SdAttempt() {
         // for JPA
     }
@@ -79,6 +83,12 @@ public class SdAttempt {
         this.quizScore = result.correct();
         this.quizTotal = result.total();
         this.quizDetail = result.detail();
+        this.quizChoices = String.join("\n", result.questions().stream()
+                .map(q -> clip(q.chosen() == null ? "" : q.chosen().replaceAll("[\\r\\n]+", " "), 300)).toList());
+    }
+
+    private static String clip(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max);
     }
 
     public boolean isEditableOn(LocalDate today) {
@@ -110,4 +120,5 @@ public class SdAttempt {
     public Integer getQuizScore() { return quizScore; }
     public Integer getQuizTotal() { return quizTotal; }
     public String getQuizDetail() { return quizDetail; }
+    public String getQuizChoices() { return quizChoices; }
 }

@@ -303,6 +303,14 @@ textarea { resize: vertical; }
 button.chip:hover { border-color: var(--ink-3); }
 .chip.todo { color: var(--ink-3); background: transparent; border-style: dashed; cursor: default; }
 
+/* Long lines wrap instead of stretching the panel (grid and flex items default to their content's width) */
+.panel, .panel > *, .revise, .revise > *, .history, .history-toggle, .history-body, .history-body > *,
+.attempt, .attempt > *, .version, .version > *, .new-version, .new-version > *, .sd-sections, .sd-sections > *,
+.analysis, .field { min-width: 0; }
+.code-view, .code-input { white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; }
+.code-input { overflow-x: hidden; }
+.notes-text, .sd-saved .notes-text, .sd-why, .sd-gq, .rec-text, .analysis-why li { overflow-wrap: anywhere; }
+
 /* Notes panel under a row */
 .notes { margin: 4px 0 6px; padding: 10px 12px; border-radius: 6px; background: var(--tint); font-size: 13px; }
 .notes-when { color: var(--ink-3); font-size: 12px; margin: 0 0 4px; }
@@ -627,6 +635,67 @@ body { transition: background-color .2s, color .2s; }
 .sd-saved .why-head { margin: 6px 0 0; font-size: 12px; font-weight: 600; }
 .sd-saved .notes-text { font-size: 13px; }
 .sd-design .analysis-slot:empty, .new-version .analysis-slot:empty { display: none; }
+
+/* ------------------------------------------------------------------
+   Reader: a problem's notes as a readable page, in a side panel
+------------------------------------------------------------------- */
+body.reader-open { overflow: hidden; }
+.reader-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0); transition: background .2s; z-index: 50; }
+.reader-backdrop.in { background: rgb(0 0 0 / .32); }
+.reader { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100vw); background: var(--bg); color: var(--ink);
+  box-shadow: -18px 0 50px rgb(0 0 0 / .18); z-index: 51; display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform .22s ease-out; }
+.reader.in { transform: none; }
+@media (prefers-reduced-motion: reduce) { .reader, .reader-backdrop { transition: none; } }
+.reader-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px 10px 24px; border-bottom: 1px solid var(--line); }
+.reader-bar-title { font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.reader-doc { max-width: 660px; margin: 0 auto; padding: 40px 40px 96px; font-size: 15.5px; line-height: 1.7; }
+.reader-kicker { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.reader-title { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; margin: 0 0 8px; overflow-wrap: anywhere; }
+.reader-link { display: inline-block; color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 500; }
+.reader-link:hover { text-decoration: underline; }
+.reader-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 4px; }
+.reader-toc-item { font: inherit; font-size: 12.5px; line-height: 1; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--raised); color: var(--ink-2); cursor: pointer; }
+.reader-toc-item:hover { color: var(--ink); border-color: var(--ink-3); }
+.reader-section { margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+.reader-section h2 { font-size: 21px; font-weight: 650; letter-spacing: -.01em; margin: 0; }
+.reader-meta { margin: 2px 0 14px; font-size: 13px; color: var(--ink-3); }
+.reader-notes { overflow-wrap: anywhere; }
+.reader-notes p { margin: 0 0 12px; }
+.reader-notes h3 { font-size: 17px; margin: 18px 0 6px; }
+.reader-notes ul, .reader-notes ol { margin: 0 0 12px; padding-left: 24px; }
+.reader-notes li + li { margin-top: 4px; }
+.reader-notes code, .reader-doc :not(pre) > code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; padding: 1px 5px; border-radius: 4px; background: var(--tint); }
+.reader-notes a { color: var(--accent); }
+.reader-empty { color: var(--ink-3); font-style: italic; }
+.reader-block { margin-top: 18px; }
+.reader-label { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.reader-code { margin-top: 18px; }
+.reader-code pre { margin: 0; padding: 14px 16px; border-radius: 8px; background: var(--raised); border: 1px solid var(--line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+.reader-doc > .reader-section > .reader-link { margin-top: 4px; }
+.reader-quiz { margin: 0; padding-left: 22px; display: grid; gap: 14px; font-size: 14.5px; }
+.reader-quiz p { margin: 0; }
+.rq-q { font-weight: 600; }
+.rq-a { color: var(--good); }
+.rq-w { color: var(--critical); text-decoration: line-through; text-decoration-thickness: 1px; }
+.rq-why { color: var(--ink-2); font-size: 13.5px; }
+.reader-quiz li.wrong::marker { color: var(--critical); font-weight: 700; }
+.reader-quiz li.right::marker { color: var(--good); font-weight: 700; }
+.attempt .reader-notes { font-size: 13.5px; line-height: 1.55; }
+.attempt .reader-notes p:last-child, .attempt .reader-notes ul:last-child, .attempt .reader-notes ol:last-child { margin-bottom: 0; }
+.attempt .reader-notes p, .attempt .reader-notes ul, .attempt .reader-notes ol { margin-bottom: 6px; }
+.btn.read-btn { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 3px 8px; font-size: 12px; color: var(--accent); }
+/* A sitting's quiz, shown again in the history */
+.sd-past-quiz > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--accent); width: fit-content; }
+.sd-past-quiz[open] > summary { margin-bottom: 10px; }
+.sd-past-quiz .reader-quiz { font-size: 13.5px; gap: 10px; }
+@media (max-width: 640px) {
+  .reader-doc { padding: 24px 18px 72px; font-size: 15px; }
+  .reader-title { font-size: 24px; }
+  .reader-bar { padding-left: 16px; }
+}
 
 /* ------------------------------------------------------------------
    Narrow screens

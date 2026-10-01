@@ -120,6 +120,39 @@ public final class Quiz {
         return Rating.AGAIN;
     }
 
+    /**
+     * A saved quiz, shown again: each question with the right answer and why, and your answer
+     * when it was kept ({@code choices} is null for quizzes from before answers were stored).
+     */
+    public static List<Graded> replay(SdCatalog.Topic topic, String detail, String choices) {
+        List<Graded> out = new ArrayList<>();
+        if (detail == null || detail.isBlank()) {
+            return out;
+        }
+        String[] picked = choices == null ? new String[0] : choices.split("\n", -1);
+        String[] parts = detail.split(",");
+        for (int n = 0; n < parts.length; n++) {
+            String p = parts[n].strip();
+            if (p.length() < 2) {
+                continue;
+            }
+            int index;
+            try {
+                index = Integer.parseInt(p.substring(0, p.length() - 1));
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            if (index < 0 || index >= topic.questions().size()) {
+                continue;
+            }
+            SdCatalog.Question q = topic.questions().get(index);
+            boolean right = p.endsWith("+");
+            String chosen = n < picked.length && !picked[n].isEmpty() ? picked[n] : (right ? q.answer() : null);
+            out.add(new Graded(index, q.q(), chosen, q.answer(), right, q.why()));
+        }
+        return List.copyOf(out);
+    }
+
     /** The latest outcome of each question across past quizzes (oldest first), from "3+,7-" strings. */
     static Map<Integer, Boolean> lastOutcomes(List<String> pastDetails) {
         Map<Integer, Boolean> last = new LinkedHashMap<>();

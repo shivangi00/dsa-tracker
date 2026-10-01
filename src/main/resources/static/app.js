@@ -2,6 +2,7 @@
 // All rules live on the server; this file only shows data and sends your answers.
 import { api } from './http.js';
 import { refreshDueBadges } from './due-badges.js';
+import { openReader, notesBlock, codeBlock, linkLine, labelled, readButton } from './reader.js';
 
 const $ = (id) => document.getElementById(id);
 const DAY_MS = 86_400_000;
@@ -910,11 +911,12 @@ function attemptBlock(p, a) {
     head.append(lock);
   }
   if (a.versions.some((v) => v.improved)) head.append(el('span', 'improved-tag', 'Improved'));
+  head.append(readButton(() => readNotes(p, a.id)));
   box.append(head);
 
   if (a.editable) box.append(notesEditor(a));
   else {
-    if (a.learnings) box.append(el('p', 'notes-text', a.learnings));
+    if (a.learnings) box.append(notesBlock(a.learnings));
     else if (a.revision > 0) box.append(el('p', 'muted small', 'No notes for this revision.'));
     if (a.excalidrawUrl) {
       const link = el('a', 'drawing-link', 'Open drawing in Excalidraw ↗');
@@ -926,6 +928,34 @@ function attemptBlock(p, a) {
   a.versions.forEach((v) => box.append(versionBlock(p, a, v)));
   if (a.editable) box.append(versionEditor(p, a));
   return box;
+}
+
+/** The problem's notes as a readable page in a side panel: every sitting, with its code. */
+function readNotes(p, focus) {
+  const sections = p.attempts.map((a) => {
+    const body = [notesBlock(a.learnings)];
+    if (a.excalidrawUrl) body.push(linkLine(a.excalidrawUrl, 'Open drawing in Excalidraw'));
+    for (const v of a.versions) {
+      const cx = v.analysis ? ` · ${v.analysis.time} time · ${v.analysis.space} space` : '';
+      body.push(codeBlock(v.code, `Version ${v.versionNo} · ${LANGUAGES[v.codeLanguage] || ''}${cx}`));
+    }
+    const rating = a.rating ? (a.revision === 0 ? SOLVE_LABEL : REVIEW_LABEL)[a.rating] : '';
+    return { id: a.id, heading: attemptTitle(a, false), meta: [fmt(a.attemptedOn, { weekday: 'long', day: 'numeric', month: 'long' }), rating].filter(Boolean).join(' · '), body };
+  });
+  if (p.interviewTips && p.interviewTips.length) {
+    const ul = el('ul');
+    p.interviewTips.forEach((t) => ul.append(el('li', '', t)));
+    const tips = el('div', 'reader-notes');
+    tips.append(ul);
+    sections.push({ id: 'tips', heading: 'Interview talking points', meta: '', body: [labelled('Say this out loud', tips)] });
+  }
+  openReader({
+    kicker: `NeetCode 150 · ${LEVEL[p.difficulty] || ''}`,
+    title: p.name,
+    link: p.link ? { href: p.link, label: 'Open on LeetCode' } : undefined,
+    sections,
+    focus,
+  });
 }
 
 function notesEditor(a) {

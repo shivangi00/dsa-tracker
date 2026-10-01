@@ -91,4 +91,24 @@ class QuizTest {
     void latestOutcomeWins() {
         assertEquals(Map.of(1, true, 2, false, 3, true), Quiz.lastOutcomes(List.of("1-,2+", "2-,1+,3+", "bad,")));
     }
+
+    @Test
+    void aSavedQuizCanBeShownAgainWithYourAnswers() {
+        List<Quiz.Graded> shown = Quiz.replay(topic, "3+,1-,7+", "right3\na1\nright7");
+        assertEquals(3, shown.size());
+        assertEquals("Q1", shown.get(1).q());
+        assertEquals("a1", shown.get(1).chosen());
+        assertEquals("right1", shown.get(1).answer());
+        assertEquals(false, shown.get(1).right());
+        assertEquals("because 1", shown.get(1).why());
+    }
+
+    @Test
+    void olderQuizzesWithoutStoredAnswersStillShowRightAndWrong() {
+        List<Quiz.Graded> shown = Quiz.replay(topic, "3+,1-,99+,x", null);
+        assertEquals(2, shown.size());                  // unknown and malformed entries are skipped
+        assertEquals("right3", shown.get(0).chosen());  // a right answer must have been the right option
+        assertEquals(null, shown.get(1).chosen());      // a wrong one: unknown
+        assertEquals(List.of(), Quiz.replay(topic, null, null));
+    }
 }

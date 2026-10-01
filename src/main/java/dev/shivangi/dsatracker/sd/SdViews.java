@@ -53,9 +53,10 @@ public final class SdViews {
                        Map<Rating, Integer> previewGaps, List<AttemptView> attempts, Double bestScore) {
     }
 
+    /** @param quiz topics: the questions of this sitting's quiz, with your answers (empty for problems) */
     public record AttemptView(long id, int revision, int tryNo, LocalDate attemptedOn, Rating rating, String notes,
                               String excalidrawUrl, boolean editable, Integer quizScore, Integer quizTotal,
-                              List<AnswerView> answers) {
+                              List<Quiz.Graded> quiz, List<AnswerView> answers) {
     }
 
     public record AnswerView(long id, int versionNo, DesignSections sections, Double score, Double structure,
@@ -98,6 +99,7 @@ public final class SdViews {
                      SdCatalog catalog, SpacedRepetitionPolicy policy, Plan plan, LocalDate today) {
         ScheduleState s = i.schedule();
         SdCatalog.Problem problem = i.getKind() == SdKind.PROBLEM ? catalog.problem(i.getItemKey()).orElse(null) : null;
+        SdCatalog.Topic topic = i.getKind() == SdKind.TOPIC ? catalog.topic(i.getItemKey()).orElse(null) : null;
         List<AttemptView> views = new ArrayList<>();
         Double best = null;
         for (SdAttempt a : attempts) {
@@ -110,6 +112,7 @@ public final class SdViews {
             }
             views.add(new AttemptView(a.getId(), a.getRevision(), a.getTryNo(), a.getAttemptedOn(), a.getRating(),
                     a.getNotes(), a.getExcalidrawUrl(), a.isEditableOn(today), a.getQuizScore(), a.getQuizTotal(),
+                    topic == null ? List.of() : Quiz.replay(topic, a.getQuizDetail(), a.getQuizChoices()),
                     List.copyOf(answers)));
         }
         return new Item(i.getId(), i.getKind(), i.getItemKey(), i.getStartedOn(), i.getFirstRating(),

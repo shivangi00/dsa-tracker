@@ -103,6 +103,10 @@ Every sitting is an **attempt**: the solve day, then each revision (and each ret
 
 An attempt is **editable on its own day and frozen after** (the server refuses changes with 409), so nothing is ever overwritten across days. A version whose time complexity beats everything you saved before it is marked **Improved**, and the dashboard counts the problems you've improved. Each problem's history starts with a trail like *Solved O(n²) → Rev 1 O(n) → Rev 2 O(n)*.
 
+## Reading your notes
+
+Every attempt has a **Read** button that opens the problem's notes as a page in a side panel (full screen on phones): each sitting with its notes, drawing link and saved code (DSA), quiz answers (system design topics) or latest design and what it still misses (system design problems), plus the interview talking points for DSA problems. Light formatting in notes is understood everywhere they're shown: blank lines for paragraphs, `- ` bullets, `1. ` lists, `# ` headings, `` `code` `` and `**bold**`. Esc, Close or a click outside closes it. `reader.js` builds it with plain DOM, so nothing in a note can run as code.
+
 ## Day and night mode
 
 Follows your device's light/dark setting by default. The sun/moon button in the header (on every page, including sign-in) switches between day and night mode, and **Settings → Appearance** offers *Match my device*, *Day mode* or *Night mode*. The choice is saved per browser. Colours are CSS variables with a second set for night mode, so every part of the page switches together.
@@ -156,7 +160,7 @@ Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, 
 
 `/system-design.html`, reached with the **DSA | System design** switch in the header. Same sign-in, same start date, same plan: new topics and problems until day 85, every revision done by day 100. It doesn't change anything in the DSA tracker (separate tables: `sd_items`, `sd_attempts`, `sd_answers`, from `V12`).
 
-**Topics** (31, in Hello Interview's four sections: Core Concepts, Patterns, Key Technologies, Advanced Topics). Read the topic on Hello Interview (the name links there), then take its quiz: 5 of its 10 multiple-choice questions, the ones you haven't seen first, then the ones you got wrong last time, with options shuffled. Grading happens on the server. The score is your rating: 5/5 Easy, 4 Good ("Medium" the first time), 3 Hard, 0–2 Again. The first quiz marks the topic studied; **three revisions** follow, each another quiz. Again repeats the revision tomorrow. A quiz that isn't due is practice: graded, but nothing is saved. Each attempt has optional notes and an Excalidraw link, editable on its day and frozen after, like DSA attempts.
+**Topics** (31, in Hello Interview's four sections: Core Concepts, Patterns, Key Technologies, Advanced Topics). Read the topic on Hello Interview (the name links there), then take its quiz: 5 of its 10 multiple-choice questions, the ones you haven't seen first, then the ones you got wrong last time, with options shuffled. Grading happens on the server. The score is your rating: 5/5 Easy, 4 Good ("Medium" the first time), 3 Hard, 0–2 Again. The first quiz marks the topic studied; **three revisions** follow, each another quiz. Again repeats the revision tomorrow. A quiz that isn't due is practice: graded, but nothing is saved. Each attempt has optional notes and an Excalidraw link, editable on its day and frozen after, like DSA attempts. A past quiz stays visible under its date: every question, your answer and the right one, with the reason (your answers are kept from `V13` on; older quizzes show right/wrong and the right answers).
 
 **Design problems** (32: 4 Easy, 16 Medium, 12 Hard). Write your design in five parts (requirements, core entities, API, high-level design, deep dives), with an optional 45-minute timer, then rate how it went (Forgot / Hard / Medium / Easy, as in DSA). **Two revisions** follow, each a fresh design. Unsaved text is kept in the browser, so a reload doesn't lose it.
 
@@ -225,7 +229,7 @@ src/main/java/dev/shivangi/dsatracker/
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
   sd/            the system design tracker: SdCatalog, Quiz, DesignScorer (pure Java), SdService, SdController, entities
 src/main/resources/
-  db/migration/V1…V12      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design
+  db/migration/V1…V13      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design; V13 = quiz answers kept
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   interview-tips.json     interview talking points for each of the 150 problems
   sd-topics.json, sd-problems.json   system design quizzes, rubrics and reference designs

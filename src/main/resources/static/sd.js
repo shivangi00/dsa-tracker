@@ -2,6 +2,7 @@
 // (/api/sd/...); this file shows the data and sends your answers.
 import { api } from './http.js';
 import { refreshDueBadges } from './due-badges.js';
+import { openReader, notesBlock, linkLine, labelled, quizBlock, readButton } from './reader.js';
 
 const $ = (id) => document.getElementById(id);
 const DAY_MS = 86_400_000;
@@ -865,22 +866,64 @@ function attemptBlock(entry, item, a) {
     lock.title = `Attempts can only be changed on their own day (${fmt(a.attemptedOn)}).`;
     head.append(lock);
   }
+  head.append(readButton(() => readNotes(entry, item, a.id)));
   box.append(head);
   if (a.editable) box.append(notesEditor(a));
   else {
-    if (a.notes) box.append(el('p', 'notes-text', a.notes));
+    if (a.notes) box.append(notesBlock(a.notes));
     if (a.excalidrawUrl) {
       const link = el('a', 'drawing-link', 'Open drawing in Excalidraw ↗');
       link.href = a.excalidrawUrl; link.target = '_blank'; link.rel = 'noopener';
       box.append(link);
     }
-    if (!a.notes && !a.excalidrawUrl && item.kind === 'TOPIC') box.append(el('p', 'muted small', 'No notes.'));
+    if (!a.notes && !a.excalidrawUrl && item.kind === 'TOPIC' && !(a.quiz && a.quiz.length)) box.append(el('p', 'muted small', 'No notes.'));
   }
+  if (item.kind === 'TOPIC' && a.quiz && a.quiz.length) box.append(pastQuiz(a));
   if (item.kind === 'PROBLEM') {
     a.answers.forEach((v) => box.append(answerBlock(entry, a, v)));
     if (a.editable) box.append(answerEditor(entry, a));
   }
   return box;
+}
+
+/** A sitting's quiz, shown again: your answers next to the right ones, with the reasons. */
+function pastQuiz(a) {
+  const d = el('details', 'sd-past-quiz');
+  const wrong = a.quiz.filter((q) => !q.right).length;
+  d.append(el('summary', '', `Quiz: ${a.quizScore}/${a.quizTotal}${wrong ? ` · review ${plural(wrong, 'missed question')}` : ' · all right'}`));
+  d.append(quizBlock(a.quiz));
+  if (a.quiz.some((q) => !q.right && !q.chosen)) d.append(el('p', 'hint', 'Your wrong answers weren\'t kept for quizzes taken before this update; the right answers are shown.'));
+  return d;
+}
+
+/** The item's notes as a readable page in a side panel: every sitting, with its quiz or design. */
+function readNotes(entry, item, focus) {
+  const sections = item.attempts.map((a) => {
+    const body = [notesBlock(a.notes)];
+    if (a.excalidrawUrl) body.push(linkLine(a.excalidrawUrl, 'Open drawing in Excalidraw'));
+    if (item.kind === 'TOPIC' && a.quiz && a.quiz.length) body.push(labelled(`Quiz · ${a.quizScore}/${a.quizTotal}`, quizBlock(a.quiz)));
+    const latest = a.answers && a.answers[a.answers.length - 1];
+    if (latest) {
+      for (const [name, label] of SECTIONS) {
+        if (latest.sections[name]) body.push(labelled(label, notesBlock(latest.sections[name])));
+      }
+      if (latest.score != null) {
+        const missed = el('div', 'reader-notes');
+        const ul = el('ul');
+        latest.missed.forEach((m) => ul.append(el('li', '', m)));
+        missed.append(ul);
+        body.push(labelled(`Score ${latest.score} / 10${latest.missed.length ? ' · still to cover' : ''}`, ...(latest.missed.length ? [missed] : [])));
+      }
+    }
+    return { id: a.id, heading: attemptTitle(item, a), meta: `${fmt(a.attemptedOn, { weekday: 'long', day: 'numeric', month: 'long' })} · ${attemptLabel(item, a)}`, body };
+  });
+  openReader({
+    kicker: `System design · ${item.kind === 'TOPIC' ? entry.section : `${LEVEL[entry.level]} problem`}`,
+    title: entry.name,
+    link: { href: entry.url, label: 'Open on Hello Interview' },
+    sections,
+    focus,
+  });
 }
 
 function notesEditor(a) {
