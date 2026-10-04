@@ -2,7 +2,7 @@
 # jar into a small Java runtime image.
 
 # ---- build ----
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /src
 COPY pom.xml .
 RUN mvn -B -q dependency:go-offline          # cached layer: re-runs only when pom.xml changes
@@ -10,7 +10,7 @@ COPY src ./src
 RUN mvn -B -q package -DskipTests            # tests run in CI, not in every image build
 
 # ---- run ----
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 # Run as an unprivileged user, never as root.
 RUN useradd --system --uid 10001 app

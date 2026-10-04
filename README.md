@@ -8,7 +8,7 @@ A second tracker, **System design** (the switch at the top of every page), follo
 
 ## Run it
 
-You need Java 25, Maven and Docker.
+You need Java 21, Maven and Docker.
 
 ```bash
 docker compose up -d          # Postgres on localhost:5433
@@ -133,7 +133,12 @@ Week *n* of your plan runs for 7 days from your start date. On the week's last d
 
 - Every NeetCode 150 problem belongs to one of **73 patterns** (e.g. "Monotonic stack", "Binary search on the answer").
 - For each pattern you practised that week, the test picks one **practice problem**: a *different* LeetCode problem that uses the same technique, never one you've had before (235 in total). At most 3 questions, so a test takes minutes, not an evening; patterns you forgot most come first.
-- For each question: **1)** pick which pattern you'd use from four options (look-alikes from the same topic), graded instantly with a one-line explanation; **2)** solve it on LeetCode and report *Solved*, *Solved with a hint* or *Couldn't solve yet*.
+- For each question, on one card:
+  1. **Mark the pattern**: one of the 18 NeetCode roadmap categories you study by (Arrays & Hashing, Two Pointers, Sliding Window…). No instant grading.
+  2. **Say what made you recognise it** (required) and add your code (optional; the language is detected).
+  3. **Copy prompt to analyse**: copies a review prompt (the problem, your pattern, your reasoning, your code, and what to check: the right pattern and the clue for it, bugs and edge cases, complexity vs optimal, a one-line verdict). Paste it into the AI chatbot you use; links to Claude, ChatGPT and Gemini are offered. Nothing is sent from the app.
+  4. **Paste the feedback** back (optional), then say how solving it went: *Solved*, *Solved with a hint* or *Couldn't solve yet*, and move on to the next question.
+- Only then does the card show what the tracker files the problem under (category, pattern and idea) next to your answer, your code and the feedback you pasted. Some problems fit more than one pattern, so a different category is shown as a note to check against the review, not as a wrong answer. Unsaved answers survive a reload. Questions answered with the old four-option quiz still show as they were.
 - *Couldn't solve yet* brings the NeetCode problem with that pattern back for revision **tomorrow** (unless it's already fully revised).
 
 Practice problems come from NeetCode's own wider list (`.problemSiteData.json`, entries outside the 150), so every LeetCode number and link is real.
@@ -207,8 +212,9 @@ Every problem has a rubric and a reference design: 8–9 key points for Easy, 9�
 | DELETE | `/api/problems/{id}` | | undo "done" |
 | POST | `/api/tests/week/{n}` | | opens week n's test (creates it the first time); 409 before it unlocks |
 | GET | `/api/tests/{id}` | | the test; right answers only for questions you've answered |
-| POST | `/api/tests/items/{id}/pattern` | `{ patternId }` | step 1, once per question |
-| POST | `/api/tests/items/{id}/outcome` | `{ outcome: SOLVED \| HINT \| NOT_SOLVED }` | step 2; the last one completes the test |
+| POST | `/api/tests/items/{id}/answer` | `{ category, recognition, code?, codeLanguage? }` | your pattern (one of the test's `categories`), why, and your code; can be saved again until the outcome is recorded |
+| POST | `/api/tests/items/{id}/outcome` | `{ outcome: SOLVED \| HINT \| NOT_SOLVED, feedback? }` | finishes the question, keeping the AI feedback you pasted; reveals the tracker's category; the last one completes the test |
+| POST | `/api/tests/items/{id}/pattern` | `{ patternId }` | the old four-option answer (kept for older questions) |
 
 Everything except `/api/auth/**` needs a signed-in session (otherwise 401). Errors are JSON with a readable `detail`.
 
@@ -229,7 +235,7 @@ src/main/java/dev/shivangi/dsatracker/
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
   sd/            the system design tracker: SdCatalog, Quiz, DesignScorer (pure Java), SdService, SdController, entities
 src/main/resources/
-  db/migration/V1…V13      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design; V13 = quiz answers kept
+  db/migration/V1…V14      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design; V13 = quiz answers kept; V14 = weekly test reflection
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   interview-tips.json     interview talking points for each of the 150 problems
   sd-topics.json, sd-problems.json   system design quizzes, rubrics and reference designs

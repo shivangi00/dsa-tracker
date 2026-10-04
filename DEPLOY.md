@@ -59,7 +59,7 @@ You already have most of these from building the app. Open **Terminal** (Mac: pr
 
 | Tool | Check with | You should see | If it's missing |
 | --- | --- | --- | --- |
-| Java 25 | `java -version` | `25.x` | `brew install openjdk@25` (Mac) or install "Temurin 25" from adoptium.net |
+| Java 21 | `java -version` | `21.x` | `brew install openjdk@21` (Mac) or install "Temurin 21" from adoptium.net |
 | Maven | `mvn -version` | `Apache Maven 3.9…` | `brew install maven` |
 | Docker Desktop | `docker --version` | `Docker version …` | Download from docker.com, install, and open it once |
 | Git | `git --version` | `git version …` | Mac: run `xcode-select --install`. Windows: git-scm.com |

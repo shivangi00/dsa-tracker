@@ -3,7 +3,7 @@
 # so the next visitor waits for a fresh start.
 
 # ---- build ----
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /src
 COPY pom.xml .
 RUN mvn -B -q dependency:go-offline
@@ -11,7 +11,7 @@ COPY src ./src
 RUN mvn -B -q package -DskipTests
 
 # ---- run ----
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 RUN useradd --system --uid 10001 app
 COPY --from=build /src/target/dsa-tracker-*.jar app.jar
