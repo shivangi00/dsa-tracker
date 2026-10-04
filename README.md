@@ -8,7 +8,7 @@ A second tracker, **System design** (the switch at the top of every page), follo
 
 ## Run it
 
-You need Java 21, Maven and Docker.
+You need Java 25, Maven and Docker.
 
 ```bash
 docker compose up -d          # Postgres on localhost:5433
