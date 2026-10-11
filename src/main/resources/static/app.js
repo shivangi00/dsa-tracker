@@ -2,6 +2,7 @@
 // All rules live on the server; this file only shows data and sends your answers.
 import { api } from './http.js';
 import { refreshDueBadges } from './due-badges.js';
+import { trackUnsaved } from './unsaved.js';
 import { openReader, notesBlock, codeBlock, linkLine, labelled, readButton } from './reader.js';
 
 const $ = (id) => document.getElementById(id);
@@ -914,7 +915,8 @@ function attemptBlock(p, a) {
   head.append(readButton(() => readNotes(p, a.id)));
   box.append(head);
 
-  if (a.editable) box.append(notesEditor(a));
+  const notesEd = a.editable ? notesEditor(a) : null;
+  if (notesEd) box.append(notesEd.node);
   else {
     if (a.learnings) box.append(notesBlock(a.learnings));
     else if (a.revision > 0) box.append(el('p', 'muted small', 'No notes for this revision.'));
@@ -926,7 +928,7 @@ function attemptBlock(p, a) {
   }
 
   a.versions.forEach((v) => box.append(versionBlock(p, a, v)));
-  if (a.editable) box.append(versionEditor(p, a));
+  if (a.editable) box.append(versionEditor(p, a, notesEd));
   return box;
 }
 
@@ -958,9 +960,12 @@ function readNotes(p, focus) {
   });
 }
 
+/**
+ * The notes and drawing link of today's attempt. No button of its own: the attempt's one Save
+ * button (under the code box) saves these too, whenever they've changed.
+ */
 function notesEditor(a) {
-  const form = el('form', 'notes-form');
-  form.noValidate = true;
+  const wrap = el('div', 'notes-form');
   const draftKey = `notes:${a.id}`;
   const d = drafts.get(draftKey) || {};
   const notes = el('textarea');
@@ -968,38 +973,24 @@ function notesEditor(a) {
   const drawing = el('input');
   drawing.type = 'url'; drawing.maxLength = 500; drawing.placeholder = 'https://excalidraw.com/#json=…';
   drawing.value = d.drawing ?? a.excalidrawUrl ?? '';
-  const remember = () => drafts.set(draftKey, { notes: notes.value, drawing: drawing.value });
+  const listeners = [];
+  const remember = () => { drafts.set(draftKey, { notes: notes.value, drawing: drawing.value }); listeners.forEach((f) => f()); };
   notes.addEventListener('input', remember);
   drawing.addEventListener('input', remember);
-  const error = errorLine();
-  const save = el('button', 'btn', 'Save notes');
-  save.type = 'submit';
-  const status = el('span', 'save-status');
-  const actions = el('div', 'notes-actions');
-  actions.append(save, status);
-  form.append(field(a.revision === 0 ? 'What you learned' : 'What you noticed', notes, a.revision === 0 ? null : 'optional'),
-    drawingField(drawing), actions, error);
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    error.hidden = true;
-    if (a.revision === 0 && !notes.value.trim()) { error.textContent = 'Write down what you learned.'; error.hidden = false; return; }
-    if (drawing.value.trim() && !/^https:\/\/\S+$/.test(drawing.value.trim())) {
-      error.textContent = 'The Excalidraw link must start with https://'; error.hidden = false; return;
-    }
-    save.disabled = true;
-    try {
-      await api(`/api/attempts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ learnings: notes.value.trim(), excalidrawUrl: drawing.value.trim() }) });
-      drafts.delete(draftKey);
-      status.textContent = 'Saved';
-      await load();
-    } catch (err) {
-      error.textContent = err.message; error.hidden = false;
-      if (/frozen/i.test(err.message)) await load();
-    } finally {
-      save.disabled = false;
-    }
-  });
-  return form;
+  wrap.append(field(a.revision === 0 ? 'What you learned' : 'What you noticed', notes, a.revision === 0 ? null : 'optional'),
+    drawingField(drawing));
+  const value = () => ({ learnings: notes.value.trim(), excalidrawUrl: drawing.value.trim() });
+  const changed = () => value().learnings !== (a.learnings || '').trim() || value().excalidrawUrl !== (a.excalidrawUrl || '').trim();
+  const problem = () => {
+    if (a.revision === 0 && !value().learnings) return 'Write down what you learned.';
+    if (value().excalidrawUrl && !/^https:\/\/\S+$/.test(value().excalidrawUrl)) return 'The Excalidraw link must start with https://';
+    return null;
+  };
+  const save = async () => {
+    await api(`/api/attempts/${a.id}`, { method: 'PATCH', body: JSON.stringify(value()) });
+    drafts.delete(draftKey);
+  };
+  return { node: wrap, changed, problem, save, onChange: (f) => listeners.push(f) };
 }
 
 /**
@@ -1042,13 +1033,18 @@ function versionBlock(p, a, v) {
  * The code box under the saved versions (on the attempt's day): Analyse previews it, Save keeps it
  * as the next version with its analysis, Delete clears the box. After a save the box is empty again.
  */
-function versionEditor(p, a) {
+/**
+ * The code box under the saved versions (on the attempt's day), with the attempt's one Save button.
+ * Save keeps whatever changed: the notes and drawing link above, and the code as the next version
+ * (with its analysis) if it's new. Analyse previews the code; Delete clears the box.
+ */
+function versionEditor(p, a, notesEd) {
   const box = el('div', 'new-version');
   const draftKey = `ver:${a.id}`;
   const last = a.versions[a.versions.length - 1];
   const full = a.versions.length >= 5;
   const { lang, code, note } = codeEditor(draftKey, '', last ? last.codeLanguage : null);
-  code.placeholder = a.versions.length ? 'Paste or type your next version' : 'Paste or type your solution';
+  code.placeholder = a.versions.length ? 'Paste or type your next version (optional)' : 'Paste or type your solution (optional)';
   const head = el('div', 'code-head');
   head.append(el('span', 'code-label', a.versions.length ? `Version ${Math.max(...a.versions.map((v) => v.versionNo)) + 1}` : 'Your code'), note, lang);
   const error = errorLine();
@@ -1056,9 +1052,27 @@ function versionEditor(p, a) {
   const { btn: analyse } = previewButton(code, lang, p.catalogId, slot, error);
   const save = el('button', 'btn primary', 'Save');
   save.type = 'button';
+  save.title = 'Saves your notes, drawing link and code: whatever has changed';
   const clear = el('button', 'btn ghost danger', 'Delete');
   clear.type = 'button';
-  clear.title = 'Clear this box (nothing saved is affected)';
+  clear.title = 'Clear the code box (nothing saved is affected)';
+  const status = el('span', 'save-status');
+
+  const codeText = () => code.value.trim();
+  const codeIsNew = () => codeText() !== '' && !a.versions.some((v) => v.code.trim() === codeText() && v.codeLanguage === lang.value);
+  const notesChanged = () => Boolean(notesEd && notesEd.changed());
+  const showStatus = () => {
+    const parts = [];
+    if (notesChanged()) parts.push('notes');
+    if (codeIsNew()) parts.push('code');
+    status.textContent = parts.length ? `Unsaved changes (${parts.join(' and ')}): click Save` : '';
+    status.classList.toggle('unsaved', parts.length > 0);
+  };
+  code.addEventListener('input', showStatus);
+  lang.addEventListener('change', showStatus);
+  if (notesEd) notesEd.onChange(showStatus);
+  trackUnsaved(box, () => notesChanged() || codeIsNew());
+
   clear.addEventListener('click', () => {
     if (code.value.trim() && !confirm('Clear the code in this box?')) return;
     code.value = '';
@@ -1067,37 +1081,51 @@ function versionEditor(p, a) {
     error.hidden = true;
     code.dispatchEvent(new Event('input'));
   });
-  if (full) {
-    save.disabled = true;
-    save.title = 'You have 5 versions (the most). Delete one to save another.';
-  }
   save.addEventListener('click', async () => {
     error.hidden = true;
-    if (!code.value.trim()) { error.textContent = 'Add your code first.'; error.hidden = false; return; }
-    if (a.versions.some((v) => v.code.trim() === code.value.trim() && v.codeLanguage === lang.value)) {
-      error.textContent = 'You already saved this exact code. Change it first.'; error.hidden = false; return;
+    const saveNotes = notesChanged();
+    const saveCode = codeIsNew();
+    if (!saveNotes && !saveCode) {
+      error.textContent = codeText() ? 'Nothing new to save: this exact code is already saved and your notes haven’t changed.'
+        : 'Nothing to save yet: change your notes or link, or add your code.';
+      error.hidden = false;
+      return;
+    }
+    const problem = saveNotes ? notesEd.problem() : null;
+    if (problem) { error.textContent = problem; error.hidden = false; return; }
+    if (saveCode && full && !saveNotes) {
+      error.textContent = 'You have 5 versions (the most). Delete one to save another.'; error.hidden = false; return;
     }
     save.disabled = true;
     save.textContent = 'Saving…';
+    const done = [];
     try {
-      await api(`/api/attempts/${a.id}/versions`, {
-        method: 'POST',
-        body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: true }),
-      });
-      rememberLanguage(lang.value);
-      drafts.delete(draftKey);
-      toast('Saved as a new version, with its analysis.');
+      if (saveNotes) { await notesEd.save(); done.push('your notes'); }
+      if (saveCode && !full) {
+        await api(`/api/attempts/${a.id}/versions`, {
+          method: 'POST',
+          body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: true }),
+        });
+        rememberLanguage(lang.value);
+        drafts.delete(draftKey);
+        done.push('a new version of your code, with its analysis');
+      }
+      toast(saveCode && full ? 'Notes saved. The code wasn’t: you already have 5 versions, so delete one first.'
+        : `Saved ${done.join(' and ')}.`);
       await load();
     } catch (e) {
-      error.textContent = e.message; error.hidden = false;
+      error.textContent = done.length ? `Saved ${done[0]}, but: ${e.message}` : e.message;
+      error.hidden = false;
       save.disabled = false;
       save.textContent = 'Save';
+      if (/frozen/i.test(e.message)) await load();
     }
   });
   const actions = el('div', 'notes-actions');
-  actions.append(analyse, save, clear);
-  if (full) actions.append(el('span', 'save-status', '5 versions saved (the most). Delete one to save another.'));
+  actions.append(analyse, save, clear, status);
+  if (full) actions.append(el('span', 'save-status', '5 versions saved (the most): Save still saves your notes.'));
   box.append(head, code, el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.'), actions, error, slot);
+  showStatus();
   return box;
 }
 

@@ -1,5 +1,6 @@
 package dev.shivangi.dsatracker.web;
 
+import dev.shivangi.dsatracker.analysis.CodeLanguage;
 import dev.shivangi.dsatracker.domain.Difficulty;
 import dev.shivangi.dsatracker.domain.TestOutcome;
 
@@ -34,23 +35,33 @@ public final class TestViews {
     }
 
     /**
-     * One question. The right pattern, its explanation and the NeetCode problem it came from
-     * are only filled in after you've picked a pattern, so the page can't give the answer away.
+     * One question. What the tracker files the problem under (category, pattern, idea, and the
+     * NeetCode problem it came from) is only filled in once you've finished the question, so the
+     * page can't give it away. Old questions ({@code legacy}) were a four-option quiz: they keep
+     * their {@code options} and reveal as soon as a pattern was picked.
      */
     public record Item(
             long id,
             int position,
             PracticeRef problem,
+            boolean legacy,
             List<Option> options,
             Integer chosenPatternId,
+            String chosenCategory,
+            String recognition,
+            String code,
+            CodeLanguage codeLanguage,
+            String feedback,
             Integer correctPatternId,
             String correctPatternName,
+            String correctCategory,
             String idea,
             String anchorName,
             TestOutcome outcome) {
     }
 
+    /** @param categories the NeetCode roadmap categories, in roadmap order: the patterns to choose from */
     public record Test(long id, int weekNumber, LocalDate weekStart, LocalDate weekEnd,
-                       boolean completed, List<Item> items) {
+                       boolean completed, List<String> categories, List<Item> items) {
     }
 }

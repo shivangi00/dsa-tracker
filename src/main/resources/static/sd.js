@@ -2,6 +2,7 @@
 // (/api/sd/...); this file shows the data and sends your answers.
 import { api } from './http.js';
 import { refreshDueBadges } from './due-badges.js';
+import { trackUnsaved } from './unsaved.js';
 import { openReader, notesBlock, linkLine, labelled, quizBlock, readButton } from './reader.js';
 
 const $ = (id) => document.getElementById(id);
@@ -868,7 +869,11 @@ function attemptBlock(entry, item, a) {
   }
   head.append(readButton(() => readNotes(entry, item, a.id)));
   box.append(head);
-  if (a.editable) box.append(notesEditor(a));
+  const notesEd = a.editable ? notesEditor(a) : null;
+  if (notesEd) {
+    box.append(notesEd.node);
+    if (item.kind === 'TOPIC') box.append(notesSaveRow(notesEd));
+  }
   else {
     if (a.notes) box.append(notesBlock(a.notes));
     if (a.excalidrawUrl) {
@@ -881,7 +886,7 @@ function attemptBlock(entry, item, a) {
   if (item.kind === 'TOPIC' && a.quiz && a.quiz.length) box.append(pastQuiz(a));
   if (item.kind === 'PROBLEM') {
     a.answers.forEach((v) => box.append(answerBlock(entry, a, v)));
-    if (a.editable) box.append(answerEditor(entry, a));
+    if (a.editable) box.append(answerEditor(entry, a, notesEd));
   }
   return box;
 }
@@ -926,38 +931,69 @@ function readNotes(entry, item, focus) {
   });
 }
 
+/**
+ * The notes and drawing link of today's sitting. No button of its own: for a design problem the
+ * one Save button under the design saves these too; for a topic, {@link notesSaveRow} adds it.
+ * Unsaved text is kept in this browser, so a reload doesn't lose it.
+ */
 function notesEditor(a) {
-  const form = el('form', 'notes-form');
-  form.noValidate = true;
+  const wrap = el('div', 'notes-form');
+  const key = `notes:${a.id}`;
+  const d = draft(key);
   const notes = el('textarea');
-  notes.rows = 3; notes.maxLength = 2000; notes.value = a.notes || '';
+  notes.rows = 3; notes.maxLength = 2000; notes.value = d.notes ?? a.notes ?? '';
   const drawing = el('input');
   drawing.type = 'url'; drawing.maxLength = 500; drawing.placeholder = 'https://excalidraw.com/#json=…';
-  drawing.value = a.excalidrawUrl || '';
-  const error = errorLine();
-  const save = el('button', 'btn', 'Save notes');
-  save.type = 'submit';
+  drawing.value = d.drawing ?? a.excalidrawUrl ?? '';
+  const listeners = [];
+  const remember = () => { saveDraft(key, { notes: notes.value, drawing: drawing.value }); listeners.forEach((f) => f()); };
+  notes.addEventListener('input', remember);
+  drawing.addEventListener('input', remember);
+  wrap.append(field('Notes to remember', notes, 'optional'), drawingField(drawing));
+  const value = () => ({ notes: notes.value.trim(), excalidrawUrl: drawing.value.trim() });
+  const changed = () => value().notes !== (a.notes || '').trim() || value().excalidrawUrl !== (a.excalidrawUrl || '').trim();
+  const problem = () => (value().excalidrawUrl && !/^https:\/\/\S+$/.test(value().excalidrawUrl)
+    ? 'The drawing link must start with https://' : null);
+  const save = async () => {
+    await api(`/api/sd/attempts/${a.id}`, { method: 'PATCH', body: JSON.stringify(value()) });
+    dropDraft(key);
+  };
+  return { node: wrap, changed, problem, save, onChange: (f) => listeners.push(f) };
+}
+
+/** A topic's sitting has only notes: one Save button for them, with an unsaved-changes reminder. */
+function notesSaveRow(notesEd) {
+  const row = el('div', 'notes-actions');
+  const save = el('button', 'btn primary', 'Save');
+  save.type = 'button';
   const status = el('span', 'save-status');
-  const actions = el('div', 'notes-actions');
-  actions.append(save, status);
-  form.append(field('Notes to remember', notes, 'optional'), drawingField(drawing), actions, error);
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  const error = errorLine();
+  const show = () => {
+    status.textContent = notesEd.changed() ? 'Unsaved changes (notes): click Save' : '';
+    status.classList.toggle('unsaved', notesEd.changed());
+  };
+  notesEd.onChange(show);
+  trackUnsaved(row, () => notesEd.changed());
+  save.addEventListener('click', async () => {
     error.hidden = true;
-    if (drawing.value.trim() && !/^https:\/\/\S+$/.test(drawing.value.trim())) {
-      error.textContent = 'The drawing link must start with https://'; error.hidden = false; return;
-    }
+    if (!notesEd.changed()) { error.textContent = 'Nothing to save: your notes and link haven’t changed.'; error.hidden = false; return; }
+    const problem = notesEd.problem();
+    if (problem) { error.textContent = problem; error.hidden = false; return; }
     save.disabled = true;
     try {
-      await api(`/api/sd/attempts/${a.id}`, { method: 'PATCH', body: JSON.stringify({ notes: notes.value.trim(), excalidrawUrl: drawing.value.trim() }) });
-      status.textContent = 'Saved';
+      await notesEd.save();
+      toast('Saved your notes.');
       await load();
-    } catch (err) {
-      error.textContent = err.message; error.hidden = false;
-      if (/frozen/i.test(err.message)) await load();
-    } finally { save.disabled = false; }
+    } catch (e) {
+      error.textContent = e.message; error.hidden = false; save.disabled = false;
+      if (/frozen/i.test(e.message)) await load();
+    }
   });
-  return form;
+  row.append(save, status);
+  show();
+  const box = el('div');
+  box.append(row, error);
+  return box;
 }
 
 /** A saved design version: collapsed, its parts and score inside. Only Delete, on its day. */
@@ -1001,49 +1037,87 @@ function answerBlock(problem, a, v) {
 }
 
 /** The design box under today's saved versions: Analyse, Save (as the next version), Delete (clears it). */
-function answerEditor(problem, a) {
+/**
+ * The design box under today's saved versions, with the sitting's one Save button: it saves
+ * whatever changed, the notes and drawing link above and the design as the next version (scored)
+ * if it's new. Analyse scores without saving; Delete clears the box.
+ */
+function answerEditor(problem, a, notesEd) {
   const box = el('div', 'new-version');
   const draftKey = `ver:${a.id}`;
   const full = a.answers.length >= 5;
   const nextNo = a.answers.length ? Math.max(...a.answers.map((v) => v.versionNo)) + 1 : 1;
   const save = el('button', 'btn primary', 'Save');
   save.type = 'button';
+  save.title = 'Saves your notes, drawing link and design: whatever has changed';
   const clear = el('button', 'btn ghost danger', 'Delete');
   clear.type = 'button';
   clear.title = 'Clear this box (nothing saved is affected)';
+  const status = el('span', 'save-status');
   // The next version starts from the latest one, so you can improve it using the points you missed.
   const last = a.answers[a.answers.length - 1];
-  const editor = sectionsEditor(draftKey, problem, draft(draftKey).sections || (last ? last.sections : {}), [save, clear]);
-  box.append(el('span', 'code-label', last ? `Version ${nextNo} · starts from version ${last.versionNo}` : 'Your design'),
+  const editor = sectionsEditor(draftKey, problem, draft(draftKey).sections || (last ? last.sections : {}), [save, clear, status]);
+  box.append(el('span', 'code-label', last ? `Version ${nextNo} · starts from version ${last.versionNo}` : 'Your design (optional)'),
     timerBar(draftKey), editor.node);
-  if (full) {
-    save.disabled = true;
-    save.title = 'You have 5 versions (the most). Delete one to save another.';
-  }
+
+  const same = (x) => SECTIONS.every(([n]) => (x.sections[n] || '').trim() === (editor.value()[n] || '').trim());
+  const designIsNew = () => hasText(editor.value()) && !a.answers.some(same);
+  const notesChanged = () => Boolean(notesEd && notesEd.changed());
+  const showStatus = () => {
+    const parts = [];
+    if (notesChanged()) parts.push('notes');
+    if (designIsNew()) parts.push('design');
+    status.textContent = parts.length ? `Unsaved changes (${parts.join(' and ')}): click Save` : '';
+    status.classList.toggle('unsaved', parts.length > 0);
+  };
+  editor.node.addEventListener('input', showStatus);
+  if (notesEd) notesEd.onChange(showStatus);
+  trackUnsaved(box, () => notesChanged() || designIsNew());
+
   clear.addEventListener('click', () => {
     if (hasText(editor.value()) && !confirm('Clear this design?')) return;
     editor.set({});
     dropDraft(draftKey);
     editor.slot.replaceChildren();
     editor.error.hidden = true;
+    showStatus();
   });
   save.addEventListener('click', async () => {
     editor.error.hidden = true;
-    if (!hasText(editor.value())) { editor.error.textContent = 'Write at least one part first.'; editor.error.hidden = false; return; }
-    const same = (x) => SECTIONS.every(([n]) => (x.sections[n] || '').trim() === (editor.value()[n] || '').trim());
-    if (a.answers.some(same)) { editor.error.textContent = 'You already saved this exact design. Change it first.'; editor.error.hidden = false; return; }
+    const saveNotes = notesChanged();
+    const saveDesign = designIsNew();
+    if (!saveNotes && !saveDesign) {
+      editor.error.textContent = hasText(editor.value()) ? 'Nothing new to save: this exact design is already saved and your notes haven’t changed.'
+        : 'Nothing to save yet: change your notes or link, or write your design.';
+      editor.error.hidden = false;
+      return;
+    }
+    const problemText = saveNotes ? notesEd.problem() : null;
+    if (problemText) { editor.error.textContent = problemText; editor.error.hidden = false; return; }
+    if (saveDesign && full && !saveNotes) {
+      editor.error.textContent = 'You have 5 versions (the most). Delete one to save another.'; editor.error.hidden = false; return;
+    }
     save.disabled = true;
     save.textContent = 'Saving…';
+    const done = [];
     try {
-      await api(`/api/sd/attempts/${a.id}/answers`, { method: 'POST', body: JSON.stringify({ sections: editor.value() }) });
-      dropDraft(draftKey);
-      toast('Saved as a new version, with its score.');
+      if (saveNotes) { await notesEd.save(); done.push('your notes'); }
+      if (saveDesign && !full) {
+        await api(`/api/sd/attempts/${a.id}/answers`, { method: 'POST', body: JSON.stringify({ sections: editor.value() }) });
+        dropDraft(draftKey);
+        done.push('a new version of your design, with its score');
+      }
+      toast(saveDesign && full ? 'Notes saved. The design wasn’t: you already have 5 versions, so delete one first.'
+        : `Saved ${done.join(' and ')}.`);
       await load();
     } catch (e) {
-      editor.error.textContent = e.message; editor.error.hidden = false;
+      editor.error.textContent = done.length ? `Saved ${done[0]}, but: ${e.message}` : e.message;
+      editor.error.hidden = false;
       save.disabled = false; save.textContent = 'Save';
+      if (/frozen/i.test(e.message)) await load();
     }
   });
+  showStatus();
   return box;
 }
 

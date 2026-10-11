@@ -335,6 +335,7 @@ button.chip:hover { border-color: var(--ink-3); }
 .hint { margin: -4px 0 0; font-size: 11.5px; color: var(--ink-3); }
 .notes-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .save-status { font-size: 12px; color: var(--ink-3); }
+.save-status.unsaved { color: var(--warning); font-weight: 600; }
 
 /* Complexity analysis card */
 .analysis { margin-top: 10px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
@@ -517,6 +518,7 @@ a.btn { text-decoration: none; display: inline-block; }
 .q-verdict { font-size: 13px; padding: 10px 12px; border-radius: 6px; background: var(--tint); }
 .q-verdict.good b { color: var(--good); }
 .q-verdict.bad b { color: var(--critical); }
+.q-verdict.note b { color: var(--warning); }
 .q-anchor { font-size: 12px; color: var(--ink-3); margin: 8px 0 0; }
 .q-outcomes { display: flex; gap: 6px; flex-wrap: wrap; }
 .q-result { font-size: 13px; margin: 0; }
@@ -527,6 +529,26 @@ a.btn { text-decoration: none; display: inline-block; }
 .summary-stats b { font-size: 22px; font-variant-numeric: tabular-nums; }
 .summary-stats span { font-size: 12px; color: var(--ink-3); }
 .revisit { margin: 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
+
+/* Weekly test: mark the pattern, say why, get it reviewed, paste the feedback */
+.q-hint { margin: -4px 0 8px; font-size: 12px; color: var(--ink-3); }
+.q-label-gap { margin-top: 14px; }
+.pat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pat-chip { position: relative; cursor: pointer; }
+.pat-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.pat-chip span { display: inline-block; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--raised); font-size: 13px; color: var(--ink-2); }
+.pat-chip:hover span { border-color: var(--ink-3); color: var(--ink); }
+.pat-chip input:checked + span { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.pat-chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.q-step textarea { margin-bottom: 8px; }
+.q-step .code-head { margin: 6px 0 6px; }
+.chatbots { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.chatbots .hint { margin: 0 4px 0 0; flex-basis: 100%; }
+.prompt-copy { margin-top: 10px; display: grid; gap: 6px; }
+.q-fold { margin-top: 12px; }
+.q-fold > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--accent); width: fit-content; }
+.q-fold[open] > summary { margin-bottom: 8px; }
+.q.done .reader-notes { font-size: 14px; line-height: 1.6; }
 
 /* ------------------------------------------------------------------
    Sign up / sign in page
