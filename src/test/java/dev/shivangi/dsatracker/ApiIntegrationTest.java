@@ -230,6 +230,53 @@ class ApiIntegrationTest {
                 .andExpect(status().isConflict());
     }
 
+    @Test
+    void aWeeklyTestQuestionIsMarkedExplainedReviewedThenRecorded() throws Exception {
+        Cookie hugo = signUp("hugo");
+        markDone(hugo, 1);
+        // Move the plan (and the solve) a week back, so week 1's test is unlocked.
+        jdbc.update("UPDATE users SET start_date = start_date - 7 WHERE username = 'hugo'");
+        jdbc.update("UPDATE problems SET solved_on = solved_on - 7 WHERE user_id = (SELECT id FROM users WHERE username = 'hugo')");
+
+        String testJson = mvc.perform(post("/api/tests/week/1").with(csrf()).cookie(hugo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.categories[0]").value("Arrays & Hashing"))
+                .andExpect(jsonPath("$.categories.length()").value(18))
+                .andExpect(jsonPath("$.items[0].legacy").value(false))
+                .andExpect(jsonPath("$.items[0].correctCategory").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        long item = ((Number) JsonPath.read(testJson, "$.items[0].id")).longValue();
+        String base = "/api/tests/items/" + item;
+
+        mvc.perform(post(base + "/outcome").with(csrf()).cookie(hugo).contentType(APPLICATION_JSON)
+                .content("{\"outcome\":\"SOLVED\"}")).andExpect(status().isConflict());
+        mvc.perform(post(base + "/answer").with(csrf()).cookie(hugo).contentType(APPLICATION_JSON)
+                .content("{\"category\":\"Not a pattern\",\"recognition\":\"x\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post(base + "/answer").with(csrf()).cookie(hugo).contentType(APPLICATION_JSON)
+                .content("{\"category\":\"Arrays & Hashing\",\"recognition\":\"  \"}")).andExpect(status().isBadRequest());
+
+        mvc.perform(post(base + "/answer").with(csrf()).cookie(hugo).contentType(APPLICATION_JSON)
+                        .content("""
+                                {"category":"Arrays & Hashing","recognition":"Need to know if I've seen a value before",
+                                 "code":"def f(nums):\\n    return len(set(nums)) != len(nums)","codeLanguage":"PYTHON"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chosenCategory").value("Arrays & Hashing"))
+                .andExpect(jsonPath("$.codeLanguage").value("PYTHON"))
+                .andExpect(jsonPath("$.correctCategory").doesNotExist());   // not revealed until finished
+
+        mvc.perform(post(base + "/outcome").with(csrf()).cookie(hugo).contentType(APPLICATION_JSON)
+                        .content("{\"outcome\":\"HINT\",\"feedback\":\"Pattern right. O(n) time.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.feedback").value("Pattern right. O(n) time."))
+                .andExpect(jsonPath("$.outcome").value("HINT"))
+                .andExpect(jsonPath("$.correctCategory").exists());
+
+        mvc.perform(post(base + "/answer").with(csrf()).cookie(hugo).contentType(APPLICATION_JSON)
+                .content("{\"category\":\"Two Pointers\",\"recognition\":\"changed my mind\"}"))
+                .andExpect(status().isConflict());
+    }
+
     // ---------- recovery codes (forgot password without email)
 
     @Test

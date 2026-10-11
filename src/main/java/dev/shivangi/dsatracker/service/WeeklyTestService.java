@@ -1,5 +1,6 @@
 package dev.shivangi.dsatracker.service;
 
+import dev.shivangi.dsatracker.analysis.CodeLanguage;
 import dev.shivangi.dsatracker.domain.CatalogProblem;
 import dev.shivangi.dsatracker.domain.CatalogRepository;
 import dev.shivangi.dsatracker.domain.Pattern;
@@ -87,6 +88,8 @@ public class WeeklyTestService {
                 .collect(Collectors.groupingBy(p -> (int) (ChronoUnit.DAYS.between(start, p.getSolvedOn()) / 7) + 1,
                         Collectors.counting()));
 
+        Map<Integer, String> categoryOf = patterns.findAll().stream()
+                .collect(Collectors.toMap(Pattern::getId, Pattern::getCategory));
         List<TestViews.Summary> out = new ArrayList<>();
         for (int week = currentWeek; week >= 1; week--) {
             LocalDate ws = weekStart(start, week);
@@ -103,7 +106,8 @@ public class WeeklyTestService {
             }
             List<WeeklyTestItem> its = itemsByTest.getOrDefault(test.getId(), List.of());
             int answered = (int) its.stream().filter(i -> i.getOutcome() != null).count();
-            int right = (int) its.stream().filter(WeeklyTestItem::patternCorrect).count();
+            int right = (int) its.stream().filter(i -> i.patternAnswered()
+                    && i.patternCorrect(categoryOf.get(i.getPatternId()))).count();
             int solved = (int) its.stream().filter(i -> i.getOutcome() == TestOutcome.SOLVED).count();
             int hint = (int) its.stream().filter(i -> i.getOutcome() == TestOutcome.HINT).count();
             out.add(new TestViews.Summary(week, ws, we, test.isCompleted() ? "COMPLETED" : "IN_PROGRESS",
@@ -185,20 +189,71 @@ public class WeeklyTestService {
         return itemView(item, lookups());
     }
 
+    public static final int MAX_RECOGNITION = 2000;
+    public static final int MAX_CODE = 10_000;
+    public static final int MAX_FEEDBACK = 10_000;
+
+    /**
+     * Your answer: the category you'd use, what made you recognise it, and your code (optional).
+     * Can be saved again until you record how it went.
+     */
+    @Transactional
+    public TestViews.Item answer(Long userId, long itemId, String category, String recognition, String code,
+                                 CodeLanguage language) {
+        WeeklyTestItem item = ownedItem(userId, itemId);
+        if (item.getOutcome() != null) {
+            throw new ConflictException("This question is finished");
+        }
+        if (item.isLegacy()) {
+            throw new ConflictException("This question was answered with the old quiz");
+        }
+        List<String> categories = categories();
+        if (category == null || !categories.contains(category)) {
+            throw new BadRequestException("Mark one of the patterns");
+        }
+        String why = recognition == null ? "" : recognition.strip();
+        if (why.isEmpty()) {
+            throw new BadRequestException("Write what made you recognise the pattern");
+        }
+        if (why.length() > MAX_RECOGNITION) {
+            throw new BadRequestException("Keep the pattern recognition under " + MAX_RECOGNITION + " characters");
+        }
+        String solution = code == null || code.isBlank() ? null : code.stripTrailing();
+        if (solution != null && solution.length() > MAX_CODE) {
+            throw new BadRequestException("Code can be at most " + MAX_CODE + " characters");
+        }
+        if (solution != null && language == null) {
+            throw new BadRequestException("Choose the language of your code");
+        }
+        item.answer(category, why, solution, language);
+        return itemView(item, lookups());
+    }
+
     /**
      * Step 2: how solving it went. "Couldn't solve" brings the NeetCode problem with the same
      * pattern back for review tomorrow. The last answer completes the test.
      */
     @Transactional
     public TestViews.Item recordOutcome(Long userId, long itemId, TestOutcome outcome) {
+        return recordOutcome(userId, itemId, outcome, null);
+    }
+
+    /** As above, keeping the AI feedback you pasted (optional). */
+    @Transactional
+    public TestViews.Item recordOutcome(Long userId, long itemId, TestOutcome outcome, String feedback) {
         WeeklyTestItem item = ownedItem(userId, itemId);
         if (!item.patternAnswered()) {
-            throw new ConflictException("Pick the pattern first");
+            throw new ConflictException("Mark the pattern and say why first");
+        }
+        String pasted = feedback == null || feedback.isBlank() ? null : feedback.strip();
+        if (pasted != null && pasted.length() > MAX_FEEDBACK) {
+            throw new BadRequestException("Feedback can be at most " + MAX_FEEDBACK + " characters");
         }
         if (item.getOutcome() != null) {
             throw new ConflictException("You've already recorded this one");
         }
         LocalDate today = LocalDate.now(clock);
+        item.recordFeedback(pasted);
         item.recordOutcome(outcome, clock.instant());
 
         if (outcome == TestOutcome.NOT_SOLVED) {
@@ -249,24 +304,48 @@ public class WeeklyTestService {
         List<TestViews.Item> list = items.findByTestIdOrderByPosition(test.getId()).stream()
                 .map(i -> itemView(i, l)).toList();
         return new TestViews.Test(test.getId(), test.getWeekNumber(), test.getWeekStart(), test.getWeekEnd(),
-                test.isCompleted(), list);
+                test.isCompleted(), categories(l), list);
     }
 
     private static TestViews.Item itemView(WeeklyTestItem i, Lookups l) {
         PracticeProblem pp = l.practice().get(i.getPracticeProblemId());
-        List<TestViews.Option> options = i.options().stream()
-                .map(id -> new TestViews.Option(id, l.patterns().get(id).getName())).toList();
-        boolean revealed = i.patternAnswered();
+        boolean legacy = i.isLegacy();
+        List<TestViews.Option> options = legacy
+                ? i.options().stream().map(id -> new TestViews.Option(id, l.patterns().get(id).getName())).toList()
+                : List.of();
+        // Old quiz: revealed once a pattern was picked. Now: once the question is finished.
+        boolean revealed = legacy ? i.patternAnswered() : i.getOutcome() != null;
         Pattern correct = l.patterns().get(i.getPatternId());
         return new TestViews.Item(
                 i.getId(), i.getPosition(),
                 new TestViews.PracticeRef(pp.getName(), pp.getLeetcodeNumber(), pp.getDifficulty(), pp.getUrl()),
+                legacy,
                 options,
                 i.getChosenPatternId(),
+                i.getChosenCategory(),
+                i.getRecognition(),
+                i.getCode(),
+                i.getCodeLanguage(),
+                i.getFeedback(),
                 revealed ? correct.getId() : null,
                 revealed ? correct.getName() : null,
+                revealed ? correct.getCategory() : null,
                 revealed ? correct.getIdea() : null,
                 revealed ? l.catalog().get(i.getAnchorCatalogId()).getName() : null,
                 i.getOutcome());
+    }
+
+    /** The NeetCode roadmap categories in roadmap order (by their first pattern's id). */
+    private List<String> categories() {
+        return categories(new Lookups(patterns.findAll().stream().collect(Collectors.toMap(Pattern::getId, Function.identity())),
+                Map.of(), Map.of()));
+    }
+
+    private static List<String> categories(Lookups l) {
+        return l.patterns().values().stream()
+                .sorted(java.util.Comparator.comparing(Pattern::getId))
+                .map(Pattern::getCategory)
+                .distinct()
+                .toList();
     }
 }
