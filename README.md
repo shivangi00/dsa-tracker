@@ -107,6 +107,30 @@ An attempt is **editable on its own day and frozen after** (the server refuses c
 
 Every attempt has a **Read** button that opens the problem's notes as a page in a side panel (full screen on phones): each sitting with its notes, drawing link and saved code (DSA), quiz answers (system design topics) or latest design and what it still misses (system design problems), plus the interview talking points for DSA problems. Light formatting in notes is understood everywhere they're shown: blank lines for paragraphs, `- ` bullets, `1. ` lists, `# ` headings, `` `code` `` and `**bold**`. Esc, Close or a click outside closes it. `reader.js` builds it with plain DOM, so nothing in a note can run as code.
 
+## Push to GitHub
+
+Link a repository once (**Settings → GitHub**: `owner/name`, a fine-grained token with *Contents: Read and write* on just that repository, and optionally a branch). Then each solved problem's row has a GitHub button: one click pushes that problem's notes, every saved version of its code and each version's analysis, in **one commit**:
+
+```
+README.md                         your progress, by topic, linking every problem
+01 Arrays & Hashing/
+  001 Contains Duplicate/
+    README.md                     the problem, and each sitting with its date, rating and complexity
+    Solved/       notes.md  v1.java  v2.py
+    Revision 1/   notes.md  v1.java
+    Revision 1 (try 2)/ …         after an "Again"
+    Revision 2/ … Revision 3/ …
+```
+
+- The button shows the state: no dot = never pushed, green = up to date, amber = changed since the last push (a fingerprint of the files is kept, so this needs no call to GitHub). **Push everything** in Settings pushes all problems in one commit. **Push automatically after every save** does it for you after Mark as done, a revision or Save.
+- Only files whose content changed are sent; pushing an unchanged problem makes no commit. A code version deleted in the tracker is deleted from that problem's folder. Nothing else in the repository is touched: your own files, a README you wrote elsewhere, other problems' folders. The front-page `README.md` is the exception: the app rewrites it on each push.
+- Only saved work is pushed: with unsaved edits on the page, the button asks first.
+- The token is checked with GitHub when you connect, stored encrypted (AES-GCM with the server's `GITHUB_TOKEN_KEY`) and never sent back to the browser. Disconnect deletes it. A public repository gets a warning in Settings, because notes can be personal.
+- Errors are explained in plain words: an expired or revoked token, missing write access, a repository or branch that doesn't exist, GitHub's rate limit. If someone else pushes in between, the app retries once on top of their commit.
+- Deleting a problem in the tracker doesn't delete its folder on GitHub; delete it there if you want it gone. Edits made on github.com inside a problem's folder are overwritten by the next push of that problem.
+
+Code: `github/` (`RepoLayout` builds the files, `GitHubClient` talks to the GitHub API, `TokenCipher` encrypts tokens, `GitHubService` ties them to your data). Tested against a stand-in GitHub (`FakeGitHub`).
+
 ## Day and night mode
 
 Follows your device's light/dark setting by default. The sun/moon button in the header (on every page, including sign-in) switches between day and night mode, and **Settings → Appearance** offers *Match my device*, *Day mode* or *Night mode*. The choice is saved per browser. Colours are CSS variables with a second set for night mode, so every part of the page switches together.
@@ -200,6 +224,9 @@ Every problem has a rubric and a reference design: 8–9 key points for Easy, 9�
 | POST | `/api/auth/recover` | `{ username, recoveryCode, password, confirmPassword }` | `{ me, recoveryCode }` (the new code); signs out other sessions and signs you in; 400 if they don't match |
 | GET / PATCH | `/api/me` | `{ startDate }` | your account: `{ username, startDate, hasRecoveryCode }` |
 | POST | `/api/me/recovery-code` | `{ password }` | `{ recoveryCode }`: a new code; the old one stops working |
+| GET / PUT / PATCH / DELETE | `/api/github` | PUT `{ repository, token, branch?, autoPush }`, PATCH `{ autoPush }` | the link's status (never the token) and each problem's push state; connect; auto-push; disconnect |
+| POST | `/api/github/problems/{id}/push` | | push one problem (one commit, or none if unchanged) |
+| POST | `/api/github/push-all` | | push every problem in one commit |
 | GET | `/api/due-counts` | | `{ dsa, systemDesign }`: revisions due today in each tracker, for the red badges on the DSA / System design switch and the count in the browser tab title |
 | GET | `/api/dashboard` | | due revisions, plan (key dates, pace, 14-day workload), memory stages, recall, study days, weekly tests, all 150 problems with their attempt history |
 | POST | `/api/catalog/{catalogId}/done` | `{ learnings, excalidrawUrl, code?, codeLanguage?, rating }` | `rating` is AGAIN / HARD / GOOD / EASY (shown as Forgot / Hard / Medium / Easy; missing = GOOD) and sets the first revision; code is saved as version 1 and analysed; 409 after day 85 |
@@ -235,7 +262,7 @@ src/main/java/dev/shivangi/dsatracker/
   web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
   sd/            the system design tracker: SdCatalog, Quiz, DesignScorer (pure Java), SdService, SdController, entities
 src/main/resources/
-  db/migration/V1…V14      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design; V13 = quiz answers kept; V14 = weekly test reflection
+  db/migration/V1…V15      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design; V13 = quiz answers kept; V14 = weekly test reflection; V15 = GitHub
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   interview-tips.json     interview talking points for each of the 150 problems
   sd-topics.json, sd-problems.json   system design quizzes, rubrics and reference designs
@@ -256,6 +283,7 @@ All settings are environment variables; `.env.example` has production values to 
 | `RATE_LIMITS_ENABLED` | true | true |
 | `ANTHROPIC_API_KEY` | (empty: built-in estimate) | optional: a key from console.anthropic.com makes Analyse use Claude |
 | `ANALYSIS_MODEL` | `claude-haiku-4-5-20251001` | any Claude model id |
+| `GITHUB_TOKEN_KEY` | (empty: Push to GitHub is off and Settings says why) | `openssl rand -base64 32`; keep it the same once set (DEPLOY.md 7.3) |
 | `PORT`, `WEB_THREADS` | 8080, 200 | set by Render / `50` on Render's free 512 MB plan |
 
 ## The NeetCode 150 list

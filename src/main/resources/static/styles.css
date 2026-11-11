@@ -462,6 +462,22 @@ dialog h2 { font-size: 16px; font-weight: 650; }
 .form-error { color: var(--critical); margin: 0; font-size: 13px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
+.toast-link { color: inherit; font-weight: 600; text-decoration: underline; margin-left: 4px; }
+.btn.icon.gh-btn { position: relative; color: var(--ink-3); display: inline-grid; place-items: center; }
+.btn.icon.gh-btn:hover { color: var(--ink); background: var(--tint); }
+.gh-btn.busy { opacity: .5; cursor: progress; }
+.gh-dot { position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--bg); }
+.gh-ok .gh-dot { background: var(--good); }
+.gh-changed .gh-dot { background: var(--warning); }
+.gh-steps { margin: 4px 0 10px; padding-left: 20px; font-size: 13px; color: var(--ink-2); display: grid; gap: 4px; }
+.gh-steps a, .gh-linked a { color: var(--accent); }
+.gh-linked { margin: 0 0 6px; font-size: 14px; }
+.hint.warn { color: var(--warning); }
+#gh-settings { display: grid; gap: 10px; }
+#gh-settings label.check { display: flex; align-items: center; justify-content: flex-start; gap: 8px; font-size: 13px; cursor: pointer; }
+#gh-settings label.check input { width: auto; margin: 0; flex: none; }
+#gh-settings .code-actions .btn { flex: none; }
+#gh-settings p { margin: 0; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 14px; border-radius: 7px; font-size: 13px; max-width: calc(100% - 32px); }
 
 /* ------------------------------------------------------------------

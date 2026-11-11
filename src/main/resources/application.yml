@@ -77,3 +77,8 @@ app:
   # Optional. With a key, "Analyse" asks Claude; without one it uses the built-in estimate.
   anthropic-api-key: ${ANTHROPIC_API_KEY:}
   analysis-model: ${ANALYSIS_MODEL:claude-haiku-4-5-20251001}
+  github:
+    # Needed for "Push to GitHub": encrypts the tokens people link (openssl rand -base64 32).
+    # Without it, the GitHub section in Settings explains that it isn't set up.
+    token-key: ${GITHUB_TOKEN_KEY:}
+    api-url: https://api.github.com
