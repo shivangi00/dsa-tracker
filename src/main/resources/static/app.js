@@ -2,7 +2,7 @@
 // All rules live on the server; this file only shows data and sends your answers.
 import { api } from './http.js';
 import { refreshDueBadges } from './due-badges.js';
-import { trackUnsaved } from './unsaved.js';
+import { trackUnsaved, hasUnsaved } from './unsaved.js';
 import { openReader, notesBlock, codeBlock, linkLine, labelled, readButton } from './reader.js';
 
 const $ = (id) => document.getElementById(id);
@@ -31,7 +31,8 @@ let doneTarget = null;      // the catalog item the dialog is marking done
 
 async function load() {
   try {
-    state = await api('/api/dashboard');
+    const [dashboard] = await Promise.all([api('/api/dashboard'), loadGitHub()]);
+    state = dashboard;
     render(state);
     refreshDueBadges('dsa');
     if (!load.checkedRecovery) { load.checkedRecovery = true; checkRecoveryCode(); }
@@ -493,6 +494,8 @@ function catalogRow(c) {
   undo.append(binIcon());
   undo.addEventListener('click', () => remove(p));
   const actions = el('div', 'actions');
+  const gh = githubButton(p);
+  if (gh) actions.append(gh);
   actions.append(undo);
 
   li.append(title, level, ...cells, compact, actions, panel);
@@ -851,6 +854,7 @@ function reviseForm(p, key) {
           ? `No problem. Try revision ${k} again ${inDays(updated.intervalDays)} (${fmt(updated.nextDueOn)}).`
           : `Revision ${k} done. Revision ${k + 1} ${inDays(updated.intervalDays)} (${fmt(updated.nextDueOn)}).`);
       await load();
+      autoPush(p.id);
     } catch (e) {
       error.textContent = e.message; error.hidden = false;
       buttons.forEach((x) => (x.disabled = false));
@@ -1113,6 +1117,7 @@ function versionEditor(p, a, notesEd) {
       toast(saveCode && full ? 'Notes saved. The code wasn’t: you already have 5 versions, so delete one first.'
         : `Saved ${done.join(' and ')}.`);
       await load();
+      autoPush(p.id);
     } catch (e) {
       error.textContent = done.length ? `Saved ${done[0]}, but: ${e.message}` : e.message;
       error.hidden = false;
@@ -1431,6 +1436,7 @@ doneForm.addEventListener('submit', async (ev) => {
     const complexity = a ? ` Time ${a.time}, space ${a.space}.` : '';
     toast(`Done. First review ${inDays(saved.intervalDays)}, ${fmt(saved.nextDueOn)}.${complexity}`);
     await load();
+    autoPush(saved.id);
   } catch (e) {
     err.textContent = e.message;
     err.hidden = false;
@@ -1465,6 +1471,7 @@ function openSettings() {
   $('rc-result').hidden = true;
   $('rc-error').hidden = true;
   $('rc-password').value = '';
+  renderGitHubSettings();
   settings.showModal();
 }
 $('open-settings').addEventListener('click', openSettings);
@@ -1556,12 +1563,180 @@ function el(tag, cls = '', text) {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, link) {
   const t = $('toast');
   t.textContent = msg;
+  if (link) {
+    const a = el('a', 'toast-link', `${link.label} ↗`);
+    a.href = link.href; a.target = '_blank'; a.rel = 'noopener';
+    t.append(' ', a);
+  }
   t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.hidden = true), 3500);
+  toastTimer = setTimeout(() => (t.hidden = true), link ? 8000 : 3500);
+}
+
+// ---------- GitHub: push a problem's notes, code and analysis to your repository
+let github = null;   // GET /api/github: whether it's linked, and each problem's push status
+
+async function loadGitHub() {
+  try { github = await api('/api/github'); } catch { github = null; }
+}
+
+function githubIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('fill', 'currentColor');
+  path.setAttribute('d', 'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z');
+  svg.append(path);
+  return svg;
+}
+
+/** The GitHub button in a solved problem's row: grey (never pushed), green dot (up to date), amber dot (changes). */
+function githubButton(p) {
+  if (!github || !github.connected) return null;
+  const s = github.problems[p.id];
+  const b = el('button', `btn icon gh-btn${s ? (s.upToDate ? ' gh-ok' : ' gh-changed') : ''}`);
+  b.type = 'button';
+  const label = !s ? `Push "${p.name}" to GitHub`
+    : s.upToDate ? `On GitHub, up to date (pushed ${fmt(s.pushedAt.slice(0, 10))}). Click to push again.`
+      : `Changes since the last push: push "${p.name}" to GitHub`;
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.append(githubIcon());
+  if (s) b.append(el('i', 'gh-dot'));
+  b.addEventListener('click', () => pushToGitHub(p.id, b));
+  return b;
+}
+
+async function pushToGitHub(problemId, button) {
+  if (hasUnsaved() && !confirm('You have unsaved changes. Only saved work is pushed. Push anyway?')) return;
+  if (button) { button.disabled = true; button.classList.add('busy'); }
+  try {
+    const r = await api(`/api/github/problems/${problemId}/push`, { method: 'POST' });
+    toast(r.message, { href: r.folderUrl, label: 'View on GitHub' });
+    await loadGitHub();
+    render(state);
+  } catch (e) {
+    toast(`GitHub: ${e.message}`);
+    if (button) { button.disabled = false; button.classList.remove('busy'); }
+  }
+}
+
+/** After a save: push straight away when "Push after every save" is on. */
+async function autoPush(problemId) {
+  if (github && github.connected && github.autoPush && problemId) await pushToGitHub(problemId, null);
+}
+
+// The GitHub part of Settings
+function renderGitHubSettings() {
+  const box = $('gh-settings');
+  box.replaceChildren();
+  const g = github;
+  if (!g) { box.append(el('p', 'hint', 'Couldn’t check the GitHub link. Try again later.')); return; }
+  if (!g.available) { box.append(el('p', 'hint', g.unavailableReason)); return; }
+  const error = el('p', 'form-error');
+  error.setAttribute('role', 'alert');
+  error.hidden = true;
+  const fail = (e) => { error.textContent = e.message; error.hidden = false; };
+
+  if (!g.connected) {
+    box.append(el('p', 'hint', 'Push your notes, every version of your code and its analysis to your own repository, as topic → question → Solved / Revision 1–3. Use a private repository if your notes are personal.'));
+    const steps = el('ol', 'gh-steps');
+    const li1 = el('li');
+    const newRepo = el('a', '', 'Create a repository ↗');
+    newRepo.href = 'https://github.com/new'; newRepo.target = '_blank'; newRepo.rel = 'noopener';
+    li1.append(newRepo, document.createTextNode(' (or use an existing one).'));
+    const li2 = el('li');
+    const newToken = el('a', '', 'Create a fine-grained token ↗');
+    newToken.href = 'https://github.com/settings/personal-access-tokens/new'; newToken.target = '_blank'; newToken.rel = 'noopener';
+    li2.append(newToken, document.createTextNode(': "Only select repositories" → that repository; Repository permissions → Contents: Read and write. Pick an expiry you’re happy with.'));
+    steps.append(li1, li2, el('li', '', 'Paste the repository and token below.'));
+    box.append(steps);
+    const repo = el('input');
+    repo.placeholder = 'owner/repository'; repo.autocomplete = 'off'; repo.spellcheck = false;
+    const token = el('input');
+    token.type = 'password'; token.placeholder = 'github_pat_…'; token.autocomplete = 'off';
+    const branch = el('input');
+    branch.placeholder = 'default branch'; branch.autocomplete = 'off'; branch.spellcheck = false;
+    const auto = el('input');
+    auto.type = 'checkbox';
+    const autoLabel = el('label', 'check');
+    autoLabel.append(auto, el('span', '', 'Push automatically after every save'));
+    const connect = el('button', 'btn primary', 'Connect');
+    connect.type = 'button';
+    connect.addEventListener('click', async () => {
+      error.hidden = true;
+      connect.disabled = true; connect.textContent = 'Checking…';
+      try {
+        github = await api('/api/github', { method: 'PUT', body: JSON.stringify({ repository: repo.value.trim(), token: token.value.trim(), branch: branch.value.trim(), autoPush: auto.checked }) });
+        token.value = '';
+        renderGitHubSettings();
+        render(state);
+        toast(`Connected to ${github.repository}.`);
+      } catch (e) { fail(e); connect.disabled = false; connect.textContent = 'Connect'; }
+    });
+    // Enter connects (instead of saving the start date, the dialog's own submit).
+    [repo, token, branch].forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); connect.click(); } }));
+    const row = el('div', 'code-actions');
+    row.append(connect);
+    box.append(ghField('Repository', repo), ghField('Token', token, 'Stored encrypted; never shown again.'), ghField('Branch', branch, 'Optional.'),
+      autoLabel, row, error);
+    return;
+  }
+
+  const line = el('p', 'gh-linked');
+  const link = el('a', '', `${g.repository} ↗`);
+  link.href = g.repoUrl; link.target = '_blank'; link.rel = 'noopener';
+  line.append(document.createTextNode('Connected to '), link, document.createTextNode(` · branch ${g.branch} · ${g.isPrivate ? 'private' : 'public'}`));
+  box.append(line);
+  if (!g.isPrivate) box.append(el('p', 'hint warn', 'This repository is public: anyone can read your notes. Make it private on GitHub if they’re personal.'));
+  box.append(el('p', 'hint', g.lastPushAt ? `Last push ${new Date(g.lastPushAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}. Use the GitHub button in a problem’s row to push it.`
+    : 'Nothing pushed yet. Use the GitHub button in a solved problem’s row, or push everything now.'));
+  const auto = el('input');
+  auto.type = 'checkbox';
+  auto.checked = g.autoPush;
+  const autoLabel = el('label', 'check');
+  autoLabel.append(auto, el('span', '', 'Push automatically after every save'));
+  auto.addEventListener('change', async () => {
+    try { github = await api('/api/github', { method: 'PATCH', body: JSON.stringify({ autoPush: auto.checked }) }); }
+    catch (e) { fail(e); auto.checked = !auto.checked; }
+  });
+  const all = el('button', 'btn', 'Push everything');
+  all.type = 'button';
+  all.addEventListener('click', async () => {
+    error.hidden = true;
+    all.disabled = true; all.textContent = 'Pushing…';
+    try {
+      const r = await api('/api/github/push-all', { method: 'POST' });
+      await loadGitHub();
+      renderGitHubSettings();
+      render(state);
+      toast(r.message, { href: r.folderUrl, label: 'Open repository' });
+    } catch (e) { fail(e); all.disabled = false; all.textContent = 'Push everything'; }
+  });
+  const off = el('button', 'btn ghost danger', 'Disconnect');
+  off.type = 'button';
+  off.addEventListener('click', async () => {
+    if (!confirm(`Disconnect ${g.repository}? The token is deleted here; nothing is removed from GitHub.`)) return;
+    try { await api('/api/github', { method: 'DELETE' }); await loadGitHub(); renderGitHubSettings(); render(state); }
+    catch (e) { fail(e); }
+  });
+  const row = el('div', 'code-actions');
+  row.append(all, off);
+  box.append(autoLabel, row, error);
+}
+
+function ghField(label, input, hint) {
+  const f = el('label', 'field');
+  f.append(el('span', '', label), input);
+  if (hint) f.append(el('small', 'hint', hint));
+  return f;
 }
 
 load();

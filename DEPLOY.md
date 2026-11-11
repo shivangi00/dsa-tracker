@@ -442,6 +442,16 @@ The free `…onrender.com` address works fine. If you buy a domain later (about 
 
 Results then say "Analysed by Claude"; if Claude can't be reached, the built-in estimate answers instead. Each user can run 50 analyses a day, which keeps costs bounded. Check current prices on Anthropic's pricing page.
 
+### 7.3 Turn on "Push to GitHub"
+
+The GitHub button needs one extra setting so the tokens people link can be stored encrypted:
+
+1. Make a random key. In a terminal: `openssl rand -base64 32` (or, without openssl, any password manager's 44-character base64 generator). Copy the line it prints.
+2. Render → your service → **Environment** → add `GITHUB_TOKEN_KEY` = that line → **Save Changes** (Render redeploys by itself).
+3. In the app: **Settings → GitHub**, follow the three steps there (a repository, a fine-grained token with **Contents: Read and write** on just that repository, paste both).
+
+Keep the key the same from then on. If it ever changes, saved tokens can't be read any more and the app asks you to connect again (nothing on GitHub is lost). Never put the key in a file in the project.
+
 ### 7.3 Password reset by email (later, with a domain)
 
 Recovery codes need no email, which is why this guide skips it. If you buy a domain later and want "email me a reset link" as well, ask me: it means adding an email provider (such as Resend, whose free plan covers this) and a few DNS records to your domain.
