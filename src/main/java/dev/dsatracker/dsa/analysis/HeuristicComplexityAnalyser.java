@@ -86,6 +86,8 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             "(?i)\\b\\w*(mid|middle|half|split)\\w*\\s*\\(|\\b(mid|middle|half)\\w*\\s*=(?!=)|\\bfast\\s*=\\s*fast\\s*\\.\\s*next\\s*\\.\\s*next");
     /** Walking a linked list: curr = curr.next, node = node->next. */
     private static final Pattern LINKED_WALK = Pattern.compile("\\b(\\w+)\\s*=\\s*\\1\\s*(\\.|->)\\s*next\\b");
+    /** A base case that returns one element by index: "return lists[lo]", "return arr[si];". */
+    private static final Pattern INDEXED_RETURN = Pattern.compile("\\breturn\\s+\\w+\\s*\\[\\s*\\w+\\s*\\]\\s*;?\\s*$", Pattern.MULTILINE);
     private static final Pattern MID = Pattern.compile("\\bmid\\b|\\bm\\s*=|/\\s*2\\b|>>\\s*1\\b|>>>\\s*1\\b|//\\s*2\\b");
     private static final Pattern POP = Pattern.compile(
             "\\.(heappop|pop|poll|pollLast|pollFirst|removeLast|removeFirst|popleft|shift|pop_back|pop_front|remove)\\s*\\(");
@@ -315,8 +317,10 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             List<String> out = explain(time, space);
             out.add(grid
                     ? "m × n is the size of the grid (m rows, n columns)."
-                    : "n is the size of the input (for two inputs, the larger one)."
-                            + (time.usesK() || space.usesK() ? " k is the size of each item, such as a word's length." : ""));
+                    : (kIsLists
+                            ? "n is the total number of nodes across all the lists; k is the number of lists."
+                            : "n is the size of the input (for two inputs, the larger one)."
+                            + (time.usesK() || space.usesK() ? " k is the size of each item, such as a word's length." : "")));
             out.add("An estimate from the code's structure: check it against your own reasoning.");
             String conf = confidence >= 3 ? "high" : confidence == 2 ? "medium" : "low";
             return new ComplexityAnalysis(time.format(grid), space.format(grid), out, conf, ComplexityAnalysis.ESTIMATE);
@@ -516,6 +520,26 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 return args;
             }
             return args.strip().matches("\\w+") && ctx.elements().contains(args.strip()) ? args : null;
+        }
+
+        /**
+         * Divide and conquer over a list of linked lists: the base case returns one list by index
+         * ({@code return lists[lo]}) and the combine step merges linked lists (walks {@code .next}).
+         */
+        /** Set when k means the number of lists (Merge K Sorted Lists), for the closing explanation. */
+        boolean kIsLists;
+
+        boolean mergesListsByIndex(Node f) {
+            if (!INDEXED_RETURN.matcher(f.body).find()) {
+                return false;
+            }
+            for (Node g : functions.values()) {
+                if (g != f && Pattern.compile("\\b" + Pattern.quote(g.name) + "\\s*\\(").matcher(f.body).find()
+                        && LINKED_WALK.matcher(g.body).find()) {
+                    return true;
+                }
+            }
+            return LINKED_WALK.matcher(f.body).find();
         }
 
         boolean heapOp(String stmt) {
@@ -776,6 +800,16 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                     lower(2);
                     globalTime = Cx.max(globalTime, total);
                     result = new Fn(Cx.ONE, total, units());
+                } else if (halving && !callInLoop && selfCalls >= 2 && body.equals(Cx.N) && mergesListsByIndex(f)) {
+                    // Merge K Sorted Lists in pairs: it halves the range of list indices (k lists), and each
+                    // level merges every node once, so O(n) per level × O(log k) levels.
+                    Cx total = Cx.N.times(Cx.LOG_K);
+                    reason(name + " splits the lists in half by index and merges the two halves: there are O(log k) levels"
+                            + " (k = the number of lists), and each level merges every node once (n = all nodes) → "
+                            + total.format(grid) + ". Recursion depth O(log k).");
+                    lower(2);
+                    kIsLists = true;
+                    result = new Fn(total, total, Cx.LOG_K);
                 } else if (halving && !callInLoop) {
                     Cx total;
                     if (selfCalls == 1) {

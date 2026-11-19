@@ -29,6 +29,8 @@ record Cx(int power, int logs, int kpow, int klogs, Growth growth, boolean heigh
     static final Cx H = new Cx(0, 0, 0, 0, Growth.POLY, true);
     static final Cx TWO_TO_N = new Cx(0, 0, 0, 0, Growth.EXPONENTIAL, false);
     static final Cx N_FACTORIAL = new Cx(0, 0, 0, 0, Growth.FACTORIAL, false);
+    /** Halving the number of lists (Merge K Sorted Lists, merging in pairs): O(log k) levels. */
+    static final Cx LOG_K = new Cx(0, 0, 0, 1, Growth.POLY, false);
     /** A binary search over a range of values (1…m): O(log m). */
     static final Cx LOG_M = new Cx(0, 0, 0, 0, Growth.POLY, false, 1);
 

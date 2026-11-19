@@ -17,9 +17,10 @@ class HeuristicComplexityAnalyserTest {
 
     private final HeuristicComplexityAnalyser analyser = new HeuristicComplexityAnalyser();
 
-    private void expect(String time, String space, String code, CodeLanguage lang) {
+    private ComplexityAnalysis expect(String time, String space, String code, CodeLanguage lang) {
         ComplexityAnalysis a = analyser.analyse(code, lang);
         assertEquals(time + " / " + space, a.time() + " / " + a.space(), String.join("\n", a.reasons()));
+        return a;
     }
 
     // ---------------------------------------------------------------- arrays & hashing
@@ -766,6 +767,75 @@ class HeuristicComplexityAnalyserTest {
      * Merge K Sorted Lists by joining every list and merge-sorting the result: the middle is found with
      * midNode() (slow/fast pointers), not passed as "mid", and getTail(arr[i]) walks each list once.
      */
+    @Test
+    void mergeKListsInPairsIsNLogK() {
+        ComplexityAnalysis a = expect("O(n log k)", "O(log k)", """
+                # Definition for singly-linked list.
+                # class ListNode:
+                #     def __init__(self, val=0, next=None):
+                #         self.val = val
+                #         self.next = next
+                class Solution:
+                    def merge2sorted(self, list1: ListNode | None, list2: ListNode | None) -> ListNode | None:
+                        dummy = ListNode(0)
+                        curr = dummy
+
+                        while list1 and list2:
+                            if list1.val < list2.val:
+                                curr.next = list1
+                                list1 = list1.next
+                            else:
+                                curr.next = list2
+                                list2 = list2.next
+                            curr = curr.next
+
+                        curr.next = list1 if list1 else list2
+
+                        return dummy.next
+
+                    def mergeKLists_03(self, arr: list[ListNode | None], si: int, ei: int) -> ListNode | None:
+                        if si == ei: return arr[si]
+
+                        mid = (si + ei) // 2
+                        return self.merge2sorted(self.mergeKLists_03(arr, si, mid), self.mergeKLists_03(arr, mid + 1, ei))
+
+                    def mergeKLists(self, arr: list[ListNode | None]) -> ListNode | None:
+                        if len(arr) == 0:
+                            return None
+                        return self.mergeKLists_03(arr, 0, len(arr) - 1)
+                """, PYTHON);
+        assertTrue(a.reasons().stream().anyMatch(l -> l.contains("k is the number of lists")), String.join("\n", a.reasons()));
+    }
+
+    @Test
+    void mergeKListsInPairsInJava() {
+        expect("O(n log k)", "O(log k)", """
+                class Solution {
+                    private ListNode merge(ListNode a, ListNode b) {
+                        ListNode dummy = new ListNode(0), cur = dummy;
+                        while (a != null && b != null) {
+                            if (a.val < b.val) { cur.next = a; a = a.next; }
+                            else { cur.next = b; b = b.next; }
+                            cur = cur.next;
+                        }
+                        cur.next = a != null ? a : b;
+                        return dummy.next;
+                    }
+
+                    private ListNode divide(ListNode[] lists, int lo, int hi) {
+                        if (lo == hi) return lists[lo];
+                        int mid = lo + (hi - lo) / 2;
+                        return merge(divide(lists, lo, mid), divide(lists, mid + 1, hi));
+                    }
+
+                    public ListNode mergeKLists(ListNode[] lists) {
+                        if (lists.length == 0) return null;
+                        return divide(lists, 0, lists.length - 1);
+                    }
+                }
+                """, JAVA);
+    }
+
     @Test
     void linkedListMergeSortIsNLogN() {
         expect("O(n log n)", "O(log n)", """
