@@ -115,7 +115,7 @@ Link a repository once (**Settings → GitHub**: `owner/name`, a fine-grained to
 README.md                         your progress, by topic, linking every problem
 01 Arrays & Hashing/
   001 Contains Duplicate/
-    README.md                     the problem, and each sitting with its date, rating and complexity
+    README.md                     the problem, and each sitting: date, rating, complexity, drawing link
     Solved/       notes.md  v1.java  v2.py
     Revision 1/   notes.md  v1.java
     Revision 1 (try 2)/ …         after an "Again"
@@ -129,7 +129,7 @@ README.md                         your progress, by topic, linking every problem
 - Errors are explained in plain words: an expired or revoked token, missing write access, a repository or branch that doesn't exist, GitHub's rate limit. If someone else pushes in between, the app retries once on top of their commit.
 - Deleting a problem in the tracker doesn't delete its folder on GitHub; delete it there if you want it gone. Edits made on github.com inside a problem's folder are overwritten by the next push of that problem.
 
-Code: `github/` (`RepoLayout` builds the files, `GitHubClient` talks to the GitHub API, `TokenCipher` encrypts tokens, `GitHubService` ties them to your data). Tested against a stand-in GitHub (`FakeGitHub`).
+Code: `dev/dsatracker/github/` (`RepoLayout` builds the files, `GitHubClient` talks to the GitHub API, `TokenCipher` encrypts tokens, `GitHubService` ties them to your data). Tested against a stand-in GitHub (`FakeGitHub`).
 
 ## Day and night mode
 
@@ -248,26 +248,32 @@ Everything except `/api/auth/**` needs a signed-in session (otherwise 401). Erro
 ## Where things live
 
 ```
-src/main/java/dev/shivangi/dsatracker/
-  security/      SecurityConfig, CsrfCookieFilter, RateLimiter, DatabaseRateLimiter, RateLimitRules, RateLimitFilter, RecoveryCodes, AuthUser
-  domain/        AppUser, CatalogProblem, Pattern, PracticeProblem, Problem, RevisionAttempt,
-                 WeeklyTest, WeeklyTestItem, repositories
-  repetition/    SpacedRepetitionPolicy, ScheduleState          ← the review algorithm (pure Java)
-  consistency/   ConsistencyCalculator, ActivityRepository      ← study days, weekly target (pure Java + SQL)
-  weekly/        TestBuilder                                    ← picks test questions (pure Java)
-  analysis/      CodeStructure, HeuristicComplexityAnalyser, Cx ← the built-in complexity estimate (pure Java)
-                 ClaudeComplexityAnalyser, FallbackComplexityAnalyser  ← optional Claude, with the estimate as backup
-                 ComplexityExpression, ApproachRecommender, BestApproaches ← "a better approach exists" (pure Java)
-  service/       AuthService, ProblemService, AnalysisService, DashboardService, WeeklyTestService
-  web/           Auth/Me/Problem/WeeklyTest controllers, JSON views, error handler
-  sd/            the system design tracker: SdCatalog, Quiz, DesignScorer (pure Java), SdService, SdController, entities
+src/main/java/dev/dsatracker/          one folder per feature
+  DsaTrackerApplication.java
+  account/        sign-up, sign-in, recovery codes, who you are: AppUser, AuthService, AuthController, MeController,
+                  AuthUser, DbUserDetailsService, RecoveryCodes
+  dsa/            the NeetCode 150 tracker: Problem, Attempt, SolutionVersion, CatalogProblem, their repositories,
+                  ProblemService, DashboardService, AnalysisService, ProblemController and its JSON views
+    analysis/     complexity analysis: CodeStructure, HeuristicComplexityAnalyser, Cx (the built-in estimate, pure Java),
+                  ClaudeComplexityAnalyser + FallbackComplexityAnalyser (optional Claude, estimate as backup),
+                  ComplexityExpression, ApproachRecommender, BestApproaches ("a better approach exists")
+    consistency/  ConsistencyCalculator, ActivityRepository   ← study days, weekly target
+    weekly/       weekly tests: TestBuilder (picks questions, pure Java), WeeklyTestService, WeeklyTestController,
+                  Pattern, PracticeProblem, WeeklyTest, WeeklyTestItem
+  systemdesign/   the system design tracker: SdCatalog, Quiz, DesignScorer (pure Java), SdService, SdController, entities
+  github/         Push to GitHub: RepoLayout, GitHubClient, TokenCipher, GitHubService, GitHubController
+  shared/         used by everything: AppConfig, AppProperties, Plan (the 100 days), the error types + ApiExceptionHandler,
+                  DueCountsController (the badges on both tabs)
+    repetition/   SpacedRepetitionPolicy, ScheduleState, Rating   ← the review algorithm, for both trackers (pure Java)
+    security/     SecurityConfig, CsrfCookieFilter, rate limiting (RateLimiter, DatabaseRateLimiter, RateLimitRules, RateLimitFilter)
 src/main/resources/
   db/migration/V1…V15      V3 = the 150 problems; V4 = accounts + adaptive schedule; V5 = patterns, practice problems, tests; V6 = sessions + version columns; V7 = shared rate limits; V8 = code + analysis; V9 = recovery codes; V10 = ratings; V11 = attempt history; V12 = system design; V13 = quiz answers kept; V14 = weekly test reflection; V15 = GitHub
   best-approaches.json    best known approaches for each of the 150 problems (edit to add or improve one)
   interview-tips.json     interview talking points for each of the 150 problems
   sd-topics.json, sd-problems.json   system design quizzes, rubrics and reference designs
   static/        theme.js (day/night mode, loaded first so there's no flash), http.js (fetch + CSRF header), auth.html/js, index.html + app.js, system-design.html + sd.js, test.html/js, styles.css
-src/test/java/…  unit tests for the pure rules + ApiIntegrationTest, SystemDesignIntegrationTest, RateLimitIntegrationTest (real Postgres via Testcontainers)
+src/test/java/dev/dsatracker/…  the same folders: unit tests next to what they test, plus ApiIntegrationTest, SystemDesignIntegrationTest,
+                 RateLimitIntegrationTest and github/GitHubIntegrationTest (real Postgres via Testcontainers)
 Dockerfile (Render), Dockerfile.vercel + vercel.json (Vercel, kept in case its limits change), docker-compose.yml, .github/workflows/ci.yml, .env.example, DEPLOY.md
 ```
 
