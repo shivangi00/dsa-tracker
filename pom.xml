@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>dev.shivangi</groupId>
+    <groupId>dev.dsatracker</groupId>
     <artifactId>dsa-tracker</artifactId>
     <version>0.1.0</version>
     <name>dsa-tracker</name>
