@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -93,7 +94,11 @@ public class ProblemController {
 
     /** "Save as new version". {@code analyse}: also analyse it now (the page sends this after an Analyse). */
     public record VersionRequest(@Size(max = ProblemService.MAX_CODE_LENGTH) String code, CodeLanguage codeLanguage,
-                                 boolean analyse) {
+                                 boolean analyse, @Size(max = 100) String yourTime, @Size(max = 100) String yourSpace) {
+    }
+
+    /** Your own answer for a version's complexity; a blank time clears it. */
+    public record YourComplexityRequest(@Size(max = 100) String time, @Size(max = 100) String space) {
     }
 
     /**
@@ -137,7 +142,8 @@ public class ProblemController {
     @ResponseStatus(HttpStatus.CREATED)
     public ProblemView addVersion(@AuthenticationPrincipal AuthUser me, @PathVariable long id,
                                   @Valid @RequestBody VersionRequest req) {
-        ProblemService.Saved saved = problems.addVersion(me.id(), id, req.code(), req.codeLanguage());
+        ProblemService.Saved saved = problems.addVersion(me.id(), id, req.code(), req.codeLanguage(),
+                req.yourTime(), req.yourSpace());
         return view(me, req.analyse() ? analyseIfAny(me, saved) : saved.problem());
     }
 
@@ -145,6 +151,13 @@ public class ProblemController {
     @PostMapping("/versions/{id}/analysis")
     public ProblemView analyseVersion(@AuthenticationPrincipal AuthUser me, @PathVariable long id) {
         return view(me, analysis.analyse(me.id(), id));
+    }
+
+    /** "Your complexity": set or correct your own answer, on any day. */
+    @PutMapping("/versions/{id}/complexity")
+    public ProblemView setYourComplexity(@AuthenticationPrincipal AuthUser me, @PathVariable long id,
+                                         @Valid @RequestBody YourComplexityRequest req) {
+        return view(me, problems.setYourComplexity(me.id(), id, req.time(), req.space()));
     }
 
     @DeleteMapping("/versions/{id}")

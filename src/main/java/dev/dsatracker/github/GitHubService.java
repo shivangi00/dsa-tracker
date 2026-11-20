@@ -257,7 +257,8 @@ public class GitHubService {
                 for (SolutionVersion v : byAttempt.getOrDefault(a.getId(), List.of())) {
                     ComplexityAnalysis an = v.analysis();
                     vs.add(new RepoLayout.Version(v.getVersionNo(), v.getCodeLanguage() == null ? null : v.getCodeLanguage().name(),
-                            v.getCode(), an == null ? null : new RepoLayout.Analysis(an.time(), an.space(), an.reasons(), an.source())));
+                            v.getCode(), an == null ? null : new RepoLayout.Analysis(an.time(), an.space(), an.reasons(), an.source()),
+                            v.getYourTime(), v.getYourSpace()));
                 }
                 sittings.add(new RepoLayout.Sitting(a.getRevision(), a.getTryNo(), a.getAttemptedOn(),
                         label(a.getRating(), a.getRevision() == 0), a.getLearnings(), a.getExcalidrawUrl(), vs));

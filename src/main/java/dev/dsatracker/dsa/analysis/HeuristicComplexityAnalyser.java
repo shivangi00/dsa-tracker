@@ -73,6 +73,18 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
     private static final Pattern BOUNDS = Pattern.compile(
             "(?i)\\b(l|r|lo|hi|left|right|low|high|start|end|beg|begin)\\b\\s*(<=|<)\\s*\\b(l|r|lo|hi|left|right|low|high|start|end|beg|begin)\\b");
     /** "while lo < hi", "while (si <= ei)": two bounds compared. */
+    /** A loop that only ends by return/break: while True, while (true), while 1, for (;;). */
+    private static final Pattern FOREVER = Pattern.compile("^(while\\s*\\(?\\s*(True|true|1)\\s*\\)?\\s*:?|for\\s*\\(\\s*;\\s*;\\s*\\))\\s*\\{?\\s*$");
+    /** "a, b = b, a" (Python, JavaScript destructuring) */
+    private static final Pattern SWAP = Pattern.compile("\\[?\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\]?\\s*=\\s*\\[?\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\]?");
+    /** the first two parameters of a function header (skipping self, types and annotations) */
+    private static final Pattern PARAMS = Pattern.compile("\\(\\s*(?:self\\s*,\\s*)?(?:[\\w<>\\[\\]]+\\s+)?(\\w+)\\s*(?::[^,]*)?,\\s*(?:[\\w<>\\[\\]]+\\s+)?(\\w+)");
+    private static final Pattern CPP_SWAP = Pattern.compile("\\b(std::)?swap\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)");
+    /** len(a), a.length, a.size(), len(self.a) */
+    private static final Pattern LENGTH_EXPR = Pattern.compile("len\\s*\\(\\s*[\\w.]+\\s*\\)|[\\w.]+\\.(length|size\\(\\s*\\))");
+    private static final Pattern LENGTH_VAR = Pattern.compile("\\b(\\w+)\\s*=\\s*(len\\s*\\(\\s*[\\w.]+\\s*\\)|[\\w.]+\\.(length|size\\(\\s*\\)))");
+    /** if a < b / if (a.length > b.length) */
+    private static final Pattern IF_COMPARE = Pattern.compile("\\bif\\s*\\(?\\s*([\\w.]+(?:\\(\\s*[\\w.]*\\s*\\))?)\\s*[<>]=?\\s*([\\w.]+(?:\\(\\s*[\\w.]*\\s*\\))?)");
     private static final Pattern WHILE_BOUNDS = Pattern.compile("^while\\s*\\(?\\s*(\\w+)\\s*(<=|<)\\s*(\\w+)\\s*\\)?\\s*:?\\s*\\{?\\s*$");
     private static final Pattern ASSIGN = Pattern.compile("(?m)\\b(\\w+)\\s*=(?!=)\\s*([^;\\n]+)");
     /** Taking the middle: "/ 2", "// 2", ">> 1", ">>> 1". */
@@ -315,15 +327,34 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             Cx space = space(depth);
 
             List<String> out = explain(time, space);
+            String timeText = time.format(grid);
+            if (!grid && time.equals(Cx.LOG) && searchesShorter()) {
+                // The search runs over whichever array is shorter.
+                String old = timeText;
+                timeText = "O(log(min(m, n)))";
+                for (int i = 0; i < out.size(); i++) {
+                    if (out.get(i).startsWith("Time: total")) {
+                        out.set(i, out.get(i).replace(old, timeText));
+                    }
+                }
+                int at = 0;
+                while (at < out.size() && !out.get(at).startsWith("Time: total")) {
+                    at++;
+                }
+                out.add(Math.min(at, out.size()),
+                        "Time: the code swaps the arrays so it searches the shorter one: the search depends only on"
+                        + " the smaller length → O(log(min(m, n))).");
+            }
             out.add(grid
                     ? "m × n is the size of the grid (m rows, n columns)."
+                    : timeTextIsMin(time) ? "m and n are the lengths of the two arrays."
                     : (kIsLists
                             ? "n is the total number of nodes across all the lists; k is the number of lists."
                             : "n is the size of the input (for two inputs, the larger one)."
                             + (time.usesK() || space.usesK() ? " k is the size of each item, such as a word's length." : "")));
             out.add("An estimate from the code's structure: check it against your own reasoning.");
             String conf = confidence >= 3 ? "high" : confidence == 2 ? "medium" : "low";
-            return new ComplexityAnalysis(time.format(grid), space.format(grid), out, conf, ComplexityAnalysis.ESTIMATE);
+            return new ComplexityAnalysis(timeText, space.format(grid), out, conf, ComplexityAnalysis.ESTIMATE);
         }
 
         /** Cost of running {@code node}'s code once. */
@@ -526,6 +557,10 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
          * Divide and conquer over a list of linked lists: the base case returns one list by index
          * ({@code return lists[lo]}) and the combine step merges linked lists (walks {@code .next}).
          */
+        boolean timeTextIsMin(Cx time) {
+            return time.equals(Cx.LOG) && searchesShorter();
+        }
+
         /** Set when k means the number of lists (Merge K Sorted Lists), for the closing explanation. */
         boolean kIsLists;
 
@@ -660,7 +695,7 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
         boolean isBinarySearch(Node loop) {
             Matcher cmp = WHILE_BOUNDS.matcher(loop.header.strip());
             if (!cmp.find()) {
-                return false;
+                return FOREVER.matcher(loop.header.strip()).find() && searchesForever(loop);
             }
             String a = cmp.group(1);
             String b = cmp.group(3);
@@ -681,6 +716,94 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
                 }
             }
             return false;
+        }
+
+        /**
+         * A binary search written as {@code while True:} / {@code while (true)} that returns from inside
+         * (Median of Two Sorted Arrays): it takes the middle of two variables ({@code i = (l + r) // 2})
+         * and moves one of them past it ({@code r = i - 1}, {@code l = i + 1}).
+         */
+        boolean searchesForever(Node loop) {
+            String body = loop.body;
+            if (!Pattern.compile("\\b(return|break)\\b").matcher(body).find()) {
+                return false;
+            }
+            Matcher assign = ASSIGN.matcher(body);
+            while (assign.find()) {
+                String mid = assign.group(1);
+                String rhs = assign.group(2);
+                if (!HALF.matcher(rhs).find()) {
+                    continue;
+                }
+                Set<String> bounds = new HashSet<>(identifiers(rhs));
+                bounds.remove(mid);
+                if (bounds.size() < 2) {
+                    continue;
+                }
+                for (String bound : bounds) {
+                    if (Pattern.compile("\\b" + Pattern.quote(bound) + "\\s*=\\s*" + Pattern.quote(mid) + "\\b")
+                            .matcher(body).find()) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Puts the shorter of two arrays first before searching it
+         * ({@code if len(b) < len(a): a, b = b, a}), so the search is O(log(min(m, n))).
+         */
+        boolean searchesShorter() {
+            for (Node f : functions.values()) {
+                String code = f.body;
+                // names holding a length: n1 = len(nums1), int m = a.length, …
+                Set<String> lengths = new HashSet<>();
+                Matcher lv = LENGTH_VAR.matcher(code);
+                while (lv.find()) {
+                    lengths.add(lv.group(1));
+                }
+                boolean compares = false;
+                Matcher c = IF_COMPARE.matcher(code);
+                while (c.find()) {
+                    if (isLength(c.group(1), lengths) && isLength(c.group(2), lengths)) {
+                        compares = true;
+                    }
+                }
+                if (!compares) {
+                    continue;
+                }
+                Matcher swap = SWAP.matcher(code);
+                while (swap.find()) {
+                    if (swap.group(1).equals(swap.group(4)) && swap.group(2).equals(swap.group(3))) {
+                        return true;
+                    }
+                }
+                if (CPP_SWAP.matcher(code).find()) {
+                    return true;
+                }
+                // findMedianSortedArrays(nums2, nums1): calls itself with the arrays the other way round
+                Pattern back = swappedSelfCall(f);
+                if (back != null && back.matcher(code).find()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** f(b, a) inside f(a, b, …): a call that only swaps the first two arguments; null if f has fewer than two. */
+        static Pattern swappedSelfCall(Node f) {
+            Matcher params = PARAMS.matcher(f.header);
+            if (!params.find()) {
+                return null;
+            }
+            return Pattern.compile("\\b" + Pattern.quote(f.name) + "\\s*\\(\\s*" + Pattern.quote(params.group(2))
+                    + "\\s*,\\s*" + Pattern.quote(params.group(1)) + "\\s*\\)");
+        }
+
+        private static boolean isLength(String side, Set<String> lengths) {
+            String t = side.strip();
+            return lengths.contains(t) || LENGTH_EXPR.matcher(t).matches();
         }
 
         /**
@@ -760,6 +883,11 @@ public final class HeuristicComplexityAnalyser implements ComplexityAnalyser {
             inProgress.add(f);
             Pattern call = Pattern.compile("\\b" + Pattern.quote(f.name) + "\\s*\\(");
             int selfCalls = count(call, f.body);
+            Pattern swapCall = swappedSelfCall(f);
+            if (selfCalls > 0 && swapCall != null && count(swapCall, f.body) == selfCalls) {
+                // if (a.length > b.length) return f(b, a): it calls itself once to swap the inputs, not to recurse
+                selfCalls = 0;
+            }
             boolean callInLoop = f.descendants().stream()
                     .anyMatch(d -> d.kind == Kind.LOOP && call.matcher(d.body + " " + d.header).find());
             List<String> args = callArgs(call, f.body);

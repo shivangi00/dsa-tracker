@@ -768,6 +768,88 @@ class HeuristicComplexityAnalyserTest {
      * midNode() (slow/fast pointers), not passed as "mid", and getTail(arr[i]) walks each list once.
      */
     @Test
+    void medianOfTwoSortedArraysWithWhileTrue() {
+        expect("O(log(min(m, n)))", "O(1)", """
+                class Solution:
+                    def findMedianSortedArrays(self, nums1: list[int], nums2: list[int]) -> float:
+                        n1 = len(nums1)
+                        n2 = len(nums2)
+
+                        if n2 < n1:
+                            nums1, nums2 = nums2, nums1
+
+                        l, r = 0, len(nums1) - 1
+                        total = n1 + n2
+                        half = total // 2
+
+                        while True:
+                            i = (l + r) // 2 # nums1
+                            j = half - i - 2 # nums2
+
+                            left1 = nums1[i] if i >= 0 else float('-inf')
+                            right1 = nums1[i + 1] if (i + 1) < len(nums1) else float('inf')
+                            left2 = nums2[j] if j >= 0 else float('-inf')
+                            right2 = nums2[j + 1] if (j + 1) < len(nums2) else float('inf')
+
+                            # check if partition is valid
+                            if left1 <= right2 and left2 <= right1:
+                                #odd
+                                if total % 2:
+                                    return min(right1, right2)
+                                return (max(left1, left2) + min(right1, right2)) / 2
+                            elif left1 > right2:
+                                r = i - 1
+                            else:
+                                l = i + 1
+                """, PYTHON);
+    }
+
+    @Test
+    void medianOfTwoSortedArraysInJava() {
+        expect("O(log(min(m, n)))", "O(1)", """
+                class Solution {
+                    public double findMedianSortedArrays(int[] a, int[] b) {
+                        if (a.length > b.length) return findMedianSortedArrays(b, a);
+                        int total = a.length + b.length, half = (total + 1) / 2;
+                        int lo = 0, hi = a.length;
+                        while (lo <= hi) {
+                            int i = (lo + hi) / 2, j = half - i;
+                            int l1 = i == 0 ? Integer.MIN_VALUE : a[i - 1];
+                            int r1 = i == a.length ? Integer.MAX_VALUE : a[i];
+                            int l2 = j == 0 ? Integer.MIN_VALUE : b[j - 1];
+                            int r2 = j == b.length ? Integer.MAX_VALUE : b[j];
+                            if (l1 <= r2 && l2 <= r1) {
+                                if (total % 2 == 1) return Math.max(l1, l2);
+                                return (Math.max(l1, l2) + Math.min(r1, r2)) / 2.0;
+                            } else if (l1 > r2) hi = i - 1;
+                            else lo = i + 1;
+                        }
+                        return 0;
+                    }
+                }
+                """, JAVA);
+    }
+
+    @Test
+    void binarySearchWrittenAsWhileTrue() {
+        expect("O(log n)", "O(1)", """
+                class Solution:
+                    def search(self, nums: list[int], target: int) -> int:
+                        lo, hi = 0, len(nums) - 1
+                        while True:
+                            if lo > hi:
+                                return -1
+                            mid = (lo + hi) // 2
+                            if nums[mid] == target:
+                                return mid
+                            if nums[mid] < target:
+                                lo = mid + 1
+                            else:
+                                hi = mid - 1
+                """, PYTHON);
+    }
+
+    @Test
     void mergeKListsInPairsIsNLogK() {
         ComplexityAnalysis a = expect("O(n log k)", "O(log k)", """
                 # Definition for singly-linked list.

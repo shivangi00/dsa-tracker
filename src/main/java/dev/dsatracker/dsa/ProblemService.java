@@ -169,6 +169,18 @@ public class ProblemService {
     /** "Save as new version": keeps your code as another version of this attempt, on its day only. */
     @Transactional
     public Saved addVersion(Long userId, long attemptId, String code, CodeLanguage language) {
+        return addVersion(userId, attemptId, code, language, null, null);
+    }
+
+    /** The same, with your own answer for its complexity (either may be blank). */
+    @Transactional
+    public Saved addVersion(Long userId, long attemptId, String code, CodeLanguage language,
+                            String yourTime, String yourSpace) {
+        String time = YourComplexity.tidy(yourTime, "time");
+        String space = YourComplexity.tidy(yourSpace, "space");
+        if (time == null && space != null) {
+            throw new BadRequestException("Add your time complexity too");
+        }
         Attempt attempt = ownedAttempt(userId, attemptId);
         requireEditable(attempt);
         String solution = checkCode(code, language);
@@ -182,8 +194,27 @@ public class ProblemService {
                     + " versions per attempt. Delete one to save another.");
         }
         int next = versions.maxVersionNo(attemptId) + 1;
-        SolutionVersion saved = versions.save(new SolutionVersion(attemptId, next, solution, language));
+        SolutionVersion created = new SolutionVersion(attemptId, next, solution, language);
+        created.setYourComplexity(time, space, clock.instant());
+        SolutionVersion saved = versions.save(created);
         return new Saved(problem, saved.getId());
+    }
+
+    /**
+     * Your own answer for a version's time and space complexity. Unlike the code, it can be set or
+     * corrected on any day. A blank time clears it.
+     */
+    @Transactional
+    public Problem setYourComplexity(Long userId, long versionId, String yourTime, String yourSpace) {
+        SolutionVersion version = ownedVersion(userId, versionId);
+        String time = YourComplexity.tidy(yourTime, "time");
+        String space = YourComplexity.tidy(yourSpace, "space");
+        if (time == null && space != null) {
+            throw new BadRequestException("Add your time complexity too");
+        }
+        version.setYourComplexity(time, space, clock.instant());
+        Attempt attempt = attempts.findById(version.getAttemptId()).orElseThrow();
+        return problems.findById(attempt.getProblemId()).orElseThrow();
     }
 
     /** Deletes a saved version, on its attempt's day only. */

@@ -15,6 +15,10 @@ public record AnalysisView(String time, String space, List<String> reasons, Stri
                            Recommendation recommendation, List<String> interviewTips) {
 
 
+    public AnalysisView withoutRecommendation() {
+        return new AnalysisView(time, space, reasons, confidence, source, null, interviewTips);
+    }
+
     /** Null when there's no analysis. */
     public static AnalysisView of(ComplexityAnalysis a, Integer catalogId, ApproachRecommender approaches) {
         if (a == null) {

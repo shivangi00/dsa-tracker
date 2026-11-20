@@ -1,6 +1,7 @@
 package dev.dsatracker.dsa;
 
 import dev.dsatracker.dsa.analysis.CodeLanguage;
+import dev.dsatracker.dsa.analysis.Recommendation;
 import dev.dsatracker.shared.repetition.Rating;
 
 import java.time.LocalDate;
@@ -15,10 +16,19 @@ public record AttemptView(long id, int revision, int tryNo, LocalDate attemptedO
                           String excalidrawUrl, boolean editable, List<AttemptView.Version> versions) {
 
     /**
-     * A saved version of your code, with its analysis if it has one. {@code improved}: its time
-     * complexity beats every version you saved before it, in this attempt or earlier ones.
+     * A saved version of your code.
+     *
+     * @param analysis        the built-in estimate (its recommendation is left out: see {@code recommendation})
+     * @param yours           your own answer, or null
+     * @param recommendation  how your answer (or, without one, the estimate) compares with the best known approaches
+     * @param estimateDiffers a sentence when the estimate clearly disagrees with your answer, else null
+     * @param improved        its time (yours, else the estimate's) beats every version you saved before it
      */
     public record Version(long id, int versionNo, String code, CodeLanguage codeLanguage, AnalysisView analysis,
-                          boolean improved) {
+                          Complexity yours, Recommendation recommendation, String estimateDiffers, boolean improved) {
+    }
+
+    /** A time and space pair, e.g. "O(n log k)" and "O(log k)"; space may be empty. */
+    public record Complexity(String time, String space) {
     }
 }

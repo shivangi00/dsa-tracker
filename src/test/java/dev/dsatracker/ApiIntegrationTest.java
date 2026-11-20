@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -384,7 +385,7 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.attempts[0].editable").value(true))
                 .andExpect(jsonPath("$.attempts[0].versions[0].versionNo").value(1))
                 .andExpect(jsonPath("$.attempts[0].versions[0].analysis.time").value("O(n²)"))
-                .andExpect(jsonPath("$.attempts[0].versions[0].analysis.recommendation.verdict").value("faster")));
+                .andExpect(jsonPath("$.attempts[0].versions[0].recommendation.verdict").value("faster")));
         long attempt = idAt(done, "$.attempts[0].id");
 
         // Optimised: "Save as new version" keeps version 1 as it was
@@ -402,10 +403,31 @@ class ApiIntegrationTest {
         mvc.perform(post("/api/versions/" + v2 + "/analysis").with(csrf()).cookie(hana))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.attempts[0].versions[1].analysis.time").value("O(n)"))
-                .andExpect(jsonPath("$.attempts[0].versions[1].analysis.recommendation.verdict").value("optimal"))
+                .andExpect(jsonPath("$.attempts[0].versions[1].recommendation.verdict").value("optimal"))
                 .andExpect(jsonPath("$.attempts[0].versions[0].improved").value(false))
                 .andExpect(jsonPath("$.attempts[0].versions[1].improved").value(true));   // O(n) beats O(n²)
         mvc.perform(get("/api/dashboard").cookie(hana)).andExpect(jsonPath("$.counts.improved").value(1));
+
+        // Your own complexity: tidied into O(…), and it decides the verdict instead of the estimate
+        long v1 = idAt(after, "$.catalog[2].progress.attempts[0].versions[0].id");
+        mvc.perform(put("/api/versions/" + v1 + "/complexity").with(csrf()).cookie(hana).contentType(APPLICATION_JSON)
+                        .content("{\"time\":\"fast\",\"space\":\"\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/versions/" + v1 + "/complexity").with(csrf()).cookie(hana).contentType(APPLICATION_JSON)
+                        .content("{\"time\":\"n\",\"space\":\"o(n)\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attempts[0].versions[0].yours.time").value("O(n)"))
+                .andExpect(jsonPath("$.attempts[0].versions[0].yours.space").value("O(n)"))
+                .andExpect(jsonPath("$.attempts[0].versions[0].analysis.time").value("O(n²)"))
+                .andExpect(jsonPath("$.attempts[0].versions[0].recommendation.verdict").value("optimal"))
+                .andExpect(jsonPath("$.attempts[0].versions[0].estimateDiffers").exists())
+                .andExpect(jsonPath("$.attempts[0].versions[1].improved").value(false));   // O(n) no longer beats your O(n)
+        // A blank time clears it, so the estimate decides again
+        mvc.perform(put("/api/versions/" + v1 + "/complexity").with(csrf()).cookie(hana).contentType(APPLICATION_JSON)
+                        .content("{\"time\":\"\",\"space\":\"\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attempts[0].versions[0].yours").doesNotExist())
+                .andExpect(jsonPath("$.attempts[0].versions[0].recommendation.verdict").value("faster"));
 
         // Notes can be edited on the day
         mvc.perform(patch("/api/attempts/" + attempt).with(csrf()).cookie(hana).contentType(APPLICATION_JSON)

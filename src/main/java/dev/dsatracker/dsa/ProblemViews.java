@@ -69,9 +69,12 @@ public class ProblemViews {
                             versionsByAttempt.getOrDefault(a.getId(), List.of()).stream()
                                     .map(v -> {
                                         ComplexityAnalysis analysis = v.analysis();
+                                        ComplexityAnalysis yours = v.yours();
+                                        // Your answer decides; the estimate stands in until you give one.
+                                        ComplexityAnalysis decides = yours != null ? yours : analysis;
                                         boolean improved = false;
-                                        if (analysis != null) {
-                                            var time = ComplexityExpression.evaluate(analysis.time()).orElse(null);
+                                        if (decides != null) {
+                                            var time = ComplexityExpression.evaluate(decides.time()).orElse(null);
                                             if (time != null) {
                                                 improved = best[0] != null && ApproachRecommender.improved(time, best[0]);
                                                 if (best[0] == null || time.log() < best[0].log()) {
@@ -79,8 +82,12 @@ public class ProblemViews {
                                                 }
                                             }
                                         }
+                                        AnalysisView estimate = AnalysisView.of(analysis, p.getCatalogId(), approaches);
                                         return new AttemptView.Version(v.getId(), v.getVersionNo(), v.getCode(),
-                                                v.getCodeLanguage(), AnalysisView.of(analysis, p.getCatalogId(), approaches),
+                                                v.getCodeLanguage(), estimate == null ? null : estimate.withoutRecommendation(),
+                                                yours == null ? null : new AttemptView.Complexity(yours.time(), yours.space()),
+                                                decides == null ? null : approaches.recommend(p.getCatalogId(), decides).orElse(null),
+                                                YourComplexity.estimateDiffers(yours, analysis),
                                                 improved);
                                     })
                                     .toList()))

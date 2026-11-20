@@ -61,6 +61,16 @@ public class SolutionVersion {
     @Column(name = "analysed_at")
     private Instant analysedAt;
 
+    /** Your own answer ("Your complexity"); null until you give one. */
+    @Column(name = "your_time")
+    private String yourTime;
+
+    @Column(name = "your_space")
+    private String yourSpace;
+
+    @Column(name = "your_set_at")
+    private Instant yourSetAt;
+
     @Column(name = "created_at", nullable = false, insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -93,6 +103,24 @@ public class SolutionVersion {
                 ? List.of() : Arrays.asList(analysisReasons.split("\n"));
         return new ComplexityAnalysis(timeComplexity, spaceComplexity, reasons, analysisConfidence, analysisSource);
     }
+
+    /** Sets (or, with a null time, clears) your own answer. Allowed on any day: it's not the code. */
+    public void setYourComplexity(String time, String space, Instant at) {
+        this.yourTime = time;
+        this.yourSpace = time == null ? null : space;
+        this.yourSetAt = time == null ? null : at;
+    }
+
+    /** Your answer as an analysis (no steps), or null if you haven't given one. */
+    public ComplexityAnalysis yours() {
+        if (yourTime == null) {
+            return null;
+        }
+        return new ComplexityAnalysis(yourTime, yourSpace == null ? "" : yourSpace, List.of(), "high", ComplexityAnalysis.YOURS);
+    }
+
+    public String getYourTime() { return yourTime; }
+    public String getYourSpace() { return yourSpace; }
 
     public Long getId() { return id; }
     public Long getAttemptId() { return attemptId; }

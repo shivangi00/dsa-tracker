@@ -93,4 +93,18 @@ class RepoLayoutTest {
     void theCommitMessageSaysWhatHappened() {
         assertEquals("Two Sum: revision 1 (try 2) (Good) · O(n) time", RepoLayout.commitMessage(twoSum()));
     }
+
+    @Test
+    void yourAnswerComesFirstAndLeadsTheReadme() {
+        LocalDate d = LocalDate.of(2026, 10, 1);
+        var p = new RepoLayout.Problem(23, "Linked List", 6, "Merge K Sorted Lists", "HARD", null, false, List.of(
+                new RepoLayout.Sitting(0, 1, d, "Good", null, null, List.of(
+                        new RepoLayout.Version(1, "PYTHON", "class Solution:\n    pass\n", LINEAR, "O(n log k)", "O(log k)")))));
+        Map<String, String> files = RepoLayout.problemFiles(p);
+        String notes = files.get("06 Linked List/023 Merge K Sorted Lists/Solved/notes.md");
+        assertTrue(notes.contains("**My answer:** time `O(n log k)` · space `O(log k)`"), notes);
+        assertTrue(notes.contains("**Built-in estimate:** **Time:** `O(n)`"), notes);
+        String readme = files.get("06 Linked List/023 Merge K Sorted Lists/README.md");
+        assertTrue(readme.contains("| `O(n log k)` | `O(log k)` |"), readme);
+    }
 }

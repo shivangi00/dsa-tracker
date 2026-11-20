@@ -31,7 +31,24 @@ public final class RepoLayout {
     public record Analysis(String time, String space, List<String> steps, String source) {
     }
 
-    public record Version(int number, String language, String code, Analysis analysis) {
+    /** {@code yourTime}/{@code yourSpace}: your own answer, when you gave one; it beats the estimate. */
+    public record Version(int number, String language, String code, Analysis analysis, String yourTime, String yourSpace) {
+
+        public Version(int number, String language, String code, Analysis analysis) {
+            this(number, language, code, analysis, null, null);
+        }
+
+        boolean hasComplexity() {
+            return yourTime != null || analysis != null;
+        }
+
+        String time() {
+            return yourTime != null ? yourTime : analysis.time();
+        }
+
+        String space() {
+            return yourTime != null ? (yourSpace == null || yourSpace.isBlank() ? "–" : yourSpace) : analysis.space();
+        }
     }
 
     /** One sitting: the solve (revision 0) or a revision; {@code rating} is the label you chose. */
@@ -127,8 +144,8 @@ public final class RepoLayout {
             Version best = latestAnalysed(s);
             md.append("| [").append(sittingFolder(s)).append("](").append(link(sittingFolder(s))).append("/notes.md) | ")
                     .append(s.on()).append(" | ").append(nz(s.rating())).append(" | ")
-                    .append(best == null ? "–" : code(best.analysis().time())).append(" | ")
-                    .append(best == null ? "–" : code(best.analysis().space())).append(" | ")
+                    .append(best == null ? "–" : code(best.time())).append(" | ")
+                    .append(best == null ? "–" : code(best.space())).append(" | ")
                     .append(s.versions().isEmpty() ? "–" : s.versions().size() + (s.versions().size() == 1 ? " version" : " versions"))
                     .append(" | ").append(s.drawingUrl() == null || s.drawingUrl().isBlank() ? "–" : "[Excalidraw](" + s.drawingUrl().strip() + ")")
                     .append(" |\n");
@@ -151,11 +168,18 @@ public final class RepoLayout {
         for (Version v : s.versions()) {
             String file = "v" + v.number() + "." + extension(v.language());
             md.append("\n## Version ").append(v.number()).append(" · [").append(file).append("](").append(file).append(")\n\n");
+            if (v.yourTime() != null) {
+                md.append("**My answer:** time ").append(code(v.yourTime()));
+                if (v.yourSpace() != null && !v.yourSpace().isBlank()) {
+                    md.append(" · space ").append(code(v.yourSpace()));
+                }
+                md.append("\n\n");
+            }
             if (v.analysis() == null) {
-                md.append("_Not analysed._\n");
+                md.append(v.yourTime() != null ? "" : "_Not analysed._\n");
                 continue;
             }
-            md.append("**Time:** ").append(code(v.analysis().time())).append(" · **Space:** ").append(code(v.analysis().space()));
+            md.append(v.yourTime() != null ? "**Built-in estimate:** " : "").append("**Time:** ").append(code(v.analysis().time())).append(" · **Space:** ").append(code(v.analysis().space()));
             if ("claude".equals(v.analysis().source())) {
                 md.append(" · analysed by Claude");
             }
@@ -199,7 +223,7 @@ public final class RepoLayout {
             md.append("| [").append(p.name()).append("](").append(link(problemFolder(p))).append(") | ")
                     .append(p.difficulty() == null ? "–" : cap(p.difficulty())).append(" | ")
                     .append(last == null ? "–" : sittingFolder(last)).append(" | ")
-                    .append(v == null ? "–" : code(v.analysis().time()) + " time, " + code(v.analysis().space()) + " space")
+                    .append(v == null ? "–" : code(v.time()) + " time, " + code(v.space()) + " space")
                     .append(" |\n");
         }
         return md.toString();
@@ -225,7 +249,7 @@ public final class RepoLayout {
     private static Version latestAnalysed(Sitting s) {
         Version best = null;
         for (Version v : s.versions()) {
-            if (v.analysis() != null) {
+            if (v.hasComplexity()) {
                 best = v;
             }
         }

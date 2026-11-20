@@ -100,8 +100,11 @@ public class ApproachRecommender {
         // 3. Nothing better among the usual approaches
         Rated best = usual.isEmpty() ? known.stream().min(fastest).get() : usual.stream().min(fastest).get();
         if (better(time.get(), best.time)) {
-            String msg = "The analysis (" + analysis.time() + ") is faster than the best known approach ("
-                    + best.approach.time() + "), so the analysis may have missed something. Worth a second look.";
+            String msg = ComplexityAnalysis.YOURS.equals(analysis.source())
+                    ? "Your answer (" + analysis.time() + ") is faster than the best known approach ("
+                            + best.approach.time() + "), so it's worth checking it again."
+                    : "The analysis (" + analysis.time() + ") is faster than the best known approach ("
+                            + best.approach.time() + "), so the analysis may have missed something. Worth a second look.";
             return Optional.of(new Recommendation(Recommendation.CHECK, msg, best.approach, null));
         }
         String msg = "Your " + analysis.time() + " time is the best known for this problem.";

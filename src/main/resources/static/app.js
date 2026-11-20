@@ -885,11 +885,14 @@ function history(p, collapsed, only = null) {
   return wrap;
 }
 
+/** A version's complexity: your answer if you gave one, else the built-in estimate. */
+const cxOf = (v) => v.yours || v.analysis || null;
+
 function historyBody(p) {
   const body = el('div', 'history-body');
   const trail = el('p', 'trail');
   p.attempts.forEach((a, i) => {
-    const best = a.versions.filter((v) => v.analysis).map((v) => v.analysis.time);
+    const best = a.versions.map(cxOf).filter(Boolean).map((c) => c.time);
     if (i) trail.append(el('span', 'trail-sep', '→'));
     trail.append(el('span', 'trail-step', `${attemptTitle(a, true)}${best.length ? ` ${best[best.length - 1]}` : ''}`));
   });
@@ -942,7 +945,8 @@ function readNotes(p, focus) {
     const body = [notesBlock(a.learnings)];
     if (a.excalidrawUrl) body.push(linkLine(a.excalidrawUrl, 'Open drawing in Excalidraw'));
     for (const v of a.versions) {
-      const cx = v.analysis ? ` · ${v.analysis.time} time · ${v.analysis.space} space` : '';
+      const c = cxOf(v);
+      const cx = c ? ` · ${c.time} time${c.space ? ` · ${c.space} space` : ''}${v.yours ? '' : ' (estimate)'}` : '';
       body.push(codeBlock(v.code, `Version ${v.versionNo} · ${LANGUAGES[v.codeLanguage] || ''}${cx}`));
     }
     const rating = a.rating ? (a.revision === 0 ? SOLVE_LABEL : REVIEW_LABEL)[a.rating] : '';
@@ -1001,19 +1005,47 @@ function notesEditor(a) {
  * One saved version: collapsed, with its code and analysis inside. Saved versions never change,
  * so the only action (on the attempt's day) is Delete.
  */
+// Versions you have open, so saving your complexity (which reloads the page) keeps them open.
+const openVersions = new Set();
+
 function versionBlock(p, a, v) {
   const box = el('details', 'version');
+  box.open = openVersions.has(v.id);
+  box.addEventListener('toggle', () => { if (box.open) openVersions.add(v.id); else openVersions.delete(v.id); });
   const summary = el('summary');
   summary.append(el('span', 'v-name', `Version ${v.versionNo}`), el('span', 'v-lang', LANGUAGES[v.codeLanguage] || ''));
-  summary.append(v.analysis
-    ? el('span', 'v-cx', `${v.analysis.time} time · ${v.analysis.space} space`)
-    : el('span', 'v-cx muted', 'not analysed'));
+  if (v.yours) {
+    summary.append(el('span', 'v-cx', `${v.yours.time} time${v.yours.space ? ` · ${v.yours.space} space` : ''}`));
+  } else if (v.analysis) {
+    const cx = el('span', 'v-cx', `${v.analysis.time} time · ${v.analysis.space} space`);
+    cx.append(el('span', 'v-est', 'estimate'));
+    summary.append(cx);
+  } else {
+    summary.append(el('span', 'v-cx muted', 'no complexity yet'));
+  }
   if (v.improved) summary.append(el('span', 'improved-tag', 'Improved'));
   box.append(summary);
   const pre = el('pre', 'code-view');
   pre.append(el('code', '', v.code));
   box.append(pre);
-  if (v.analysis) box.append(analysisBox(v.analysis));
+  box.append(yourComplexityRow(p, v));
+  if (v.recommendation) box.append(recommendationBox(v.recommendation, v.yours ? 'high' : v.analysis && v.analysis.confidence));
+  if (v.analysis) {
+    if (v.yours) {
+      // Your answer leads; the estimate is a second opinion you can open.
+      const second = el('details', 'estimate');
+      const sum = el('summary', '', `Built-in estimate: ${v.analysis.time} time · ${v.analysis.space} space`);
+      if (v.estimateDiffers) sum.append(el('span', 'est-differs', 'differs'));
+      second.append(sum, analysisBox(v.analysis, 'Built-in estimate'));
+      second.open = openVersions.has(`est:${v.id}`);
+      second.addEventListener('toggle', () => {
+        if (second.open) openVersions.add(`est:${v.id}`); else openVersions.delete(`est:${v.id}`);
+      });
+      box.append(second);
+    } else {
+      box.append(analysisBox(v.analysis, 'Built-in estimate'));
+    }
+  }
   if (a.editable) {
     const error = errorLine();
     const del = el('button', 'btn ghost danger', 'Delete');
@@ -1031,6 +1063,82 @@ function versionBlock(p, a, v) {
     box.append(actions, error);
   }
   return box;
+}
+
+/** Two small boxes for your own time and space complexity. */
+function complexityInputs(time = '', space = '') {
+  const t = el('input', 'cx-input');
+  t.type = 'text'; t.value = time; t.placeholder = 'e.g. O(n log n)'; t.maxLength = 60;
+  t.setAttribute('aria-label', 'Your time complexity'); t.spellcheck = false; t.autocomplete = 'off';
+  const s = el('input', 'cx-input');
+  s.type = 'text'; s.value = space; s.placeholder = 'e.g. O(n)'; s.maxLength = 60;
+  s.setAttribute('aria-label', 'Your space complexity'); s.spellcheck = false; s.autocomplete = 'off';
+  const row = el('div', 'cx-row');
+  const tl = el('label', 'cx-field'); tl.append(el('span', '', 'Time'), t);
+  const sl = el('label', 'cx-field'); sl.append(el('span', '', 'Space'), s);
+  row.append(tl, sl);
+  return { row, time: t, space: s };
+}
+
+/**
+ * "Your complexity" on a saved version: what you think its time and space are. It saves by itself
+ * when you leave the boxes or press Enter (no button to miss), on any day, so you can also correct
+ * an answer later. It's what the tracker compares with the best approaches and uses for Improved.
+ */
+function yourComplexityRow(p, v) {
+  const wrap = el('section', 'yours');
+  const head = el('div', 'yours-head');
+  head.append(el('p', 'analysis-title', 'Your complexity'));
+  const status = el('span', 'save-status');
+  head.append(status);
+  const { row, time, space } = complexityInputs(v.yours ? v.yours.time : '', v.yours ? v.yours.space : '');
+  const error = errorLine();
+  const hint = el('p', 'hint', v.yours
+    ? 'Saves when you leave the boxes or press Enter. Change it any time.'
+    : 'Work it out yourself first, as you would out loud in an interview. Your answer is what gets compared with the best approaches.');
+  let saving = false;
+  const saved = () => [v.yours ? v.yours.time : '', v.yours ? v.yours.space : ''];
+  const changed = () => {
+    const [t0, s0] = saved();
+    return time.value.trim() !== t0 || space.value.trim() !== s0;
+  };
+  const save = async () => {
+    if (saving || !changed()) return;
+    if (!time.value.trim() && space.value.trim()) {
+      error.textContent = 'Add your time complexity too.'; error.hidden = false; return;
+    }
+    saving = true;
+    error.hidden = true;
+    status.textContent = 'Saving…';
+    status.classList.remove('unsaved');
+    try {
+      await api(`/api/versions/${v.id}/complexity`, {
+        method: 'PUT',
+        body: JSON.stringify({ time: time.value, space: space.value }),
+      });
+      openVersions.add(v.id);
+      toast(time.value.trim() ? 'Saved your complexity.' : 'Cleared your complexity.');
+      await load();
+      autoPush(p.id);
+    } catch (e) {
+      error.textContent = e.message; error.hidden = false;
+      status.textContent = 'Not saved'; status.classList.add('unsaved');
+      saving = false;
+    }
+  };
+  for (const input of [time, space]) {
+    input.addEventListener('input', () => {
+      status.textContent = changed() ? 'Unsaved: leave the box or press Enter' : '';
+      status.classList.toggle('unsaved', changed());
+    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+  }
+  // Save when focus leaves both boxes (moving from Time to Space doesn't count).
+  row.addEventListener('focusout', (e) => { if (!row.contains(e.relatedTarget)) save(); });
+  trackUnsaved(wrap, changed);
+  wrap.append(head, row, hint, error);
+  if (v.estimateDiffers) wrap.append(el('p', 'est-note', v.estimateDiffers));
+  return wrap;
 }
 
 /**
@@ -1061,6 +1169,10 @@ function versionEditor(p, a, notesEd) {
   clear.type = 'button';
   clear.title = 'Clear the code box (nothing saved is affected)';
   const status = el('span', 'save-status');
+  const yours = complexityInputs();
+  const yoursBox = el('div', 'yours yours-new');
+  yoursBox.append(el('p', 'analysis-title', 'Your complexity'), yours.row,
+    el('p', 'hint', 'Optional, saved with the code. You can add or change it later on the saved version.'));
 
   const codeText = () => code.value.trim();
   const codeIsNew = () => codeText() !== '' && !a.versions.some((v) => v.code.trim() === codeText() && v.codeLanguage === lang.value);
@@ -1108,7 +1220,8 @@ function versionEditor(p, a, notesEd) {
       if (saveCode && !full) {
         await api(`/api/attempts/${a.id}/versions`, {
           method: 'POST',
-          body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: true }),
+          body: JSON.stringify({ code: code.value, codeLanguage: lang.value, analyse: true,
+            yourTime: yours.time.value, yourSpace: yours.space.value }),
         });
         rememberLanguage(lang.value);
         drafts.delete(draftKey);
@@ -1129,7 +1242,7 @@ function versionEditor(p, a, notesEd) {
   const actions = el('div', 'notes-actions');
   actions.append(analyse, save, clear, status);
   if (full) actions.append(el('span', 'save-status', '5 versions saved (the most): Save still saves your notes.'));
-  box.append(head, code, el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.'), actions, error, slot);
+  box.append(head, code, el('p', 'hint', 'Tab indents. Press Esc, then Tab, to move on.'), yoursBox, actions, error, slot);
   showStatus();
   return box;
 }
@@ -1180,11 +1293,11 @@ function indentWithTab(e) {
  * The analysis of YOUR code (time, space and the working), then, separately, a nudge towards a
  * better approach if one exists, with the approach itself behind a hint so you can try first.
  */
-function analysisBox(a) {
+function analysisBox(a, title = 'Your code') {
   const wrap = el('div', 'analysis-wrap');
   const box = el('section', 'analysis');
-  box.setAttribute('aria-label', 'Complexity of your code');
-  box.append(el('p', 'analysis-title', 'Your code'));
+  box.setAttribute('aria-label', title === 'Your code' ? 'Complexity of your code' : title);
+  box.append(el('p', 'analysis-title', title));
   const head = el('div', 'analysis-head');
   const time = el('div', 'metric');
   time.append(el('span', 'metric-label', 'Time'), el('span', 'metric-value', a.time));
@@ -1193,7 +1306,7 @@ function analysisBox(a) {
   const meta = el('div', 'analysis-meta');
   meta.append(
     el('span', `confidence ${a.confidence}`, CONFIDENCE[a.confidence] || a.confidence),
-    el('span', 'source', a.source === 'claude' ? 'Analysed by Claude' : 'Built-in estimate'));
+    el('span', 'source', a.source === 'claude' ? 'Analysed by Claude' : title === 'Built-in estimate' ? 'Reads the code’s shape' : 'Built-in estimate'));
   head.append(time, space, meta);
   box.append(head);
   if (a.reasons && a.reasons.length) box.append(workingBox(a.reasons));
