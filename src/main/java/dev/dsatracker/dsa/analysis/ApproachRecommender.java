@@ -117,6 +117,21 @@ public class ApproachRecommender {
                 .orElse(null);
     }
 
+    /**
+     * For the "Improved" tag between your own versions: a smaller step than {@link #better} counts,
+     * so dropping a log factor (O(n log n) → O(n log k), about 2.3× at typical sizes) shows up,
+     * while O(n + m) against O(n) (2×) still doesn't.
+     */
+    static final double IMPROVED_MARGIN = Math.log(2.1);
+
+    /** True when your new version's time {@code a} is smaller than your best so far {@code b}. */
+    public static boolean improved(ComplexityExpression.Size a, ComplexityExpression.Size b) {
+        if (a.exponential() && b.exponential()) {
+            return false;
+        }
+        return b.log() - a.log() > IMPROVED_MARGIN;
+    }
+
     /** True when {@code a} is clearly smaller than {@code b}. */
     public static boolean better(ComplexityExpression.Size a, ComplexityExpression.Size b) {
         if (a.exponential() && b.exponential()) {

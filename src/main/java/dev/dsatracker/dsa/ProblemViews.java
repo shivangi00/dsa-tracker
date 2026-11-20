@@ -73,7 +73,7 @@ public class ProblemViews {
                                         if (analysis != null) {
                                             var time = ComplexityExpression.evaluate(analysis.time()).orElse(null);
                                             if (time != null) {
-                                                improved = best[0] != null && ApproachRecommender.better(time, best[0]);
+                                                improved = best[0] != null && ApproachRecommender.improved(time, best[0]);
                                                 if (best[0] == null || time.log() < best[0].log()) {
                                                     best[0] = time;
                                                 }

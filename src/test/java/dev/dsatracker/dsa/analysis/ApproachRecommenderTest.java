@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -134,5 +135,19 @@ class ApproachRecommenderTest {
         assertTrue(msg.contains("Two Sum") && msg.contains("a function named twoSum"), msg);
         assertTrue(r.wrongProblem(99, "anything", CodeLanguage.PYTHON).isEmpty());     // unknown problem: no check
         assertTrue(r.wrongProblem(null, "anything", CodeLanguage.PYTHON).isEmpty());
+    }
+
+    @Test
+    void droppingALogFactorCountsAsImproved() {
+        var nLogN = ComplexityExpression.evaluate("O(n log n)").orElseThrow();
+        var nLogK = ComplexityExpression.evaluate("O(n log k)").orElseThrow();
+        var n = ComplexityExpression.evaluate("O(n)").orElseThrow();
+        var nPlusM = ComplexityExpression.evaluate("O(n + m)").orElseThrow();
+        var nSquared = ComplexityExpression.evaluate("O(n²)").orElseThrow();
+        assertTrue(ApproachRecommender.improved(nLogK, nLogN), "n log k beats n log n");
+        assertTrue(ApproachRecommender.improved(nLogN, nSquared), "n log n beats n²");
+        assertFalse(ApproachRecommender.improved(n, nPlusM), "n against n + m is the same class");
+        assertFalse(ApproachRecommender.improved(nLogN, nLogN), "no change");
+        assertFalse(ApproachRecommender.improved(nLogN, nLogK), "slower isn't improved");
     }
 }
